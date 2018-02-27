@@ -7,14 +7,9 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
-import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.RateLimit;
-import com.binance.api.client.domain.market.CandlestickInterval;
-import com.binance.api.client.domain.market.OrderBook;
-import com.binance.api.client.domain.market.TickerPrice;
-import com.sun.org.apache.xerces.internal.xs.StringList;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -24,7 +19,11 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.prefs.Preferences;
 import javax.swing.DefaultListModel;
-import javax.swing.ListModel;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
 import javax.swing.text.DefaultCaret;
 
 /**
@@ -42,6 +41,30 @@ public class mainApplication extends javax.swing.JFrame {
     private HeroesController heroesController = new HeroesController(this);
     
     private boolean is_paused = false;
+    Preferences prefs = null;
+    
+    private void componentPrefLoad(JComponent cb, String name) {
+        if (cb instanceof JCheckBox) {
+            ((JCheckBox)cb).setSelected("true".equals(prefs.get(name, ((JCheckBox)cb).isSelected() ? "true" : "false")));
+        } else if (cb instanceof JTextField) {
+            ((JTextField)cb).setText(prefs.get(name, ((JTextField)cb).getText()));
+        } else if (cb instanceof JSpinner) {
+            ((JSpinner)cb).setValue(Integer.parseInt(prefs.get(name, ((Integer) ((JSpinner)cb).getValue()).toString())));
+        } else if (cb instanceof JComboBox) {
+            ((JComboBox<String>)cb).setSelectedIndex(Integer.parseInt(prefs.get(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString())));
+        }
+    }
+    private void componentPrefSave(JComponent cb, String name) {
+        if (cb instanceof JCheckBox) {
+            prefs.put(name, ((JCheckBox)cb).isSelected() ? "true" : "false");
+        } else if (cb instanceof JTextField) {
+            prefs.put(name, ((JTextField)cb).getText());
+        } else if (cb instanceof JSpinner) {
+            prefs.put(name, ((JSpinner)cb).getValue().toString());
+        } else if (cb instanceof JComboBox) {
+            prefs.put(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString());
+        }
+    }
     
     /**
      * Creates new form mainApplication
@@ -54,17 +77,25 @@ public class mainApplication extends javax.swing.JFrame {
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
         listHeroes.setModel(heroesController.getListHeroesModel());
         
-        Preferences prefs = Preferences.userNodeForPackage(this.getClass());
-        textFieldApiKey.setText(prefs.get("api_key", textFieldApiKey.getText()));
-        textFieldApiSecret.setText(prefs.get("api_secret", textFieldApiSecret.getText()));
-        textFieldTradePairs.setText(prefs.get("trade_pairs", textFieldTradePairs.getText()));
-        checkboxTestMode.setSelected("true".equals(prefs.get("test_mode", checkboxTestMode.isSelected() ? "true" : "false")));
+        prefs = Preferences.userNodeForPackage(this.getClass());
         setBounds(
             Integer.parseInt(prefs.get("window_pos_x", String.valueOf(Math.round(getBounds().getX())))),
             Integer.parseInt(prefs.get("window_pos_y", String.valueOf(Math.round(getBounds().getY())))),
             Integer.parseInt(prefs.get("window_size_x", String.valueOf(Math.round(getBounds().getWidth())))),
             Integer.parseInt(prefs.get("window_size_y", String.valueOf(Math.round(getBounds().getHeight()))))
         );
+        componentPrefLoad(textFieldApiKey, "api_key");
+        componentPrefLoad(textFieldApiSecret, "api_secret");
+        componentPrefLoad(textFieldTradePairs, "trade_pairs");
+        componentPrefLoad(checkboxTestMode, "test_mode");
+        componentPrefLoad(checkBoxLowHold, "low_hold");
+        componentPrefLoad(checkboxAutoFastorder, "auto_heroes");
+        componentPrefLoad(checkBoxLimitedOrders, "limited_orders");
+        componentPrefLoad(checkBoxCheckOtherStrategies, "strategies_add_check");
+        componentPrefLoad(spinnerUpdateDelay, "update_delay");
+        componentPrefLoad(spinnerBuyPercent, "buy_percent");
+        componentPrefLoad(comboBoxBarsInterval, "bars");
+        componentPrefLoad(ComboBoxMainStrategy, "main_strategy");
     }
 
     private int searchCurrencyFirstPair(String currencyPair, boolean is_hodling) {
@@ -151,6 +182,7 @@ public class mainApplication extends javax.swing.JFrame {
                         nproc.setBarInterval(comboBoxBarsInterval.getItemAt(interval_index));
                         nproc.setDelayTime((Integer) spinnerUpdateDelay.getValue());
                         nproc.setLowHold(checkBoxLowHold.isSelected());
+                        nproc.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
                         nproc.setStartDelay(pairs.size() * 1000 + 500);
                         nproc.start();
                         pairs.add(nproc);
@@ -162,6 +194,7 @@ public class mainApplication extends javax.swing.JFrame {
                         pairs.get(pair_index).setBarInterval(comboBoxBarsInterval.getItemAt(interval_index));
                         pairs.get(pair_index).setDelayTime((Integer) spinnerUpdateDelay.getValue());
                         pairs.get(pair_index).setLowHold(checkBoxLowHold.isSelected());
+                        pairs.get(pair_index).setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
                     }
                 }
             });
@@ -227,6 +260,7 @@ public class mainApplication extends javax.swing.JFrame {
         textFieldApiSecret = new javax.swing.JTextField();
         textFieldApiKey = new javax.swing.JTextField();
         jLabel9 = new javax.swing.JLabel();
+        checkBoxCheckOtherStrategies = new javax.swing.JCheckBox();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -403,11 +437,13 @@ public class mainApplication extends javax.swing.JFrame {
 
         jLabel9.setText("Api Secret / Api Key:");
 
+        checkBoxCheckOtherStrategies.setText("Check other strategies");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addComponent(buttonClear, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -443,6 +479,17 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(buttonShowPlot))
                             .addComponent(jLabel1)
+                            .addComponent(checkboxAutoFastorder)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(buttonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonStop, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonPause, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(checkboxTestMode)
+                                .addGap(36, 36, 36)
+                                .addComponent(checkBoxLimitedOrders))
                             .addGroup(layout.createSequentialGroup()
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                     .addComponent(comboBoxBarsInterval, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -460,20 +507,10 @@ public class mainApplication extends javax.swing.JFrame {
                                     .addGroup(layout.createSequentialGroup()
                                         .addComponent(spinnerBuyPercent, javax.swing.GroupLayout.PREFERRED_SIZE, 64, javax.swing.GroupLayout.PREFERRED_SIZE)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(ComboBoxMainStrategy, javax.swing.GroupLayout.PREFERRED_SIZE, 148, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(checkboxTestMode)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(checkBoxLimitedOrders)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(checkBoxLowHold))
-                            .addComponent(checkboxAutoFastorder)
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(buttonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonStop, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonPause, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                            .addComponent(checkBoxCheckOtherStrategies)
+                                            .addComponent(ComboBoxMainStrategy, javax.swing.GroupLayout.PREFERRED_SIZE, 148, javax.swing.GroupLayout.PREFERRED_SIZE)))))
+                            .addComponent(checkBoxLowHold))
                         .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -521,12 +558,14 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(spinnerUpdateDelay, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(checkBoxLimitedOrders)
                             .addComponent(checkboxTestMode)
-                            .addComponent(checkBoxLowHold))
+                            .addComponent(checkBoxCheckOtherStrategies)
+                            .addComponent(checkBoxLimitedOrders))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(checkBoxLowHold)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(checkboxAutoFastorder)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 20, Short.MAX_VALUE)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonRun)
                             .addComponent(buttonStop)
@@ -600,6 +639,7 @@ public class mainApplication extends javax.swing.JFrame {
             buttonShowPlot.setEnabled(true);
         } catch (Exception e) {
             log("Error: " + e.getMessage(), true, true);
+            e.printStackTrace();
             buttonRun.setEnabled(true);
         }
     }//GEN-LAST:event_buttonRunActionPerformed
@@ -761,15 +801,22 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkboxAutoFastorderStateChanged
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
-        Preferences prefs = Preferences.userNodeForPackage(this.getClass());
-        prefs.put("api_key", textFieldApiKey.getText());
-        prefs.put("api_secret", textFieldApiSecret.getText());
-        prefs.put("trade_pairs", textFieldTradePairs.getText());
-        prefs.put("test_mode", checkboxTestMode.isSelected() ? "true" : "false");
         prefs.put("window_pos_x", String.valueOf(Math.round(getBounds().getX())));
         prefs.put("window_pos_y", String.valueOf(Math.round(getBounds().getY())));
         prefs.put("window_size_x", String.valueOf(Math.round(getBounds().getWidth())));
         prefs.put("window_size_y", String.valueOf(Math.round(getBounds().getHeight())));
+        componentPrefSave(textFieldApiKey, "api_key");
+        componentPrefSave(textFieldApiSecret, "api_secret");
+        componentPrefSave(textFieldTradePairs, "trade_pairs");
+        componentPrefSave(checkboxTestMode, "test_mode");
+        componentPrefSave(checkBoxLowHold, "low_hold");
+        componentPrefSave(checkboxAutoFastorder, "auto_heroes");
+        componentPrefSave(checkBoxLimitedOrders, "limited_orders");
+        componentPrefSave(checkBoxCheckOtherStrategies, "strategies_add_check");
+        componentPrefSave(spinnerUpdateDelay, "update_delay");
+        componentPrefSave(spinnerBuyPercent, "buy_percent");
+        componentPrefSave(comboBoxBarsInterval, "bars");
+        componentPrefSave(ComboBoxMainStrategy, "main_strategy");
     }//GEN-LAST:event_formWindowClosing
 
     /**
@@ -819,6 +866,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonShowPlot;
     private javax.swing.JButton buttonStop;
     private javax.swing.JButton buttonUpdate;
+    private javax.swing.JCheckBox checkBoxCheckOtherStrategies;
     private javax.swing.JCheckBox checkBoxLimitedOrders;
     private javax.swing.JCheckBox checkBoxLowHold;
     private javax.swing.JCheckBox checkboxAutoFastorder;

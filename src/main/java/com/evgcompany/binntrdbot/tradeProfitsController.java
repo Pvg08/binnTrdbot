@@ -12,7 +12,6 @@ import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.NewOrderResponse;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
@@ -47,7 +46,7 @@ public class tradeProfitsController {
     private boolean isTestMode = false;
     private boolean isLimitedOrders = false;
 
-    private float tradeComission = 0.00015f;
+    private float tradeComissionPercent = 0.05f;
 
     private BinanceApiRestClient client = null;
     private Account account = null;
@@ -107,7 +106,7 @@ public class tradeProfitsController {
                 if (!isTestMode) {
                     NewOrderResponse newOrderResponse;
                     if (isLimitedOrders) {
-                        price = price / (1 + tradeComission);
+                        price = price / (1 + 0.01f * tradeComissionPercent);
                         newOrderResponse = client.newOrder(limitBuy(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
                         result = newOrderResponse.getOrderId();
                     } else {
@@ -185,7 +184,7 @@ public class tradeProfitsController {
                 }
                 NewOrderResponse newOrderResponse;
                 if (isLimitedOrders) {
-                    price = price * (1 + tradeComission);
+                    price = price * (1 + 0.01f * tradeComissionPercent);
                     newOrderResponse = client.newOrder(limitSell(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
                     result = newOrderResponse.getOrderId();
                 } else {
@@ -412,17 +411,17 @@ public class tradeProfitsController {
     }
 
     /**
-     * @return the tradeComission
+     * @return the tradeComissionPercent
      */
-    public float getTradeComission() {
-        return tradeComission;
+    public float getTradeComissionPercent() {
+        return tradeComissionPercent;
     }
 
     /**
-     * @param tradeComission the tradeComission to set
+     * @param tradeComissionPercent the tradeComissionPercent to set
      */
-    public void setTradeComission(float tradeComission) {
-        this.tradeComission = tradeComission;
+    public void setTradeComissionPercent(float tradeComissionPercent) {
+        this.tradeComissionPercent = tradeComissionPercent;
     }
 
     void removeCurrencyPair(String symbolPair) {

@@ -26,7 +26,7 @@
   <Layout>
     <DimensionLayout dim="0">
       <Group type="103" groupAlignment="0" attributes="0">
-          <Group type="102" alignment="0" attributes="0">
+          <Group type="102" alignment="1" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" max="-2" attributes="0">
                   <Component id="buttonClear" alignment="0" min="-2" pref="85" max="-2" attributes="0"/>
@@ -66,6 +66,19 @@
                               <Component id="buttonShowPlot" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="checkboxAutoFastorder" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Component id="buttonRun" min="-2" pref="85" max="-2" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="buttonStop" min="-2" pref="85" max="-2" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="buttonPause" min="-2" pref="85" max="-2" attributes="0"/>
+                          </Group>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Component id="checkboxTestMode" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace min="-2" pref="36" max="-2" attributes="0"/>
+                              <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
+                          </Group>
                           <Group type="102" alignment="0" attributes="0">
                               <Group type="103" groupAlignment="0" max="-2" attributes="0">
                                   <Component id="comboBoxBarsInterval" max="32767" attributes="0"/>
@@ -86,25 +99,14 @@
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="spinnerBuyPercent" min="-2" pref="64" max="-2" attributes="0"/>
                                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                      <Component id="ComboBoxMainStrategy" min="-2" pref="148" max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="0" attributes="0">
+                                          <Component id="checkBoxCheckOtherStrategies" min="-2" max="-2" attributes="0"/>
+                                          <Component id="ComboBoxMainStrategy" min="-2" pref="148" max="-2" attributes="0"/>
+                                      </Group>
                                   </Group>
                               </Group>
                           </Group>
-                          <Group type="102" alignment="0" attributes="0">
-                              <Component id="checkboxTestMode" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                              <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="checkBoxLowHold" min="-2" max="-2" attributes="0"/>
-                          </Group>
-                          <Component id="checkboxAutoFastorder" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Group type="102" alignment="0" attributes="0">
-                              <Component id="buttonRun" min="-2" pref="85" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonStop" min="-2" pref="85" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonPause" min="-2" pref="85" max="-2" attributes="0"/>
-                          </Group>
+                          <Component id="checkBoxLowHold" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                   </Group>
@@ -164,13 +166,15 @@
                       </Group>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="checkBoxLimitedOrders" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="checkboxTestMode" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="checkBoxLowHold" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="checkBoxCheckOtherStrategies" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="checkBoxLimitedOrders" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
+                      <Component id="checkBoxLowHold" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
                       <Component id="checkboxAutoFastorder" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="32767" attributes="0"/>
+                      <EmptySpace pref="20" max="32767" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="buttonRun" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="buttonStop" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -522,6 +526,11 @@
     <Component class="javax.swing.JLabel" name="jLabel9">
       <Properties>
         <Property name="text" type="java.lang.String" value="Api Secret / Api Key:"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JCheckBox" name="checkBoxCheckOtherStrategies">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Check other strategies"/>
       </Properties>
     </Component>
   </SubComponents>

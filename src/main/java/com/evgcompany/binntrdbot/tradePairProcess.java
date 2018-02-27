@@ -5,12 +5,9 @@
  */
 package com.evgcompany.binntrdbot;
 
-import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
-import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
-import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
@@ -19,20 +16,17 @@ import com.binance.api.client.domain.account.request.OrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
 import com.binance.api.client.domain.event.CandlestickEvent;
 import com.binance.api.client.domain.general.ExchangeInfo;
-import com.binance.api.client.domain.general.FilterType;
 import com.binance.api.client.domain.general.SymbolFilter;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.exception.BinanceApiException;
-import com.binance.api.client.impl.BinanceApiWebSocketClientImpl;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,6 +108,7 @@ public class tradePairProcess extends Thread {
     private boolean isTryingToBuyDip = false;
     private boolean sellUpAll = false;
     private boolean lowHold = true;
+    private boolean checkOtherStrategies = true;
     
     private List<Long> orderToCancelOnSellUp = new ArrayList<>();
     private long last_time = 0;
@@ -197,7 +192,7 @@ public class tradePairProcess extends Thread {
     }
     private void doExit(float curPrice, boolean skip_check) {
         float new_sold_price = sold_amount * curPrice;
-        float incomeWithoutComission = sold_amount * (curPrice * (1 - profitsChecker.getTradeComission()) - sold_price);
+        float incomeWithoutComission = sold_amount * (curPrice * (1 - 0.01f * profitsChecker.getTradeComissionPercent()) - sold_price);
         float incomeWithoutComissionPercent = 100 *  incomeWithoutComission / (sold_price * sold_amount);
         if (skip_check || !lowHold || incomeWithoutComissionPercent > tradeMinProfitPercent) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
@@ -299,7 +294,7 @@ public class tradePairProcess extends Thread {
             }
         }
 
-        if (!isTryingToBuyDip && !buyOnStart) {
+        if (!isTryingToBuyDip && !buyOnStart && checkOtherStrategies) {
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
                 if (entry.getKey() != mainStrategy) {
                     if (is_hodling) {
@@ -738,26 +733,17 @@ public class tradePairProcess extends Thread {
         /**
          * Analysis criteria
          */
-        // Total profit
         app.log("");
         app.log("Current strategy ("+mainStrategy+") criterias:");
         TotalProfitCriterion totalProfit = new TotalProfitCriterion();
         app.log("Total profit: " + totalProfit.calculate(series, tradingRecord));
-        // Average profit (per tick)
         app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecord));
-        // Number of trades
         app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecord));
-        // Profitable trades ratio
         app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
-        // Maximum drawdown
         app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecord));
-        // Reward-risk ratio
         app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecord));
-        // Total transaction cost
-        app.log("Total transaction cost (from $1000): " + new LinearTransactionCostCriterion(1000, 0.003).calculate(series, tradingRecord));
-        // Buy-and-hold
+        app.log("Total transaction cost (from $1000): " + new LinearTransactionCostCriterion(1000, 0.01f * profitsChecker.getTradeComissionPercent()).calculate(series, tradingRecord));
         app.log("Buy-and-hold: " + new BuyAndHoldCriterion().calculate(series, tradingRecord));
-        // Total profit vs buy-and-hold
         app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
         app.log("");
     }
@@ -1317,5 +1303,9 @@ public class tradePairProcess extends Thread {
 
     void setStartDelay(int startDelayTime) {
         this.startDelayTime = startDelayTime;
+    }
+
+    void setCheckOtherStrategies(boolean checkOtherStrategies) {
+        this.checkOtherStrategies = checkOtherStrategies;
     }
 }
