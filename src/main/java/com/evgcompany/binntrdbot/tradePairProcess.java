@@ -72,6 +72,7 @@ import org.ta4j.core.indicators.helpers.MaxPriceIndicator;
 import org.ta4j.core.indicators.helpers.MinPriceIndicator;
 import org.ta4j.core.indicators.helpers.MultiplierIndicator;
 import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
+import org.ta4j.core.indicators.helpers.TypicalPriceIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuChikouSpanIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanAIndicator;
@@ -462,6 +463,81 @@ public class tradePairProcess extends Thread {
         return new BaseStrategy(entryRule, exitRule);
     }
     
+    
+    /**
+     * @param series a time series
+     * @return a Ichimoku strategy
+     */
+    private Strategy buildIchimokuStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
+        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
+        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
+        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
+        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
+        
+        // Entry rule
+        Rule entryRule = new CrossedDownIndicatorRule(kijunSen, tenkanSen);
+        
+        // Exit rule
+        Rule exitRule = new CrossedUpIndicatorRule(kijunSen, tenkanSen);
+        
+        return new BaseStrategy(entryRule, exitRule);
+    }
+    
+    /**
+     * @param series a time series
+     * @return a Ichimoku strategy
+     */
+    private Strategy buildIchimoku2Strategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
+        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
+        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
+        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
+        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
+        
+        // Entry rule
+        Rule entryRule = new CrossedDownIndicatorRule(closePrice, kijunSen);
+        
+        // Exit rule
+        Rule exitRule = new CrossedUpIndicatorRule(closePrice, kijunSen);
+        
+        return new BaseStrategy(entryRule, exitRule);
+    }
+    
+    /**
+     * @param series a time series
+     * @return a Ichimoku strategy
+     */
+    private Strategy buildIchimoku3Strategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
+        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
+        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
+        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
+        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
+        
+        // Entry rule
+        Rule entryRule = new CrossedDownIndicatorRule(closePrice, senkouSpanB);
+        
+        // Exit rule
+        Rule exitRule = new CrossedUpIndicatorRule(closePrice, senkouSpanB);
+        
+        return new BaseStrategy(entryRule, exitRule);
+    }
+    
     /**
      * @param series a time series
      * @return a dummy strategy
@@ -700,6 +776,9 @@ public class tradePairProcess extends Thread {
         strategies.put("GlobalExtrema", buildGlobalExtremaStrategy(series));
         strategies.put("Simple MA", buildSimpleStrategy(series));
         strategies.put("Advanced EMA", buildAdvancedEMAStrategy(series));
+        strategies.put("Ichimoku", buildIchimokuStrategy(series));
+        strategies.put("Ichimoku2", buildIchimoku2Strategy(series));
+        strategies.put("Ichimoku3", buildIchimoku3Strategy(series));
         strategies.put("My WIP Strategy", buildMyMainStrategy(series));
         strategies.put("No strategy", buildNoStrategy(series));
         if (mainStrategy.equals("Auto")) {
@@ -952,14 +1031,16 @@ public class tradePairProcess extends Thread {
     private void resetSeries() {
         series = new BaseTimeSeries(symbol + "_SERIES");
         need_bar_reset = false;
-        List<Candlestick> bars = client.getCandlestickBars(symbol, barInterval);
-        if (bars.size() >= 2) {
+        List<Candlestick> bars = client.getCandlestickBars(symbol, barInterval, 2000, System.currentTimeMillis() - 2000 * barSeconds * 1000, System.currentTimeMillis());
+        /*if (bars.size() >= 2) {
             long period = bars.get(bars.size()-1).getCloseTime() - bars.get(0).getOpenTime();
-            List<Candlestick> bars_pre = client.getCandlestickBars(symbol, barInterval, 500, bars.get(0).getOpenTime() - period - 1000, bars.get(0).getOpenTime() - 1);
-            addBars(bars_pre);
-        }
-        addBars(bars);
+            List<Candlestick> bars_pre = client.getCandlestickBars(symbol, barInterval, 1000, bars.get(0).getOpenTime() - period - 1000, bars.get(bars.size()-1).getCloseTime() - period - 1000);
+            if (bars_pre.size() > 0) {
+                addBars(bars_pre);
+            }
+        }*/
         if (bars.size() > 0) {
+            addBars(bars);
             last_time = bars.get(bars.size() - 1).getOpenTime();
         }
     }

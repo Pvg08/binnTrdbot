@@ -403,7 +403,7 @@
     <Component class="javax.swing.JComboBox" name="ComboBoxMainStrategy">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="9">
+          <StringArray count="12">
             <StringItem index="0" value="Auto"/>
             <StringItem index="1" value="MovingMomentum"/>
             <StringItem index="2" value="CCICorrection"/>
@@ -411,8 +411,11 @@
             <StringItem index="4" value="GlobalExtrema"/>
             <StringItem index="5" value="Simple MA"/>
             <StringItem index="6" value="Advanced EMA"/>
-            <StringItem index="7" value="My WIP Strategy"/>
-            <StringItem index="8" value="No strategy"/>
+            <StringItem index="7" value="Ichimoku"/>
+            <StringItem index="8" value="Ichimoku2"/>
+            <StringItem index="9" value="Ichimoku3"/>
+            <StringItem index="10" value="My WIP Strategy"/>
+            <StringItem index="11" value="No strategy"/>
           </StringArray>
         </Property>
       </Properties>

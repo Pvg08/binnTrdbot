@@ -106,7 +106,7 @@ public class tradeProfitsController {
                 if (!isTestMode) {
                     NewOrderResponse newOrderResponse;
                     if (isLimitedOrders) {
-                        price = price / (1 + 0.01f * tradeComissionPercent);
+                        //price = price / (1 + 0.01f * tradeComissionPercent);
                         newOrderResponse = client.newOrder(limitBuy(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
                         result = newOrderResponse.getOrderId();
                     } else {
@@ -131,6 +131,9 @@ public class tradeProfitsController {
                                 price = lastTradePrice;
                                 pair.setPrice(price);
                                 pair.setLastOrderPrice(lastTradePrice);
+                            } else {
+                                pair.setPrice(price);
+                                pair.setLastOrderPrice(price);
                             }
                             result = 0;
                         }
@@ -184,7 +187,7 @@ public class tradeProfitsController {
                 }
                 NewOrderResponse newOrderResponse;
                 if (isLimitedOrders) {
-                    price = price * (1 + 0.01f * tradeComissionPercent);
+                    //price = price * (1 + 0.01f * tradeComissionPercent);
                     newOrderResponse = client.newOrder(limitSell(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
                     result = newOrderResponse.getOrderId();
                 } else {
@@ -209,6 +212,9 @@ public class tradeProfitsController {
                             price = lastTradePrice;
                             pair.setPrice(price);
                             pair.setLastOrderPrice(lastTradePrice);
+                        } else {
+                            pair.setPrice(price);
+                            pair.setLastOrderPrice(price);
                         }
                         result = 0;
                     }

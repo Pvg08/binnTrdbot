@@ -374,7 +374,7 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerBuyPercent.setValue(100);
 
-        ComboBoxMainStrategy.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Auto", "MovingMomentum", "CCICorrection", "RSI2", "GlobalExtrema", "Simple MA", "Advanced EMA", "My WIP Strategy", "No strategy" }));
+        ComboBoxMainStrategy.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Auto", "MovingMomentum", "CCICorrection", "RSI2", "GlobalExtrema", "Simple MA", "Advanced EMA", "Ichimoku", "Ichimoku2", "Ichimoku3", "My WIP Strategy", "No strategy" }));
 
         jLabel4.setText("Main strategy:");
 
