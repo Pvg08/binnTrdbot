@@ -370,12 +370,13 @@
     <Component class="javax.swing.JComboBox" name="comboBoxBarsInterval">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="5">
+          <StringArray count="6">
             <StringItem index="0" value="1m"/>
             <StringItem index="1" value="5m"/>
             <StringItem index="2" value="15m"/>
             <StringItem index="3" value="30m"/>
             <StringItem index="4" value="1h"/>
+            <StringItem index="5" value="2h"/>
           </StringArray>
         </Property>
       </Properties>

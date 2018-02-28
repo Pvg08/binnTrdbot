@@ -7,9 +7,12 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
+import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.RateLimit;
+import com.binance.api.client.domain.market.CandlestickInterval;
+import java.io.Closeable;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -366,7 +369,7 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        comboBoxBarsInterval.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "1m", "5m", "15m", "30m", "1h" }));
+        comboBoxBarsInterval.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "1m", "5m", "15m", "30m", "1h", "2h" }));
 
         jLabel2.setText("Bars interval:");
 
@@ -598,7 +601,6 @@ public class mainApplication extends javax.swing.JFrame {
                 textFieldApiSecret.getText()
             );
             client = factory.newRestClient();
-            
             heroesController.setClient(client);
             heroesController.setLowHold(checkBoxLowHold.isSelected());
             heroesController.setAutoOrder(checkboxAutoFastorder.isSelected());
