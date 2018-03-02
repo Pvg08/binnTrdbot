@@ -25,6 +25,8 @@ import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.exception.BinanceApiException;
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
@@ -71,19 +73,18 @@ public class tradePairProcess extends Thread {
     private List<Long> orderToCancelOnSellUp = new ArrayList<>();
     private long last_time = 0;
     
-    private float baseStartBalance;
-    private float quoteStartBalance;
+    private BigDecimal quoteStartBalance = BigDecimal.ZERO;
     
     private long limitOrderId = 0;
     
-    private float tradingBalancePercent = 50f;
-    private float tradeMinProfitPercent = 0.03f;
+    private BigDecimal tradingBalancePercent = new BigDecimal("50");
+    private BigDecimal tradeMinProfitPercent = new BigDecimal("0.03");
     
     private TimeSeries series = null;
     
     private boolean is_hodling = false;
-    private float sold_price = 0f;
-    private float sold_amount = 0f;
+    private BigDecimal sold_price = BigDecimal.ZERO;
+    private BigDecimal sold_amount = BigDecimal.ZERO;
     
     private long delayTime = 10;
     
@@ -101,19 +102,24 @@ public class tradePairProcess extends Thread {
     private boolean do_remove_flag = false;
     
     private boolean filterPrice = false;
-    private float filterPriceTickSize = 0;
-    private float filterMinPrice = 0;
-    private float filterMaxPrice = 0;
+    private BigDecimal filterPriceTickSize = BigDecimal.ZERO;
+    private BigDecimal filterMinPrice = BigDecimal.ZERO;
+    private BigDecimal filterMaxPrice = BigDecimal.ZERO;
     private boolean filterQty = false;
-    private float filterQtyStep = 0;
-    private float filterMinQty = 0;
-    private float filterMaxQty = 0;
+    private BigDecimal filterQtyStep = BigDecimal.ZERO;
+    private BigDecimal filterMinQty = BigDecimal.ZERO;
+    private BigDecimal filterMaxQty = BigDecimal.ZERO;
     private boolean filterNotional = false;
-    private float filterMinNotional = 0;
+    private BigDecimal filterMinNotional = BigDecimal.ZERO;
     
     private static DecimalFormat df5 = new DecimalFormat("0.#####");
     private static DecimalFormat df8 = new DecimalFormat("0.########");
     private int startDelayTime = 0;
+    
+    private long currentPriceMillis = 0;
+    private long lastStrategyPriceMillis = 0;
+    private BigDecimal currentPrice = BigDecimal.ZERO;
+    private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
     public tradePairProcess(mainApplication application, BinanceApiRestClient rclient, tradeProfitsController rprofitsChecker, String pair) {
         app = application;
@@ -124,12 +130,12 @@ public class tradePairProcess extends Thread {
         setBarInterval("1m");
     }
     
-    private void doEnter(float curPrice) {
-        float summ_to_buy = quoteStartBalance * tradingBalancePercent / 100.0f;
+    private void doEnter(BigDecimal curPrice) {
+        BigDecimal summ_to_buy = quoteStartBalance.multiply(tradingBalancePercent.multiply(BigDecimal.valueOf(0.01)));
         sold_price = normalizePrice(curPrice);
-        sold_amount = normalizeQuantity(summ_to_buy / curPrice, true);
+        sold_amount = normalizeQuantity(summ_to_buy.divide(curPrice, RoundingMode.HALF_DOWN), true);
         sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
-        summ_to_buy = sold_price * sold_amount;
+        summ_to_buy = sold_price.multiply(sold_amount);
         base_strategy_sell_ignored = false;
         if (profitsChecker.canBuy(symbol, sold_amount, curPrice)) {
             app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")\n", true, true);
@@ -145,11 +151,11 @@ public class tradePairProcess extends Thread {
             app.log("Can't buy " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")\n");
         }
     }
-    private void doExit(float curPrice, boolean skip_check) {
-        float new_sold_price = sold_amount * curPrice;
-        float incomeWithoutComission = sold_amount * (curPrice * (1 - 0.01f * profitsChecker.getTradeComissionPercent()) - sold_price);
-        float incomeWithoutComissionPercent = 100 *  incomeWithoutComission / (sold_price * sold_amount);
-        if (skip_check || !lowHold || incomeWithoutComissionPercent > tradeMinProfitPercent) {
+    private void doExit(BigDecimal curPrice, boolean skip_check) {
+        BigDecimal new_sold_price = sold_amount.multiply(curPrice);
+        BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
+        BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
+        if (skip_check || !lowHold || incomeWithoutComissionPercent.compareTo(tradeMinProfitPercent) > 0) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
                 base_strategy_sell_ignored = false;
                 app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(new_sold_price) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
@@ -197,35 +203,26 @@ public class tradePairProcess extends Thread {
             profitsChecker.updateAllBalances(true);
             app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is finished! Status="+order.getStatus().name()+"; Price = "+order.getPrice(), true, true);
         }
-        int endIndex = series.getEndIndex();
-        if (endIndex >= 0 && endIndex < series.getBarCount()) {
-            float curPrice = series.getBar(endIndex).getClosePrice().floatValue();
-            profitsChecker.setPairPrice(symbol, curPrice);
-        }
+        profitsChecker.setPairPrice(symbol, currentPrice);
     }
     
     private void checkStatus() {
         StrategiesAction saction = strategiesController.checkStatus(
-                is_hodling, 
-                !isTryingToBuyDip && !buyOnStart && checkOtherStrategies, 
-                isTryingToBuyDip ? StrategiesMode.BUY_DIP : (base_strategy_sell_ignored ? StrategiesMode.SELL_UP : StrategiesMode.NORMAL)
+            is_hodling, 
+            !isTryingToBuyDip && !buyOnStart && checkOtherStrategies, 
+            isTryingToBuyDip ? StrategiesMode.BUY_DIP : (base_strategy_sell_ignored ? StrategiesMode.SELL_UP : StrategiesMode.NORMAL)
         );
         if (saction == StrategiesAction.DO_ENTER || saction == StrategiesAction.DO_LEAVE) {
-            int endIndex = series.getEndIndex();
-            float curPrice = series.getBar(endIndex).getClosePrice().floatValue();
             if (saction == StrategiesAction.DO_ENTER) {
-                doEnter(curPrice);
+                doEnter(lastStrategyCheckPrice);
             } else {
-                doExit(curPrice, false);
+                doExit(lastStrategyCheckPrice, false);
             }
         }
+        profitsChecker.setPairPrice(symbol, currentPrice);
     }
     
     public void doStop() {
-        /*try {
-            ((BinanceApiWebSocketClientImpl) client_s).close();
-        } catch(Exception e) {}
-        client_s = null;*/
         need_stop = true;
         paused = false;
     }
@@ -236,15 +233,6 @@ public class tradePairProcess extends Thread {
     
     private void tradeResponse(CandlestickEvent response) {
         app.log(symbol + " = " + response.getClose(), false, true);
-    }
-    
-    private float getQuoteBalance() {
-        AssetBalance qbalance = profitsChecker.getAccount().getAssetBalance(quoteAssetSymbol);
-        return Float.parseFloat(qbalance.getFree());
-    }
-    private float getBaseBalance() {
-        AssetBalance qbalance = profitsChecker.getAccount().getAssetBalance(baseAssetSymbol);
-        return Float.parseFloat(qbalance.getFree());
     }
     
     private void doWait(long ms) {
@@ -305,44 +293,43 @@ public class tradePairProcess extends Thread {
         SEMAPHORE_ADD.release();
     }
     
-    
-    public float normalizeQuantity(float qty, boolean qty_down_only) {
+    public BigDecimal normalizeQuantity(BigDecimal qty, boolean qty_down_only) {
         if (filterQty) {
-            float pqty = qty;
-            if (filterQtyStep > 0) {
-                qty = Math.round(qty / filterQtyStep) * filterQtyStep;
+            BigDecimal pqty = qty;
+            if (filterQtyStep.compareTo(BigDecimal.ZERO) > 0) {
+                qty = qty.divide(filterQtyStep).setScale(0, RoundingMode.HALF_UP).multiply(filterQtyStep);
             }
-            if (qty < filterMinQty) {
+            if (qty.compareTo(filterMinQty) < 0) {
                 qty = filterMinQty;
-            } else if (qty > filterMaxQty) {
+            } else if (qty.compareTo(filterMaxQty) > 0) {
                 qty = filterMaxQty;
             }
-            if (qty_down_only && qty > pqty) {
-                qty -= filterQtyStep;
-                if (qty < 0) {
-                    qty = 0;
+            if (qty_down_only && qty.compareTo(pqty) > 0) {
+                qty = qty.subtract(filterQtyStep);
+                if (qty.compareTo(BigDecimal.ZERO) < 0) {
+                    qty = BigDecimal.ZERO;
                 }
             }
         }
         return qty;
     }
-    public float normalizePrice(float price) {
+    public BigDecimal normalizePrice(BigDecimal price) {
         if (filterPrice) {
-            if (filterPriceTickSize > 0) {
-                price = Math.round(price / filterPriceTickSize) * filterPriceTickSize;
+            if (filterPriceTickSize.compareTo(BigDecimal.ZERO) > 0) {
+                price = price.divide(filterPriceTickSize).setScale(0, RoundingMode.HALF_UP).multiply(filterPriceTickSize);
             }
-            if (price < filterMinPrice) {
+            if (price.compareTo(filterMinPrice) < 0) {
                 price = filterMinPrice;
-            } else if (price > filterMaxPrice) {
+            } else if (price.compareTo(filterMaxPrice) > 0) {
                 price = filterMaxPrice;
             }
         }
         return price;
     }
-    public float normalizeNotionalQuantity(float quantity, float price) {
+    public BigDecimal normalizeNotionalQuantity(BigDecimal quantity, BigDecimal price) {
         if (filterNotional) {
-            if (quantity*price < filterMinNotional) {
-                quantity = filterMinNotional / price;
+            if (quantity.multiply(price).compareTo(filterMinNotional) < 0) {
+                quantity = filterMinNotional.divide(price);
                 quantity = normalizeQuantity(quantity, false);
             }
         }
@@ -361,28 +348,27 @@ public class tradePairProcess extends Thread {
             }
         }
         if (imax >= 0) {
-            float lastBuyPrice = Float.parseFloat(myTrades.get(imax).getPrice());
-            float lastBuyQty = Float.parseFloat(myTrades.get(imax).getQty());
+            BigDecimal lastBuyPrice = new BigDecimal(myTrades.get(imax).getPrice());
+            BigDecimal lastBuyQty = new BigDecimal(myTrades.get(imax).getQty());
             
             AssetBalance qbalance = profitsChecker.getAccount().getAssetBalance(baseAssetSymbol);
-            float free_cnt = Float.parseFloat(qbalance.getFree());
-            //float locked_cnt = Float.parseFloat(qbalance.getLocked());
-            float order_cnt = 0;
+            BigDecimal free_cnt = new BigDecimal(qbalance.getFree());
+            BigDecimal order_cnt = BigDecimal.ZERO;
             
             orderToCancelOnSellUp.clear();
             
-            if (free_cnt == 0 || sellUpAll) {
+            if (free_cnt.compareTo(BigDecimal.ZERO)==0 || sellUpAll) {
                 List<Order> openOrders = client.getOpenOrders(new OrderRequest(symbol));
                 for (i=0; i < openOrders.size(); i++) {
                     if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL) {
                         orderToCancelOnSellUp.add(openOrders.get(i).getOrderId());
-                        order_cnt += Float.parseFloat(openOrders.get(i).getOrigQty());
+                        order_cnt = order_cnt.add(new BigDecimal(openOrders.get(i).getOrigQty()));
                     }
                 }
             }
             
-            if (free_cnt > 0 || (order_cnt > 0 && !orderToCancelOnSellUp.isEmpty())) {
-                float res_cnt = free_cnt + order_cnt;
+            if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !orderToCancelOnSellUp.isEmpty())) {
+                BigDecimal res_cnt = free_cnt.add(order_cnt);
                 base_strategy_sell_ignored = true;
                 sold_price = lastBuyPrice;
                 sold_amount = res_cnt;
@@ -392,9 +378,7 @@ public class tradePairProcess extends Thread {
                     limitOrderId = result;
                     app.log("Successful waiting start!", true, true);
                     is_hodling = true;
-                    int endIndex = series.getEndIndex();
-                    float curPrice = series.getBar(endIndex).getClosePrice().floatValue();
-                    profitsChecker.setPairPrice(symbol, curPrice);
+                    profitsChecker.setPairPrice(symbol, currentPrice);
                 } else {
                     app.log("Error in Buy method!", true, true);
                 }
@@ -410,10 +394,6 @@ public class tradePairProcess extends Thread {
             long period = Math.floorDiv(lastbar_to - lastbar_from + 1, 1000) * 1000;
             List<Candlestick> bars_pre = client.getCandlestickBars(symbol, barInterval, size, lastbar_from - period + barSeconds * 1000 * 30, lastbar_from + barSeconds * 1000 * 30);
             if (bars_pre.size() > 0) {
-                
-                //System.out.println(lastbar_from - bars_pre.get(bars_pre.size()-1).getCloseTime());
-                //System.out.println(size + " " + bars_pre.size());
-                
                 addPreBars(count-1, bars_pre.size(), bars_pre.get(0).getOpenTime(), bars_pre.get(bars_pre.size()-1).getCloseTime());
                 addBars(bars_pre);
             }
@@ -450,6 +430,10 @@ public class tradePairProcess extends Thread {
         if (bars.size() > 0) {
             addBars(bars);
             last_time = bars.get(bars.size() - 1).getOpenTime();
+            lastStrategyPriceMillis = System.currentTimeMillis();
+            lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClose());
+            currentPriceMillis = lastStrategyPriceMillis;
+            currentPrice = lastStrategyCheckPrice;
         }
         
         client_s = BinanceApiClientFactory.newInstance().newWebSocketClient();
@@ -471,8 +455,10 @@ public class tradePairProcess extends Thread {
                 if (last_time < nbar.getOpenTime()) {
                     last_time = nbar.getOpenTime();
                 }
+                currentPriceMillis = System.currentTimeMillis();
+                currentPrice = new BigDecimal(response.getClose());
                 if (profitsChecker != null) {
-                    profitsChecker.setPairPrice(symbol, Float.parseFloat(nbar.getClose()));
+                    profitsChecker.setPairPrice(symbol, currentPrice);
                 }
             }
         });
@@ -489,6 +475,10 @@ public class tradePairProcess extends Thread {
         if (bars != null && bars.size() > 0) {
             last_time = bars.get(bars.size() - 1).getOpenTime();
             //app.log(symbol + ": price=" + bars.get(bars.size() - 1).getClose() + "; volume=" + bars.get(bars.size() - 1).getVolume() + "; bars=" + series.getBarCount(), false, true);
+            lastStrategyPriceMillis = System.currentTimeMillis();
+            lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClose());
+            currentPriceMillis = lastStrategyPriceMillis;
+            currentPrice = lastStrategyCheckPrice;
         }
     }
     
@@ -518,19 +508,19 @@ public class tradePairProcess extends Thread {
                 if (null != filter.getFilterType()) switch (filter.getFilterType()) {
                     case PRICE_FILTER:
                         filterPrice = true;
-                        filterMinPrice = Float.parseFloat(filter.getMinPrice());
-                        filterMaxPrice = Float.parseFloat(filter.getMaxPrice());
-                        filterPriceTickSize = Float.parseFloat(filter.getTickSize());
+                        filterMinPrice = new BigDecimal(filter.getMinPrice());
+                        filterMaxPrice = new BigDecimal(filter.getMaxPrice());
+                        filterPriceTickSize = new BigDecimal(filter.getTickSize());
                         break;
                     case LOT_SIZE:
                         filterQty = true;
-                        filterQtyStep = Float.parseFloat(filter.getStepSize());
-                        filterMinQty = Float.parseFloat(filter.getMinQty());
-                        filterMaxQty = Float.parseFloat(filter.getMaxQty());
+                        filterQtyStep = new BigDecimal(filter.getStepSize());
+                        filterMinQty = new BigDecimal(filter.getMinQty());
+                        filterMaxQty = new BigDecimal(filter.getMaxQty());
                         break;
                     case MIN_NOTIONAL:
                         filterNotional = true;
-                        filterMinNotional = Float.parseFloat(filter.getMinNotional());
+                        filterMinNotional = new BigDecimal(filter.getMinNotional());
                         break;
                     default:
                         break;
@@ -541,9 +531,6 @@ public class tradePairProcess extends Thread {
             return;
         }
 
-        baseStartBalance = getBaseBalance();
-        quoteStartBalance = getQuoteBalance();
-        
         profitsChecker.placeOrUpdatePair(baseAssetSymbol, quoteAssetSymbol, symbol, true);
 
         app.log(symbol + " filters:");
@@ -587,7 +574,7 @@ public class tradePairProcess extends Thread {
         
         currencyItem quote = profitsChecker.getProfitData(quoteAssetSymbol);
         if (quote != null) {
-            baseStartBalance = quote.getInitialValue();
+            quoteStartBalance = quote.getInitialValue();
         }
         
         if (buyOnStart) {
@@ -641,17 +628,13 @@ public class tradePairProcess extends Thread {
 
     public void doBuy() {
         if (!is_hodling && limitOrderId == 0) {
-            int endIndex = series.getEndIndex();
-            float curPrice = series.getBar(endIndex).getClosePrice().floatValue();
-            this.doEnter(curPrice);
+            this.doEnter(currentPrice);
         }
     }
 
     public void doSell() {
         if (is_hodling && limitOrderId == 0) {
-            int endIndex = series.getEndIndex();
-            float curPrice = series.getBar(endIndex).getClosePrice().floatValue();
-            this.doExit(curPrice, true);
+            this.doExit(currentPrice, true);
         }
     }
 
@@ -730,15 +713,15 @@ public class tradePairProcess extends Thread {
     /**
      * @return the tradingBalancePercent
      */
-    public float getTradingBalancePercent() {
+    public BigDecimal getTradingBalancePercent() {
         return tradingBalancePercent;
     }
 
     /**
      * @param tradingBalancePercent the tradingBalancePercent to set
      */
-    public void setTradingBalancePercent(float tradingBalancePercent) {
-        this.tradingBalancePercent = tradingBalancePercent;
+    public void setTradingBalancePercent(int tradingBalancePercent) {
+        this.tradingBalancePercent = new BigDecimal(tradingBalancePercent);
     }
 
     /**

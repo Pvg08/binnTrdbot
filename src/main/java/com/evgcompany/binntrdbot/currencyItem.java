@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot;
 
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 
 /**
@@ -14,9 +15,9 @@ import java.text.DecimalFormat;
 public class currencyItem {
     private String symbol = "";
     
-    private float free_value = 0;
-    private float limit_value = 0;
-    private float initial_value = -1;
+    private BigDecimal free_value = BigDecimal.ZERO;
+    private BigDecimal limit_value = BigDecimal.ZERO;
+    private BigDecimal initial_value = new BigDecimal("-1");
     
     private int orders_count = 0;
     
@@ -31,9 +32,9 @@ public class currencyItem {
     public currencyItem(String symbol) {
         this.symbol = symbol;
         orders_count = 0;
-        free_value = 0;
-        limit_value = 0;
-        initial_value = -1;
+        free_value = BigDecimal.ZERO;
+        limit_value = BigDecimal.ZERO;
+        initial_value = new BigDecimal("-1");
         pair_key = false;
         listIndex = -1;
     }
@@ -52,15 +53,15 @@ public class currencyItem {
     public String toString() {
         String txt;
         txt = getSymbol() + ": " + df6.format(getFreeValue());
-        if (getLimitValue() > 0) {
+        if (limit_value.compareTo(BigDecimal.ZERO) > 0) {
             txt = txt + " / " + df6.format(getLimitValue());
         }
-        if (getValue() != getInitialValue() /*|| isInOrder() || isInPendingOrder()*/) {
+        if (getValue().compareTo(initial_value) != 0 /*|| isInOrder() || isInPendingOrder()*/) {
             txt = txt + " (";
             
-            txt = txt + "initially " + df6.format(getInitialValue());
-            if (getInitialValue() > 0) {
-                float percent = 100 * (getValue() - getInitialValue()) / getInitialValue();
+            txt = txt + "initially " + df6.format(initial_value);
+            if (initial_value.compareTo(BigDecimal.ZERO) > 0) {
+                float percent = 100 * (getValue().floatValue() - initial_value.floatValue()) / initial_value.floatValue();
                 txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "%";
             }
             
@@ -82,23 +83,23 @@ public class currencyItem {
         return txt;
     }
     
-    public void addFreeValue(float _free_value) {
-        free_value += _free_value;
-        if (free_value < 0) {
-            free_value = 0;
+    public void addFreeValue(BigDecimal _free_value) {
+        free_value = free_value.add(_free_value);
+        if (free_value.compareTo(BigDecimal.ZERO) == -1) {
+            free_value = BigDecimal.ZERO;
         }
     }
     
-    public void addLimitValue(float _limit_value) {
-        limit_value += _limit_value;
-        if (limit_value < 0) {
-            limit_value = 0;
+    public void addLimitValue(BigDecimal _limit_value) {
+        limit_value = limit_value.add(_limit_value);
+        if (limit_value.compareTo(BigDecimal.ZERO) == -1) {
+            limit_value = BigDecimal.ZERO;
         }
     }
-    public void addInitialValue(float _initial_value) {
-        initial_value += _initial_value;
-        if (initial_value < 0) {
-            initial_value = 0;
+    public void addInitialValue(BigDecimal _initial_value) {
+        initial_value = initial_value.add(_initial_value);
+        if (initial_value.compareTo(BigDecimal.ZERO) == -1) {
+            initial_value = BigDecimal.ZERO;
         }
     }
 
@@ -119,35 +120,35 @@ public class currencyItem {
     /**
      * @return the value
      */
-    public float getValue() {
-        return free_value + limit_value;
+    public BigDecimal getValue() {
+        return free_value.add(limit_value);
     }
 
     /**
      * @return the free_value
      */
-    public float getFreeValue() {
+    public BigDecimal getFreeValue() {
         return free_value;
     }
 
     /**
      * @param free_value the free_value to set
      */
-    public void setFreeValue(float free_value) {
+    public void setFreeValue(BigDecimal free_value) {
         this.free_value = free_value;
     }
 
     /**
      * @return the initial_value
      */
-    public float getInitialValue() {
+    public BigDecimal getInitialValue() {
         return initial_value;
     }
 
     /**
      * @param initial_value the initial_value to set
      */
-    public void setInitialValue(float initial_value) {
+    public void setInitialValue(BigDecimal initial_value) {
         this.initial_value = initial_value;
     }
 
@@ -182,14 +183,14 @@ public class currencyItem {
     /**
      * @return the limit_value
      */
-    public float getLimitValue() {
+    public BigDecimal getLimitValue() {
         return limit_value;
     }
 
     /**
      * @param limit_value the limit_value to set
      */
-    public void setLimitValue(float limit_value) {
+    public void setLimitValue(BigDecimal limit_value) {
         this.limit_value = limit_value;
     }
     

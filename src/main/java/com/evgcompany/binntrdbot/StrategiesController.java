@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.SyncedTime;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -523,7 +524,7 @@ public class StrategiesController {
         app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
         app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecord));
         app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecord));
-        app.log("Total transaction cost (from $1000): " + new LinearTransactionCostCriterion(1000, 0.01f * profitsChecker.getTradeComissionPercent()).calculate(series, tradingRecord));
+        app.log("Total transaction cost percent: " + new LinearTransactionCostCriterion(100, 0.01f * profitsChecker.getTradeComissionPercent().floatValue()).calculate(series, tradingRecord));
         app.log("Buy-and-hold: " + new BuyAndHoldCriterion().calculate(series, tradingRecord));
         app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
         app.log("");
@@ -535,6 +536,7 @@ public class StrategiesController {
         slist.add(0, this.buildNoStrategy(series));
         List<TimeSeries> subseries = splitSeries(series, Duration.ofSeconds(barSeconds * 30), Duration.ofSeconds(barSeconds * 720));
         AnalysisCriterion profitCriterion = new TotalProfitCriterion();
+        AnalysisCriterion transcostCriterion = new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().floatValue());
         Map<String, Integer> successMap = new HashMap<String, Integer>();
         
         String log = "";
@@ -548,6 +550,8 @@ public class StrategiesController {
                 TradingRecord tradingRecord = sliceManager.run(strategy);
                 double profit = profitCriterion.calculate(slice, tradingRecord);
                 log += "\tProfit for " + entry.getKey() + ": " + profit + "\n";
+                double transactionc = transcostCriterion.calculate(slice, tradingRecord);
+                log += "\tTransaction cost for " + entry.getKey() + ": " + transactionc + "\n";
             }
             Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, slist);
             
@@ -675,9 +679,7 @@ public class StrategiesController {
     }
     
     public StrategiesAction checkStatus(boolean is_hodling, boolean checkOtherStrategies, StrategiesMode mode) {
-        
         int endIndex = series.getEndIndex();
-        float curPrice = series.getBar(endIndex).getClosePrice().floatValue();
         
         if (is_hodling) {
             if (mode != StrategiesMode.BUY_DIP) {
@@ -725,8 +727,6 @@ public class StrategiesController {
                 }
             }
         }
-        
-        profitsChecker.setPairPrice(groupName, curPrice);
         return StrategiesAction.DO_NOTHING;
     }
 }

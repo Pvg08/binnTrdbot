@@ -24,6 +24,7 @@ import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
 import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,7 +47,7 @@ public class tradeProfitsController {
     private boolean isTestMode = false;
     private boolean isLimitedOrders = false;
 
-    private float tradeComissionPercent = 0.05f;
+    private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
 
     private BinanceApiRestClient client = null;
     private Account account = null;
@@ -62,7 +63,7 @@ public class tradeProfitsController {
         return curr_map.get(symbolAsset);
     }
     
-    private float getLastTradePrice(String symbolPair, boolean isBuyer) {
+    private BigDecimal getLastTradePrice(String symbolPair, boolean isBuyer) {
         int i, imax = -1;
         long max_buy_time = 0;
         List<Trade> myTrades = client.getMyTrades(symbolPair);
@@ -73,21 +74,21 @@ public class tradeProfitsController {
             }
         }
         if (imax >= 0) {
-            return Float.parseFloat(myTrades.get(imax).getPrice());
+            return new BigDecimal(myTrades.get(imax).getPrice());
         }
-        return 0;
+        return BigDecimal.ZERO;
     }
     
-    public boolean canBuy(String symbolPair, float baseAmount, float price) {
+    public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
         currencyPairItem pair = pair_map.get(symbolPair);
-        return (pair != null) && (pair.getQuoteItem().getFreeValue() >= (baseAmount * price * 0.997));
+        return (pair != null) && (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) >= 0);
     }
-    public boolean canSell(String symbolPair, float baseAmount) {
+    public boolean canSell(String symbolPair, BigDecimal baseAmount) {
         currencyPairItem pair = pair_map.get(symbolPair);
-        return (pair != null) && ((pair.getBaseItem().getFreeValue() * 1.03) >= baseAmount);
+        return (pair != null) && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
     }
 
-    public long Buy(String symbolPair, float baseAmount, float price, boolean is_preordered) {
+    public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price, boolean is_preordered) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
@@ -98,8 +99,8 @@ public class tradeProfitsController {
                 return -1;
             }
             if (!is_preordered) {
-                if (pair.getQuoteItem().getFreeValue() < (baseAmount * price * 0.997)) {
-                    app.log("Not enough " + pair.getSymbolQuote() + " to buy " + df6.format(baseAmount) + " " + pair.getSymbolBase(), true, true);
+                if (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) < 0) {
+                    app.log("Not enough " + pair.getSymbolQuote() + " to buy " + df6.format(baseAmount) + " " + pair.getSymbolBase() + ". Need " + df6.format(baseAmount.multiply(price)) + " but have " + df6.format(pair.getQuoteItem().getFreeValue()), true, true);
                     SEMAPHORE.release();
                     return -1;
                 }
@@ -114,7 +115,7 @@ public class tradeProfitsController {
                         result = newOrderResponse.getOrderId();
                     }
                     if (newOrderResponse != null && newOrderResponse.getOrderId() > 0) {
-                        pair.startBuyTransaction(baseAmount, baseAmount * price);
+                        pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
                         app.log("Order id = " + newOrderResponse.getOrderId(), false, true);
                         Thread.sleep(550);
                         Order mord = client.getOrderStatus(new OrderStatusRequest(newOrderResponse.getSymbol(), newOrderResponse.getOrderId()));
@@ -125,8 +126,8 @@ public class tradeProfitsController {
                             return -1;
                         } else if (mord.getStatus() == OrderStatus.FILLED) {
                             pair.confirmTransaction();
-                            float lastTradePrice = getLastTradePrice(symbolPair, true);
-                            if (lastTradePrice > 0) {
+                            BigDecimal lastTradePrice = getLastTradePrice(symbolPair, true);
+                            if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                                 app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
                                 price = lastTradePrice;
                                 pair.setPrice(price);
@@ -145,12 +146,12 @@ public class tradeProfitsController {
                 } else {
                     pair.setPrice(price);
                     pair.setLastOrderPrice(price);
-                    pair.startBuyTransaction(baseAmount, baseAmount * price);
+                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
                     pair.confirmTransaction();
                 }
             } else {
                 pair.setPrice(price);
-                pair.preBuyTransaction(baseAmount, baseAmount * price);
+                pair.preBuyTransaction(baseAmount, baseAmount.multiply(price));
             }
             updatePairText(symbolPair, !isTestMode);
             SEMAPHORE.release();
@@ -162,7 +163,7 @@ public class tradeProfitsController {
         return result;
     }
 
-    public long Sell(String symbolPair, float baseAmount, float price, List<Long> OrderToCancel) {
+    public long Sell(String symbolPair, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
@@ -172,7 +173,7 @@ public class tradeProfitsController {
                 SEMAPHORE.release();
                 return -1;
             }
-            if ((pair.getBaseItem().getFreeValue() * 1.03) < baseAmount) {
+            if (pair.getBaseItem().getFreeValue().compareTo(baseAmount) < 0) {
                 app.log("Not enough " + pair.getSymbolBase() + " to sell (" + df6.format(pair.getBaseItem().getFreeValue()) + " < " + df6.format(baseAmount) + ")", true, true);
                 SEMAPHORE.release();
                 return -1;
@@ -195,7 +196,7 @@ public class tradeProfitsController {
                     result = newOrderResponse.getOrderId();
                 }
                 if (newOrderResponse != null && newOrderResponse.getOrderId() > 0) {
-                    pair.startSellTransaction(baseAmount, baseAmount * price);
+                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
                     app.log("Order id = " + newOrderResponse.getOrderId(), false, true);
                     Thread.sleep(550);
                     Order mord = client.getOrderStatus(new OrderStatusRequest(newOrderResponse.getSymbol(), newOrderResponse.getOrderId()));
@@ -206,8 +207,8 @@ public class tradeProfitsController {
                         return -1;
                     } else if (mord.getStatus() == OrderStatus.FILLED) {
                         pair.confirmTransaction();
-                        float lastTradePrice = getLastTradePrice(symbolPair, false);
-                        if (lastTradePrice > 0) {
+                        BigDecimal lastTradePrice = getLastTradePrice(symbolPair, false);
+                        if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                             app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
                             price = lastTradePrice;
                             pair.setPrice(price);
@@ -226,7 +227,7 @@ public class tradeProfitsController {
             } else {
                 pair.setPrice(price);
                 pair.setLastOrderPrice(price);
-                pair.startSellTransaction(baseAmount, baseAmount * price);
+                pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
                 pair.confirmTransaction();
             }
             updatePairText(symbolPair, !isTestMode);
@@ -239,7 +240,7 @@ public class tradeProfitsController {
         return result;
     }
 
-    public void setPairPrice(String symbolPair, float price) {
+    public void setPairPrice(String symbolPair, BigDecimal price) {
         currencyPairItem pair = pair_map.get(symbolPair);
         if (pair != null) {
             pair.setPrice(price);
@@ -247,7 +248,7 @@ public class tradeProfitsController {
         }
     }
 
-    void finishOrder(String symbolPair, boolean isok, float sold_price) {
+    void finishOrder(String symbolPair, boolean isok, BigDecimal sold_price) {
         currencyPairItem pair = pair_map.get(symbolPair);
         if (pair != null) {
             if (isok) {
@@ -266,13 +267,13 @@ public class tradeProfitsController {
                 String symbol = allBalances.get(i).getAsset().toUpperCase();
                 if (curr_map.containsKey(symbol)) {
                     currencyItem curr = curr_map.get(symbol);
-                    float balance_free = Float.parseFloat(allBalances.get(i).getFree());
-                    float balance_limit = Float.parseFloat(allBalances.get(i).getLocked());
-                    float balance = balance_free + Float.parseFloat(allBalances.get(i).getLocked());
-                    if (!isTestMode || curr.getInitialValue() < 0) {
+                    BigDecimal balance_free = new BigDecimal(allBalances.get(i).getFree());
+                    BigDecimal balance_limit = new BigDecimal(allBalances.get(i).getLocked());
+                    BigDecimal balance = balance_free.add(balance_limit);
+                    if (!isTestMode || curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
                         curr.setFreeValue(balance_free);
                         curr.setLimitValue(balance_limit);
-                        if (curr.getInitialValue() < 0) {
+                        if (curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
                             curr.setInitialValue(curr.getValue());
                         }
                     }
@@ -419,14 +420,14 @@ public class tradeProfitsController {
     /**
      * @return the tradeComissionPercent
      */
-    public float getTradeComissionPercent() {
+    public BigDecimal getTradeComissionPercent() {
         return tradeComissionPercent;
     }
 
     /**
      * @param tradeComissionPercent the tradeComissionPercent to set
      */
-    public void setTradeComissionPercent(float tradeComissionPercent) {
+    public void setTradeComissionPercent(BigDecimal tradeComissionPercent) {
         this.tradeComissionPercent = tradeComissionPercent;
     }
 
