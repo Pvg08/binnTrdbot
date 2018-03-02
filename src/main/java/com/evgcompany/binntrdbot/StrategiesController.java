@@ -519,12 +519,13 @@ public class StrategiesController {
         app.log("Current strategy ("+mainStrategy+") criterias:");
         TotalProfitCriterion totalProfit = new TotalProfitCriterion();
         app.log("Total profit: " + totalProfit.calculate(series, tradingRecord));
+        app.log("Total transaction cost (per 1): " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
+        app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
         app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecord));
         app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecord));
         app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
         app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecord));
         app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecord));
-        app.log("Total transaction cost percent: " + new LinearTransactionCostCriterion(100, 0.01f * profitsChecker.getTradeComissionPercent().floatValue()).calculate(series, tradingRecord));
         app.log("Buy-and-hold: " + new BuyAndHoldCriterion().calculate(series, tradingRecord));
         app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
         app.log("");
@@ -533,10 +534,8 @@ public class StrategiesController {
     private String findOptimalStrategy() {
         String result = "Unknown";
         List<Strategy> slist = new ArrayList<Strategy>(strategies.values());
-        slist.add(0, this.buildNoStrategy(series));
-        List<TimeSeries> subseries = splitSeries(series, Duration.ofSeconds(barSeconds * 30), Duration.ofSeconds(barSeconds * 720));
-        AnalysisCriterion profitCriterion = new TotalProfitCriterion();
-        AnalysisCriterion transcostCriterion = new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().floatValue());
+        List<TimeSeries> subseries = splitSeries(series, Duration.ofSeconds(barSeconds * 30), Duration.ofSeconds(barSeconds * 1440));
+        AnalysisCriterion profitwotranscostCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
         Map<String, Integer> successMap = new HashMap<String, Integer>();
         
         String log = "";
@@ -548,12 +547,10 @@ public class StrategiesController {
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
                 Strategy strategy = entry.getValue();
                 TradingRecord tradingRecord = sliceManager.run(strategy);
-                double profit = profitCriterion.calculate(slice, tradingRecord);
-                log += "\tProfit for " + entry.getKey() + ": " + profit + "\n";
-                double transactionc = transcostCriterion.calculate(slice, tradingRecord);
-                log += "\tTransaction cost for " + entry.getKey() + ": " + transactionc + "\n";
+                double profit = profitwotranscostCriterion.calculate(slice, tradingRecord);
+                log += "\tProfit wo comission for " + entry.getKey() + ": " + profit + "\n";
             }
-            Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, slist);
+            Strategy bestStrategy = profitwotranscostCriterion.chooseBest(sliceManager, slist);
             
             String bestKey = result;
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
@@ -562,16 +559,13 @@ public class StrategiesController {
                 }
             }
             if (!successMap.containsKey(bestKey)) {
-                successMap.put(bestKey, 0);
+                successMap.put(bestKey, 1);
             }
             successMap.put(bestKey, successMap.get(bestKey)+1);
             log += "\t\t--> Best strategy: " + bestKey + "\n";
         }
         
         int max_value = 0;
-        if (successMap.containsKey(result)) {
-            successMap.remove(result);
-        }
         for (Map.Entry<String, Integer> entry : successMap.entrySet()) {
             if (entry.getValue() > max_value) {
                 max_value = entry.getValue();
