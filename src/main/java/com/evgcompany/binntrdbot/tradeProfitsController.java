@@ -50,6 +50,9 @@ public class tradeProfitsController {
 
     private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
     private String tradeComissionCurrency = "BNB";
+    
+    private BigDecimal stopLossPercent = null;
+    private BigDecimal stopGainPercent = null;
 
     private BinanceApiRestClient client = null;
     private Account account = null;
@@ -120,12 +123,16 @@ public class tradeProfitsController {
                 TickerStatistics tc = client.get24HrPriceStatistics(comission_pair);
                 if (tc != null && !tc.getLastPrice().isEmpty()) {
                     pair_price = new BigDecimal(tc.getLastPrice());
-                    placeOrUpdatePair(tradeComissionCurrency, quoteSymbol, comission_pair, true);
                 }
             }
             if (pair_price != null && pair_price.compareTo(BigDecimal.ZERO) > 0) {
                 currencyItem ccomm = curr_map.get(tradeComissionCurrency);
-                ccomm.addFreeValue(comission_quote.multiply(pair_price).multiply(BigDecimal.valueOf(-1)));
+                if (ccomm != null && ccomm.getFreeValue().compareTo(comission_quote.multiply(pair_price)) > 0) {
+                    ccomm.addFreeValue(comission_quote.multiply(pair_price).multiply(BigDecimal.valueOf(-1)));
+                    updateBaseSymbolText(tradeComissionCurrency, false);
+                } else {
+                    use_spec_currency = false;
+                }
             } else {
                 use_spec_currency = false;
             }
@@ -358,11 +365,26 @@ public class tradeProfitsController {
         if (updateBalance) {
             updateAllBalances();
         }
+        boolean symbol_updated = false;
         for (Map.Entry<String, currencyPairItem> entry : pair_map.entrySet()) {
             currencyPairItem curr = entry.getValue();
             if (curr != null && curr.getSymbolBase() == symbolBase) {
-                listCurrenciesModel.set(curr.getListIndex(), curr.toString());
-                listProfitModel.set(curr.getQuoteItem().getListIndex(), curr.toString());
+                symbol_updated = true;
+                if (curr.getListIndex() >= 0) {
+                    listCurrenciesModel.set(curr.getListIndex(), curr.toString());
+                }
+                if (curr.getQuoteItem().getListIndex() >= 0) {
+                    listProfitModel.set(curr.getQuoteItem().getListIndex(), curr.toString());
+                }
+                if (curr.getBaseItem().getListIndex() >= 0) {
+                    listProfitModel.set(curr.getBaseItem().getListIndex(), curr.toString());
+                }
+            }
+        }
+        if (!symbol_updated) {
+            currencyItem curr = curr_map.get(symbolBase);
+            if (curr != null && curr.getListIndex() >= 0) {
+                listProfitModel.set(curr.getListIndex(), curr.toString());
             }
         }
     }
@@ -513,5 +535,33 @@ public class tradeProfitsController {
      */
     public void setLimitedOrders(boolean isLimitedOrders) {
         this.isLimitedOrders = isLimitedOrders;
+    }
+
+    /**
+     * @return the stopLossPercent
+     */
+    public BigDecimal getStopLossPercent() {
+        return stopLossPercent;
+    }
+
+    /**
+     * @param stopLossPercent the stopLossPercent to set
+     */
+    public void setStopLossPercent(BigDecimal stopLossPercent) {
+        this.stopLossPercent = stopLossPercent;
+    }
+
+    /**
+     * @return the stopGainPercent
+     */
+    public BigDecimal getStopGainPercent() {
+        return stopGainPercent;
+    }
+
+    /**
+     * @param stopGainPercent the stopGainPercent to set
+     */
+    public void setStopGainPercent(BigDecimal stopGainPercent) {
+        this.stopGainPercent = stopGainPercent;
     }
 }

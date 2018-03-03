@@ -15,64 +15,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
-import org.ta4j.core.AnalysisCriterion;
-import org.ta4j.core.BaseStrategy;
-import org.ta4j.core.BaseTimeSeries;
-import org.ta4j.core.Decimal;
-import org.ta4j.core.Rule;
-import org.ta4j.core.Strategy;
-import org.ta4j.core.TimeSeries;
-import org.ta4j.core.TimeSeriesManager;
-import org.ta4j.core.TradingRecord;
-import org.ta4j.core.analysis.criteria.AverageProfitCriterion;
-import org.ta4j.core.analysis.criteria.AverageProfitableTradesCriterion;
-import org.ta4j.core.analysis.criteria.BuyAndHoldCriterion;
-import org.ta4j.core.analysis.criteria.LinearTransactionCostCriterion;
-import org.ta4j.core.analysis.criteria.MaximumDrawdownCriterion;
-import org.ta4j.core.analysis.criteria.NumberOfTradesCriterion;
-import org.ta4j.core.analysis.criteria.RewardRiskRatioCriterion;
-import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
-import org.ta4j.core.analysis.criteria.VersusBuyAndHoldCriterion;
-import org.ta4j.core.indicators.CCIIndicator;
-import org.ta4j.core.indicators.EMAIndicator;
-import org.ta4j.core.indicators.KAMAIndicator;
-import org.ta4j.core.indicators.MACDIndicator;
-import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.SMAIndicator;
-import org.ta4j.core.indicators.StochasticOscillatorKIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
-import org.ta4j.core.indicators.helpers.AbsoluteIndicator;
-import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.helpers.HighestValueIndicator;
-import org.ta4j.core.indicators.helpers.LowestValueIndicator;
-import org.ta4j.core.indicators.helpers.MaxPriceIndicator;
-import org.ta4j.core.indicators.helpers.MinPriceIndicator;
-import org.ta4j.core.indicators.helpers.MultiplierIndicator;
-import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
-import org.ta4j.core.indicators.helpers.PreviousValueIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuChikouSpanIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanAIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanBIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuTenkanSenIndicator;
-import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
-import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
-import org.ta4j.core.indicators.keltner.KeltnerChannelUpperIndicator;
-import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
-import org.ta4j.core.trading.rules.AndRule;
-import org.ta4j.core.trading.rules.BooleanRule;
-import org.ta4j.core.trading.rules.CrossedDownIndicatorRule;
-import org.ta4j.core.trading.rules.CrossedUpIndicatorRule;
-import org.ta4j.core.trading.rules.InPipeRule;
-import org.ta4j.core.trading.rules.IsFallingRule;
-import org.ta4j.core.trading.rules.IsRisingRule;
-import org.ta4j.core.trading.rules.OrRule;
-import org.ta4j.core.trading.rules.OverIndicatorRule;
-import org.ta4j.core.trading.rules.StopLossRule;
-import org.ta4j.core.trading.rules.UnderIndicatorRule;
-import org.ta4j.core.trading.rules.WaitForRule;
+import org.ta4j.core.*;
+import org.ta4j.core.analysis.criteria.*;
+import org.ta4j.core.indicators.*;
+import org.ta4j.core.indicators.bollinger.*;
+import org.ta4j.core.indicators.candles.*;
+import org.ta4j.core.indicators.helpers.*;
+import org.ta4j.core.indicators.ichimoku.*;
+import org.ta4j.core.indicators.keltner.*;
+import org.ta4j.core.indicators.statistics.*;
+import org.ta4j.core.trading.rules.*;
 
 class StrategyMarker {
     String label = "";
@@ -185,7 +137,7 @@ public class StrategiesController {
      * @param series a time series
      * @return a dummy strategy
      */
-    private Strategy buildSimpleStrategy(TimeSeries series) {
+    private Strategy buildSMAStrategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
@@ -198,10 +150,28 @@ public class StrategiesController {
         // Sell when close price goes over SMA
         return new BaseStrategy(
                 new OverIndicatorRule(sma, closePrice),
-                new UnderIndicatorRule(sma, closePrice)
+                addStopLossGain(new UnderIndicatorRule(sma, closePrice), series)
         );
     }
 
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildThreeSoldiersStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ThreeWhiteSoldiersIndicator tws = new ThreeWhiteSoldiersIndicator(series, 2, Decimal.valueOf(5));
+        ThreeBlackCrowsIndicator tbc = new ThreeBlackCrowsIndicator(series, 1, Decimal.valueOf(1));
+
+        return new BaseStrategy(
+            new BooleanIndicatorRule(tws),
+            addStopLossGain(new BooleanIndicatorRule(tbc), series)
+        );
+    }
+    
     /**
      * @param series a time series
      * @return a strategy
@@ -223,7 +193,7 @@ public class StrategiesController {
         Rule exitRule = new OverIndicatorRule(kama5, kama2)
                 .and(new CrossedDownIndicatorRule(kama2, closePrice));
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     
@@ -274,7 +244,7 @@ public class StrategiesController {
                 .and(new InPipeRule(rsi, Decimal.valueOf(100), Decimal.valueOf(45)))
                 .and(new IsFallingRule(rsi, 1));
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     
@@ -306,7 +276,7 @@ public class StrategiesController {
                 .and(new UnderIndicatorRule(keltnerM, closePrice))
                 .and(new IsFallingRule(macd, 2));
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     /**
@@ -334,7 +304,7 @@ public class StrategiesController {
                 .and(new OverIndicatorRule(ema_y, ema_2))
                 .and(new OverIndicatorRule(ema_y, ema_3));
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     
@@ -359,7 +329,7 @@ public class StrategiesController {
         // Exit rule
         Rule exitRule = new CrossedUpIndicatorRule(kijunSen, tenkanSen);
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     /**
@@ -384,7 +354,7 @@ public class StrategiesController {
         // Exit rule
         Rule exitRule = new CrossedUpIndicatorRule(closePrice, kijunSen);
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     /**
@@ -409,7 +379,7 @@ public class StrategiesController {
         // Exit rule
         Rule exitRule = new CrossedUpIndicatorRule(closePrice, senkouSpanB);
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     /**
@@ -486,7 +456,7 @@ public class StrategiesController {
         );        
         */
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     /**
@@ -520,7 +490,7 @@ public class StrategiesController {
                 .and(new CrossedUpIndicatorRule(stochasticOscillK, Decimal.valueOf(80))) // Signal 1
                 .and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
 
     /**
@@ -543,7 +513,7 @@ public class StrategiesController {
         Rule exitRule = new UnderIndicatorRule(longCci, minus100) // Bear trend
                 .and(new OverIndicatorRule(shortCci, plus100)); // Signal
         
-        Strategy strategy = new BaseStrategy(entryRule, exitRule);
+        Strategy strategy = new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
         strategy.setUnstablePeriod(5);
         return strategy;
     }
@@ -576,14 +546,14 @@ public class StrategiesController {
         MultiplierIndicator upDay = new MultiplierIndicator(dayMaxPrice, Decimal.valueOf("0.995"));
         Rule sellingRule = new OverIndicatorRule(closePrices, upDay);
 
-        return new BaseStrategy(buyingRule, sellingRule);
+        return new BaseStrategy(buyingRule, addStopLossGain(sellingRule, series));
     }
     
     /**
      * @param series a time series
      * @return a 2-period RSI strategy
      */
-    public static Strategy buildRSI2Strategy(TimeSeries series) {
+    public Strategy buildRSI2Strategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
@@ -610,9 +580,20 @@ public class StrategiesController {
         
         // TODO: Finalize the strategy
         
-        return new BaseStrategy(entryRule, exitRule);
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
+    private Rule addStopLossGain(Rule rule, TimeSeries series) {
+        if (profitsChecker != null) {
+            if (profitsChecker.getStopLossPercent() != null) {
+                rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
+            }
+            if (profitsChecker.getStopGainPercent() != null) {
+                rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));
+            }
+        }
+        return rule;
+    }
     
     public void resetStrategies() {
         markers.clear();
@@ -866,11 +847,12 @@ public class StrategiesController {
     public HashMap<String, StrategyInitializer> getStrategiesInitializerMap() {
         HashMap<String, StrategyInitializer> strategies = new HashMap<String, StrategyInitializer>();
         strategies.put("No strategy", s -> buildNoStrategy(s));
+        strategies.put("Three Soldiers", s -> buildThreeSoldiersStrategy(s));
         strategies.put("MovingMomentum", s -> buildMovingMomentumStrategy(s));
         strategies.put("CCICorrection", s -> buildCCICorrectionStrategy(s));
         strategies.put("RSI2", s -> buildRSI2Strategy(s));
         strategies.put("GlobalExtrema", s -> buildGlobalExtremaStrategy(s));
-        strategies.put("Simple MA", s -> buildSimpleStrategy(s));
+        strategies.put("SMA", s -> buildSMAStrategy(s));
         strategies.put("Advanced EMA", s -> buildAdvancedEMAStrategy(s));
         strategies.put("Ichimoku", s -> buildIchimokuStrategy(s));
         strategies.put("Ichimoku2", s -> buildIchimoku2Strategy(s));
