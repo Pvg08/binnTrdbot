@@ -80,6 +80,14 @@ public class mainApplication extends javax.swing.JFrame {
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
         listHeroes.setModel(heroesController.getListHeroesModel());
         
+        StrategiesController scontroller = new StrategiesController();
+        List<String> s_items = new ArrayList<String>(scontroller.getStrategiesInitializerMap().keySet());
+        java.util.Collections.sort(s_items);
+        s_items.forEach((strategy_name)->{
+            ComboBoxMainStrategy.addItem(strategy_name);
+        });
+        scontroller = null;
+        
         prefs = Preferences.userNodeForPackage(this.getClass());
         setBounds(
             Integer.parseInt(prefs.get("window_pos_x", String.valueOf(Math.round(getBounds().getX())))),
@@ -377,7 +385,7 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerBuyPercent.setValue(100);
 
-        ComboBoxMainStrategy.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Auto", "MovingMomentum", "CCICorrection", "RSI2", "GlobalExtrema", "Simple MA", "Advanced EMA", "Ichimoku", "Ichimoku2", "Ichimoku3", "My WIP Strategy", "No strategy" }));
+        ComboBoxMainStrategy.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Auto" }));
 
         jLabel4.setText("Main strategy:");
 

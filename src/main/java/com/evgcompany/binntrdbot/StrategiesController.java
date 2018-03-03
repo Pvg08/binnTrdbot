@@ -35,26 +35,44 @@ import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
 import org.ta4j.core.analysis.criteria.VersusBuyAndHoldCriterion;
 import org.ta4j.core.indicators.CCIIndicator;
 import org.ta4j.core.indicators.EMAIndicator;
+import org.ta4j.core.indicators.KAMAIndicator;
 import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.StochasticOscillatorKIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
+import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
+import org.ta4j.core.indicators.helpers.AbsoluteIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighestValueIndicator;
 import org.ta4j.core.indicators.helpers.LowestValueIndicator;
 import org.ta4j.core.indicators.helpers.MaxPriceIndicator;
 import org.ta4j.core.indicators.helpers.MinPriceIndicator;
 import org.ta4j.core.indicators.helpers.MultiplierIndicator;
+import org.ta4j.core.indicators.helpers.OpenPriceIndicator;
+import org.ta4j.core.indicators.helpers.PreviousValueIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuChikouSpanIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanAIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanBIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuTenkanSenIndicator;
+import org.ta4j.core.indicators.keltner.KeltnerChannelLowerIndicator;
+import org.ta4j.core.indicators.keltner.KeltnerChannelMiddleIndicator;
+import org.ta4j.core.indicators.keltner.KeltnerChannelUpperIndicator;
+import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
+import org.ta4j.core.trading.rules.AndRule;
 import org.ta4j.core.trading.rules.BooleanRule;
 import org.ta4j.core.trading.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.trading.rules.CrossedUpIndicatorRule;
+import org.ta4j.core.trading.rules.InPipeRule;
+import org.ta4j.core.trading.rules.IsFallingRule;
+import org.ta4j.core.trading.rules.IsRisingRule;
+import org.ta4j.core.trading.rules.OrRule;
 import org.ta4j.core.trading.rules.OverIndicatorRule;
+import org.ta4j.core.trading.rules.StopLossRule;
 import org.ta4j.core.trading.rules.UnderIndicatorRule;
+import org.ta4j.core.trading.rules.WaitForRule;
 
 class StrategyMarker {
     String label = "";
@@ -87,6 +105,11 @@ public class StrategiesController {
         this.groupName = groupName;
         this.app = app;
         this.profitsChecker = profitsChecker;
+    }
+    public StrategiesController() {
+        this.groupName = null;
+        this.app = null;
+        this.profitsChecker = null;
     }
     
     public void setGroupName(String groupName) {
@@ -179,6 +202,112 @@ public class StrategiesController {
         );
     }
 
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildKAMAStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        KAMAIndicator kama2 = new KAMAIndicator(closePrice, 10, 2, 30);
+        KAMAIndicator kama5 = new KAMAIndicator(closePrice, 10, 5, 30);
+        
+        // Entry rule
+        Rule entryRule = new UnderIndicatorRule(kama5, kama2)
+                .and(new CrossedUpIndicatorRule(kama2, closePrice));
+        
+        // Exit rule
+        Rule exitRule = new OverIndicatorRule(kama5, kama2)
+                .and(new CrossedDownIndicatorRule(kama2, closePrice));
+        
+        return new BaseStrategy(entryRule, exitRule);
+    }
+    
+    
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildBollingerStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        MinPriceIndicator minPrice = new MinPriceIndicator(series);
+        MaxPriceIndicator maxPrice = new MaxPriceIndicator(series);
+        RSIIndicator rsi = new RSIIndicator(closePrice, 2);
+        
+        EMAIndicator avg14 = new EMAIndicator(closePrice, 14);
+        StandardDeviationIndicator sd14 = new StandardDeviationIndicator(closePrice, 14);
+        
+        BollingerBandsMiddleIndicator bollingerM = new BollingerBandsMiddleIndicator(avg14);
+        BollingerBandsLowerIndicator bollingerL = new BollingerBandsLowerIndicator(bollingerM, sd14);
+        BollingerBandsUpperIndicator bollingerU = new BollingerBandsUpperIndicator(bollingerM, sd14);
+        
+        // Entry rule
+        Rule entryRule = new CrossedDownIndicatorRule(bollingerL, minPrice)
+                .and(new InPipeRule(rsi, Decimal.valueOf(55), Decimal.valueOf(0)))
+                .and(new IsRisingRule(rsi, 1));
+                
+                /*new UnderIndicatorRule(bollingerL, closePrice)
+                .and(new OverIndicatorRule(bollingerM, closePrice))
+            .and(new InPipeRule(rsi, Decimal.valueOf(55), Decimal.valueOf(25)))
+            .and(new IsRisingRule(rsi, 2))
+            .and(
+                    new InPipeRule(new PreviousValueIndicator(bollingerU, 1), new PreviousValueIndicator(maxPrice, 1), new PreviousValueIndicator(minPrice, 1))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 2), new PreviousValueIndicator(maxPrice, 2), new PreviousValueIndicator(minPrice, 2)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 3), new PreviousValueIndicator(maxPrice, 3), new PreviousValueIndicator(minPrice, 3)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 4), new PreviousValueIndicator(maxPrice, 4), new PreviousValueIndicator(minPrice, 4)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 5), new PreviousValueIndicator(maxPrice, 5), new PreviousValueIndicator(minPrice, 5)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 6), new PreviousValueIndicator(maxPrice, 6), new PreviousValueIndicator(minPrice, 6)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 7), new PreviousValueIndicator(maxPrice, 7), new PreviousValueIndicator(minPrice, 7)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 8), new PreviousValueIndicator(maxPrice, 8), new PreviousValueIndicator(minPrice, 8)))
+                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 9), new PreviousValueIndicator(maxPrice, 9), new PreviousValueIndicator(minPrice, 9)))
+            )*/;
+        
+        // Exit rule
+        Rule exitRule = new CrossedUpIndicatorRule(bollingerU, maxPrice) 
+                .and(new InPipeRule(rsi, Decimal.valueOf(100), Decimal.valueOf(45)))
+                .and(new IsFallingRule(rsi, 1));
+        
+        return new BaseStrategy(entryRule, exitRule);
+    }
+    
+    
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildKeltnerChannelStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        MACDIndicator macd = new MACDIndicator(closePrice, 9, 15);
+        
+        KeltnerChannelMiddleIndicator keltnerM = new KeltnerChannelMiddleIndicator(closePrice, 20);
+        KeltnerChannelLowerIndicator keltnerL = new KeltnerChannelLowerIndicator(keltnerM, Decimal.valueOf(1.5), 20);
+        KeltnerChannelUpperIndicator keltnerU = new KeltnerChannelUpperIndicator(keltnerM, Decimal.valueOf(1.5), 20);
+        
+        // Entry rule
+        Rule entryRule = new UnderIndicatorRule(keltnerL, closePrice)
+                .and(new UnderIndicatorRule(new PreviousValueIndicator(keltnerL, 1), new PreviousValueIndicator(closePrice, 1)))
+                .and(new OverIndicatorRule(keltnerM, closePrice))
+                .and(new IsRisingRule(macd, 2));
+        
+        // Exit rule
+        Rule exitRule = new OverIndicatorRule(keltnerU, closePrice)
+                .and(new OverIndicatorRule(new PreviousValueIndicator(keltnerU, 1), new PreviousValueIndicator(closePrice, 1)))
+                .and(new UnderIndicatorRule(keltnerM, closePrice))
+                .and(new IsFallingRule(macd, 2));
+        
+        return new BaseStrategy(entryRule, exitRule);
+    }
     
     /**
      * @param series a time series
@@ -318,29 +447,44 @@ public class StrategiesController {
         // https://blokt.com/technical-analysis/cryptocurrency-indicators
         // https://hackernoon.com/my-top-3-favourite-indicators-for-technical-analysis-of-cryptocurrencies-b552f584776d
         
-        
-        
-        
-        
-        
         //OpenPriceIndicator openPriceIndicator = new OpenPriceIndicator(series);
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         
-        // The bias is bullish when the shorter-moving average moves above the longer moving average.
-        // The bias is bearish when the shorter-moving average moves below the longer moving average.
-        EMAIndicator shortEma = new EMAIndicator(closePrice, 7);
-        EMAIndicator longEma = new EMAIndicator(closePrice, 25);
+        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
+        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
+        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
+        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
+        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
+        
+        SMAIndicator shortSma = new SMAIndicator(closePrice, 5);
+        SMAIndicator longSma = new SMAIndicator(closePrice, 20);
 
-        MACDIndicator macd = new MACDIndicator(closePrice, 9, 26);
-        EMAIndicator emaMacd = new EMAIndicator(macd, 18);
+        // We use a 2-period RSI indicator to identify buying
+        // or selling opportunities within the bigger trend.
+        RSIIndicator rsi = new RSIIndicator(closePrice, 2);
         
         // Entry rule
-        Rule entryRule = new OverIndicatorRule(shortEma, longEma)
-                .and(new OverIndicatorRule(macd, emaMacd));
+        // The long-term trend is up when a security is above its 200-period SMA.
+        Rule entryRule = new OverIndicatorRule(shortSma, longSma) // Trend
+                .and(new CrossedDownIndicatorRule(rsi, Decimal.valueOf(5))) // Signal 1
+                .and(new OverIndicatorRule(shortSma, closePrice)) // Signal 2
+                .and(new CrossedDownIndicatorRule(closePrice, kijunSen));
         
         // Exit rule
-        Rule exitRule = new UnderIndicatorRule(shortEma, longEma)
-                .and(new UnderIndicatorRule(macd, emaMacd));
+        // The long-term trend is down when a security is below its 200-period SMA.
+        Rule exitRule = new UnderIndicatorRule(shortSma, longSma) // Trend
+                .and(new CrossedUpIndicatorRule(rsi, Decimal.valueOf(95))) // Signal 1
+                .and(new UnderIndicatorRule(shortSma, closePrice)) // Signal 2
+                .and(new CrossedUpIndicatorRule(closePrice, kijunSen));
+
+        /*
+        .and(
+            new OrRule(
+                new StopLossRule(closePrice, Decimal.valueOf(3)),
+                new IsFallingRule(closePrice, 3, 0.9)
+            )
+        );        
+        */
         
         return new BaseStrategy(entryRule, exitRule);
     }
@@ -473,17 +617,12 @@ public class StrategiesController {
     public void resetStrategies() {
         markers.clear();
         strategies.clear();
-        strategies.put("MovingMomentum", buildMovingMomentumStrategy(series));
-        strategies.put("CCICorrection", buildCCICorrectionStrategy(series));
-        strategies.put("RSI2", buildRSI2Strategy(series));
-        strategies.put("GlobalExtrema", buildGlobalExtremaStrategy(series));
-        strategies.put("Simple MA", buildSimpleStrategy(series));
-        strategies.put("Advanced EMA", buildAdvancedEMAStrategy(series));
-        strategies.put("Ichimoku", buildIchimokuStrategy(series));
-        strategies.put("Ichimoku2", buildIchimoku2Strategy(series));
-        strategies.put("Ichimoku3", buildIchimoku3Strategy(series));
-        strategies.put("My WIP Strategy", buildMyMainStrategy(series));
-        strategies.put("No strategy", buildNoStrategy(series));
+        HashMap<String, StrategyInitializer> strategies_init = getStrategiesInitializerMap();
+        for (Map.Entry<String, StrategyInitializer> entry : strategies_init.entrySet()) {
+            strategies.put(entry.getKey(), entry.getValue().onInit(series));
+        }
+        strategies_init.clear();
+        strategies_init = null;
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
             app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
@@ -516,7 +655,7 @@ public class StrategiesController {
          * Analysis criteria
          */
         app.log("");
-        app.log("Current strategy ("+mainStrategy+") criterias:");
+        app.log("Current "+groupName+" strategy ("+mainStrategy+") criterias:");
         TotalProfitCriterion totalProfit = new TotalProfitCriterion();
         app.log("Total profit: " + totalProfit.calculate(series, tradingRecord));
         app.log("Total transaction cost (per 1): " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
@@ -722,5 +861,28 @@ public class StrategiesController {
             }
         }
         return StrategiesAction.DO_NOTHING;
+    }
+
+    public HashMap<String, StrategyInitializer> getStrategiesInitializerMap() {
+        HashMap<String, StrategyInitializer> strategies = new HashMap<String, StrategyInitializer>();
+        strategies.put("No strategy", s -> buildNoStrategy(s));
+        strategies.put("MovingMomentum", s -> buildMovingMomentumStrategy(s));
+        strategies.put("CCICorrection", s -> buildCCICorrectionStrategy(s));
+        strategies.put("RSI2", s -> buildRSI2Strategy(s));
+        strategies.put("GlobalExtrema", s -> buildGlobalExtremaStrategy(s));
+        strategies.put("Simple MA", s -> buildSimpleStrategy(s));
+        strategies.put("Advanced EMA", s -> buildAdvancedEMAStrategy(s));
+        strategies.put("Ichimoku", s -> buildIchimokuStrategy(s));
+        strategies.put("Ichimoku2", s -> buildIchimoku2Strategy(s));
+        strategies.put("Ichimoku3", s -> buildIchimoku3Strategy(s));
+        strategies.put("KAMA", s -> buildKAMAStrategy(s));
+        strategies.put("Bollinger", s -> buildBollingerStrategy(s));
+        strategies.put("Keltner Channel", s -> buildKeltnerChannelStrategy(s));
+        strategies.put("My WIP Strategy", s -> buildMyMainStrategy(s));
+        return strategies;
+    }
+    
+    public List<String> getStrategiesNames() {
+        return new ArrayList<String>(strategies.keySet());
     }
 }
