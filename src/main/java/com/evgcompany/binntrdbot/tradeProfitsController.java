@@ -24,6 +24,7 @@ import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
 import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
+import com.binance.api.client.domain.market.TickerStatistics;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,6 +49,7 @@ public class tradeProfitsController {
     private boolean isLimitedOrders = false;
 
     private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
+    private String tradeComissionCurrency = "BNB";
 
     private BinanceApiRestClient client = null;
     private Account account = null;
@@ -61,6 +63,20 @@ public class tradeProfitsController {
     
     public currencyItem getProfitData(String symbolAsset) {
         return curr_map.get(symbolAsset);
+    }
+    
+    public void showTradeComissionCurrency() {
+        if (tradeComissionCurrency.isEmpty() || client == null) {
+            return;
+        }
+        currencyItem cbase = curr_map.get(tradeComissionCurrency);
+        if (cbase == null) {
+            cbase = addCurrItem(tradeComissionCurrency);
+            cbase.setListIndex(listProfitModel.size());
+            curr_map.put(tradeComissionCurrency, cbase);
+            updateAllBalances(false);
+            listProfitModel.addElement(cbase.toString());
+        }
     }
     
     private BigDecimal getLastTradePrice(String symbolPair, boolean isBuyer) {
@@ -88,6 +104,38 @@ public class tradeProfitsController {
         return (pair != null) && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
     }
 
+    private void testPayTradeComission(BigDecimal price, String quoteSymbol) {
+        boolean use_spec_currency = !tradeComissionCurrency.isEmpty() && !tradeComissionCurrency.equals(quoteSymbol);
+        BigDecimal comission_quote = price
+                .multiply(
+                    BigDecimal.valueOf(100).subtract(tradeComissionPercent)
+                )
+                .divide(BigDecimal.valueOf(100));
+        if (use_spec_currency) {
+            String comission_pair = (tradeComissionCurrency + quoteSymbol).toUpperCase();
+            BigDecimal pair_price = null;
+            if (pair_map.containsKey(comission_pair)) {
+                pair_price = pair_map.get(comission_pair).getPrice();
+            } else {
+                TickerStatistics tc = client.get24HrPriceStatistics(comission_pair);
+                if (tc != null && !tc.getLastPrice().isEmpty()) {
+                    pair_price = new BigDecimal(tc.getLastPrice());
+                    placeOrUpdatePair(tradeComissionCurrency, quoteSymbol, comission_pair, true);
+                }
+            }
+            if (pair_price != null && pair_price.compareTo(BigDecimal.ZERO) > 0) {
+                currencyItem ccomm = curr_map.get(tradeComissionCurrency);
+                ccomm.addFreeValue(comission_quote.multiply(pair_price).multiply(BigDecimal.valueOf(-1)));
+            } else {
+                use_spec_currency = false;
+            }
+        }
+        if (!use_spec_currency) {
+            currencyItem cquote = curr_map.get(quoteSymbol);
+            cquote.addFreeValue(comission_quote.multiply(BigDecimal.valueOf(-1)));
+        }
+    }
+    
     public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price, boolean is_preordered) {
         long result = 0;
         try {
@@ -148,6 +196,7 @@ public class tradeProfitsController {
                     pair.setLastOrderPrice(price);
                     pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
                     pair.confirmTransaction();
+                    testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
                 }
             } else {
                 pair.setPrice(price);
@@ -229,6 +278,7 @@ public class tradeProfitsController {
                 pair.setLastOrderPrice(price);
                 pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
                 pair.confirmTransaction();
+                testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
             }
             updatePairText(symbolPair, !isTestMode);
             SEMAPHORE.release();
@@ -267,10 +317,10 @@ public class tradeProfitsController {
                 String symbol = allBalances.get(i).getAsset().toUpperCase();
                 if (curr_map.containsKey(symbol)) {
                     currencyItem curr = curr_map.get(symbol);
-                    BigDecimal balance_free = new BigDecimal(allBalances.get(i).getFree());
-                    BigDecimal balance_limit = new BigDecimal(allBalances.get(i).getLocked());
-                    BigDecimal balance = balance_free.add(balance_limit);
                     if (!isTestMode || curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
+                        BigDecimal balance_free = new BigDecimal(allBalances.get(i).getFree());
+                        BigDecimal balance_limit = new BigDecimal(allBalances.get(i).getLocked());
+                        BigDecimal balance = balance_free.add(balance_limit);
                         curr.setFreeValue(balance_free);
                         curr.setLimitValue(balance_limit);
                         if (curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
@@ -360,8 +410,15 @@ public class tradeProfitsController {
                 if (updateBalance) {
                     updateAllBalances();
                 }
-                listCurrenciesModel.set(cpair.getListIndex(), cpair.toString());
-                listProfitModel.set(cpair.getQuoteItem().getListIndex(), cpair.getQuoteItem().toString());
+                if (cpair.getListIndex() >= 0) {
+                    listCurrenciesModel.set(cpair.getListIndex(), cpair.toString());
+                }
+                if (cpair.getBaseItem().getListIndex() >= 0) {
+                    listProfitModel.set(cpair.getBaseItem().getListIndex(), cpair.getBaseItem().toString());
+                }
+                if (cpair.getQuoteItem().getListIndex() >= 0) {
+                    listProfitModel.set(cpair.getQuoteItem().getListIndex(), cpair.getQuoteItem().toString());
+                }
             }
         } catch (Exception e) {
         }

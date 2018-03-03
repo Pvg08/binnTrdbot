@@ -615,6 +615,7 @@ public class mainApplication extends javax.swing.JFrame {
             profitsChecker.setClient(client);
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
             profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
+            profitsChecker.showTradeComissionCurrency();
 
             log("ServerTime = " + client.getServerTime());
             log("");
