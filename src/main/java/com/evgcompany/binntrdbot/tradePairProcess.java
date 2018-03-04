@@ -92,7 +92,7 @@ public class tradePairProcess extends Thread {
     
     private CandlestickInterval barInterval;
     private int barSeconds;
-    private int barQueryCount = 500;
+    private int barQueryCount = 1;
     private boolean need_bar_reset = false;
     private Closeable socket = null;
     
@@ -697,6 +697,10 @@ public class tradePairProcess extends Thread {
         plot.showPlot();
     }
     
+    public void doShowStatistics() {
+        strategiesController.logStatistics(false);
+    }
+    
     /**
      * @return the isTryingToSellUp
      */
@@ -790,27 +794,21 @@ public class tradePairProcess extends Thread {
         if ("1m".equals(_barInterval)) {
             barInterval = CandlestickInterval.ONE_MINUTE;
             newSeconds = 60;
-            barQueryCount = 5;
         } else if ("5m".equals(_barInterval)) {
             barInterval = CandlestickInterval.FIVE_MINUTES;
             newSeconds = 60 * 5;
-            barQueryCount = 4;
         } else if ("15m".equals(_barInterval)) {
             barInterval = CandlestickInterval.FIFTEEN_MINUTES;
             newSeconds = 60 * 15;
-            barQueryCount = 3;
         } else if ("30m".equals(_barInterval)) {
             barInterval = CandlestickInterval.HALF_HOURLY;
             newSeconds = 60 * 30;
-            barQueryCount = 2;
         } else if ("1h".equals(_barInterval)) {
             barInterval = CandlestickInterval.HOURLY;
             newSeconds = 60 * 60;
-            barQueryCount = 2;
         } else if ("2h".equals(_barInterval)) {
             barInterval = CandlestickInterval.TWO_HOURLY;
             newSeconds = 60 * 120;
-            barQueryCount = 2;
         }
         if (newSeconds != barSeconds) {
             barSeconds = newSeconds;
@@ -915,5 +913,19 @@ public class tradePairProcess extends Thread {
      */
     public void setStopSellLimitTimeout(int stopSellLimitTimeout) {
         this.stopSellLimitTimeout = stopSellLimitTimeout;
+    }
+
+    /**
+     * @return the barQueryCount
+     */
+    public int getBarQueryCount() {
+        return barQueryCount;
+    }
+
+    /**
+     * @param barQueryCount the barQueryCount to set
+     */
+    public void setBarQueryCount(int barQueryCount) {
+        this.barQueryCount = barQueryCount;        
     }
 }

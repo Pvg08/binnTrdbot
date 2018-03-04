@@ -590,14 +590,51 @@ public class StrategiesController {
         if (profitsChecker != null) {
             if (profitsChecker.getStopLossPercent() != null) {
                 rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
-                app.log("StopLoss for " + groupName + " set to " + profitsChecker.getStopLossPercent());
             }
             if (profitsChecker.getStopGainPercent() != null) {
                 rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));
-                app.log("StopGain for " + groupName + " set to " + profitsChecker.getStopLossPercent());
             }
         }
         return rule;
+    }
+    
+    public void logStatistics(boolean init_marks) {
+        TimeSeriesManager seriesManager = new TimeSeriesManager(series);
+        TradingRecord tradingRecord = seriesManager.run(strategies.get(mainStrategy));
+
+        if (init_marks) {
+            List<org.ta4j.core.Trade> trlist = tradingRecord.getTrades();
+            for(int k=0; k<trlist.size(); k++) {
+                int index;
+                org.ta4j.core.Trade rtrade = trlist.get(k);
+                if (rtrade.getEntry() != null) {
+                    index = rtrade.getEntry().getIndex();
+                    addStrategyPastMarker(true, series.getBar(index).getBeginTime().toInstant().toEpochMilli(), mainStrategy);
+                }
+                if (rtrade.getExit() != null) {
+                    index = rtrade.getExit().getIndex();
+                    addStrategyPastMarker(false, series.getBar(index).getEndTime().toInstant().toEpochMilli(), mainStrategy);
+                }
+            }
+        }
+        
+        /**
+         * Analysis criteria
+         */
+        app.log("");
+        app.log("Current "+groupName+" strategy ("+mainStrategy+") criterias:");
+        TotalProfitCriterion totalProfit = new TotalProfitCriterion();
+        app.log("Total profit: " + totalProfit.calculate(series, tradingRecord));
+        app.log("Total transaction cost (per 1): " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
+        app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
+        app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecord));
+        app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecord));
+        app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
+        app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecord));
+        app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecord));
+        app.log("Buy-and-hold: " + new BuyAndHoldCriterion().calculate(series, tradingRecord));
+        app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
+        app.log("");
     }
     
     public void resetStrategies() {
@@ -620,40 +657,7 @@ public class StrategiesController {
             app.log("Strategy for " + groupName + " is not found. Using random = " + mainStrategy, true, false);
         }
 
-        TimeSeriesManager seriesManager = new TimeSeriesManager(series);
-        TradingRecord tradingRecord = seriesManager.run(strategies.get(mainStrategy));
-        
-        List<org.ta4j.core.Trade> trlist = tradingRecord.getTrades();
-        for(int k=0; k<trlist.size(); k++) {
-            int index;
-            org.ta4j.core.Trade rtrade = trlist.get(k);
-            if (rtrade.getEntry() != null) {
-                index = rtrade.getEntry().getIndex();
-                addStrategyPastMarker(true, series.getBar(index).getBeginTime().toInstant().toEpochMilli(), mainStrategy);
-            }
-            if (rtrade.getExit() != null) {
-                index = rtrade.getExit().getIndex();
-                addStrategyPastMarker(false, series.getBar(index).getEndTime().toInstant().toEpochMilli(), mainStrategy);
-            }
-        }
-
-        /**
-         * Analysis criteria
-         */
-        app.log("");
-        app.log("Current "+groupName+" strategy ("+mainStrategy+") criterias:");
-        TotalProfitCriterion totalProfit = new TotalProfitCriterion();
-        app.log("Total profit: " + totalProfit.calculate(series, tradingRecord));
-        app.log("Total transaction cost (per 1): " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
-        app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
-        app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecord));
-        app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecord));
-        app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
-        app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecord));
-        app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecord));
-        app.log("Buy-and-hold: " + new BuyAndHoldCriterion().calculate(series, tradingRecord));
-        app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
-        app.log("");
+        logStatistics(true);
     }
     
     private String findOptimalStrategy() {
