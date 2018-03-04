@@ -79,7 +79,7 @@ public class currencyPairItem {
             } else if (in_order_buy_sell_cycle) {
                 txt = txt + "; [ORDER]";
             }
-            if (!order_pending && last_order_price.floatValue() > 0) {
+            if (!order_pending && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
                 float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
                 txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "% " + symbolQuote;
             }

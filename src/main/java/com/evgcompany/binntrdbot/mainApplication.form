@@ -38,12 +38,12 @@
                   </Group>
                   <Group type="102" alignment="1" attributes="0">
                       <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                          <Component id="jScrollPane2" alignment="0" max="32767" attributes="0"/>
+                          <Component id="jScrollPane2" alignment="0" pref="254" max="32767" attributes="0"/>
                           <Component id="jLabel6" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Component id="jScrollPane1" alignment="0" max="32767" attributes="0"/>
                           <Component id="jLabel7" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="textFieldApiSecret" alignment="0" max="32767" attributes="0"/>
-                          <Component id="textFieldApiKey" alignment="0" min="-2" pref="254" max="-2" attributes="0"/>
+                          <Component id="textFieldApiKey" alignment="1" max="32767" attributes="0"/>
+                          <Component id="textFieldApiSecret" alignment="1" max="32767" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                   </Group>
@@ -422,15 +422,29 @@
                               <Component id="jLabel5" min="-2" max="-2" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="spinnerUpdateDelay" min="-2" pref="68" max="-2" attributes="0"/>
-                              <EmptySpace pref="107" max="32767" attributes="0"/>
+                              <EmptySpace max="32767" attributes="0"/>
                               <Component id="checkboxAutoFastorder" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <Group type="102" alignment="0" attributes="0">
+                          <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
                                   <Component id="checkboxTestMode" min="-2" max="-2" attributes="0"/>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="checkBoxBuyStopLimited" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="spinnerBuyStopLimited" min="-2" pref="53" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="jLabel12" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="checkBoxSellStopLimited" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="spinnerSellStopLimited" min="-2" pref="53" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="jLabel13" min="-2" max="-2" attributes="0"/>
+                                  </Group>
                               </Group>
-                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
+                              <EmptySpace min="0" pref="46" max="32767" attributes="0"/>
                           </Group>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
@@ -452,7 +466,19 @@
                       <Component id="checkboxTestMode" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace pref="106" max="32767" attributes="0"/>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="checkBoxBuyStopLimited" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="spinnerBuyStopLimited" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel12" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="checkBoxSellStopLimited" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="spinnerSellStopLimited" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel13" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace pref="51" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -495,6 +521,49 @@
               <Events>
                 <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="checkBoxLimitedOrdersStateChanged"/>
               </Events>
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="checkBoxBuyStopLimited">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Stop limited buy orders if waiting more than:"/>
+                <Property name="actionCommand" type="java.lang.String" value="Stop limited  buy orders if waiting more than:"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="checkBoxBuyStopLimitedStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="spinnerBuyStopLimited">
+              <Properties>
+                <Property name="enabled" type="boolean" value="false"/>
+                <Property name="value" type="java.lang.Object" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
+                  <Connection code="120" type="code"/>
+                </Property>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel12">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="sec."/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="checkBoxSellStopLimited">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Stop limited sell orders if waiting more than:"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="checkBoxSellStopLimitedStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="spinnerSellStopLimited">
+              <Properties>
+                <Property name="enabled" type="boolean" value="false"/>
+                <Property name="value" type="java.lang.Object" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
+                  <Connection code="120" type="code"/>
+                </Property>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel13">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="sec."/>
+              </Properties>
             </Component>
           </SubComponents>
         </Container>

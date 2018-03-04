@@ -100,11 +100,11 @@ public class tradeProfitsController {
     
     public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
         currencyPairItem pair = pair_map.get(symbolPair);
-        return (pair != null) && (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) >= 0);
+        return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && price.compareTo(BigDecimal.ZERO) > 0 && (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) >= 0);
     }
     public boolean canSell(String symbolPair, BigDecimal baseAmount) {
         currencyPairItem pair = pair_map.get(symbolPair);
-        return (pair != null) && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
+        return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
     }
 
     private void testPayTradeComission(BigDecimal price, String quoteSymbol) {
@@ -305,10 +305,11 @@ public class tradeProfitsController {
         }
     }
 
-    void finishOrder(String symbolPair, boolean isok, BigDecimal sold_price) {
+    public void finishOrder(String symbolPair, boolean isok, BigDecimal sold_price) {
         currencyPairItem pair = pair_map.get(symbolPair);
         if (pair != null) {
             if (isok) {
+                pair.setLastOrderPrice(sold_price);
                 pair.confirmTransaction();
             } else {
                 pair.rollbackTransaction();
@@ -346,6 +347,15 @@ public class tradeProfitsController {
                         if (curr.getQuoteItem().getListIndex() >= 0) {
                             listProfitModel.set(curr.getQuoteItem().getListIndex(), curr.getQuoteItem().toString());
                         }
+                        if (curr.getBaseItem().getListIndex() >= 0) {
+                            listProfitModel.set(curr.getBaseItem().getListIndex(), curr.getBaseItem().toString());
+                        }
+                    }
+                }
+                if (!tradeComissionCurrency.isEmpty()) {
+                    currencyItem curr = curr_map.get(tradeComissionCurrency);
+                    if (curr != null && curr.getListIndex() >= 0) {
+                        listProfitModel.set(curr.getListIndex(), curr.toString());
                     }
                 }
             }

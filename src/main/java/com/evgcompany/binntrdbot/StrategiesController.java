@@ -52,16 +52,19 @@ public class StrategiesController {
     private int barSeconds;
     private String groupName;
     private List<StrategyMarker> markers = new ArrayList<>();
+    private TradingRecord tradingRecord = null;
     
     public StrategiesController(String groupName, mainApplication app, tradeProfitsController profitsChecker) {
         this.groupName = groupName;
         this.app = app;
         this.profitsChecker = profitsChecker;
+        this.tradingRecord = new BaseTradingRecord();
     }
     public StrategiesController() {
         this.groupName = null;
         this.app = null;
         this.profitsChecker = null;
+        this.tradingRecord = null;
     }
     
     public void setGroupName(String groupName) {
@@ -587,9 +590,11 @@ public class StrategiesController {
         if (profitsChecker != null) {
             if (profitsChecker.getStopLossPercent() != null) {
                 rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
+                app.log("StopLoss for " + groupName + " set to " + profitsChecker.getStopLossPercent());
             }
             if (profitsChecker.getStopGainPercent() != null) {
                 rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));
+                app.log("StopGain for " + groupName + " set to " + profitsChecker.getStopLossPercent());
             }
         }
         return rule;
@@ -797,19 +802,19 @@ public class StrategiesController {
         
         if (is_hodling) {
             if (mode != StrategiesMode.BUY_DIP) {
-                if (strategies.get(mainStrategy).shouldExit(endIndex)) {
+                if (strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord)) {
                     addStrategyMarker(false, mainStrategy);
                     return StrategiesAction.DO_LEAVE;
-                } else if (strategies.get(mainStrategy).shouldEnter(endIndex)) {
+                } else if (strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord)) {
                     addStrategyMarker(true, mainStrategy);
                     app.log(groupName + " should enter here but already hodling...", false, true);
                 }
             }
         } else {
-            if (strategies.get(mainStrategy).shouldEnter(endIndex)) {
+            if (strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord)) {
                 addStrategyMarker(true, mainStrategy);
                 return StrategiesAction.DO_ENTER;
-            } else if (strategies.get(mainStrategy).shouldExit(endIndex)) {
+            } else if (strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord)) {
                 addStrategyMarker(false, mainStrategy);
                 app.log(groupName + " should exit here but everything is sold...", false, true);
             }
@@ -819,21 +824,21 @@ public class StrategiesController {
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
                 if (entry.getKey() != mainStrategy) {
                     if (is_hodling) {
-                        if (entry.getValue().shouldExit(endIndex)) {
+                        if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
                             addStrategyMarker(false, entry.getKey());
                             app.log(groupName + " should exit here ("+entry.getKey()+")...", false, true);
                             if (mode != StrategiesMode.SELL_UP) {
                                 return StrategiesAction.DO_LEAVE;
                             }
-                        } else if (entry.getValue().shouldEnter(endIndex)) {
+                        } else if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
                             addStrategyMarker(true, entry.getKey());
                             app.log(groupName + " should enter here ("+entry.getKey()+") but already hodling...", false, true);
                         }
                     } else {
-                        if (entry.getValue().shouldEnter(endIndex)) {
+                        if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
                             addStrategyMarker(true, entry.getKey());
                             app.log(groupName + " should enter here ("+entry.getKey()+")...", false, true);
-                        } else if (entry.getValue().shouldExit(endIndex)) {
+                        } else if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
                             addStrategyMarker(false, entry.getKey());
                             app.log(groupName + " should exit here ("+entry.getKey()+") but everything is sold...", false, true);
                         }
@@ -866,5 +871,19 @@ public class StrategiesController {
     
     public List<String> getStrategiesNames() {
         return new ArrayList<String>(strategies.keySet());
+    }
+
+    /**
+     * @return the tradingRecord
+     */
+    public TradingRecord getTradingRecord() {
+        return tradingRecord;
+    }
+
+    /**
+     * @param tradingRecord the tradingRecord to set
+     */
+    public void setTradingRecord(TradingRecord tradingRecord) {
+        this.tradingRecord = tradingRecord;
     }
 }

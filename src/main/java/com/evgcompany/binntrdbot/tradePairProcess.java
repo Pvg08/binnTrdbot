@@ -116,6 +116,12 @@ public class tradePairProcess extends Thread {
     private static DecimalFormat df8 = new DecimalFormat("0.########");
     private int startDelayTime = 0;
     
+    private boolean useBuyStopLimited = false;
+    private int stopBuyLimitTimeout = 120;
+    private boolean useSellStopLimited = false;
+    private int stopSellLimitTimeout = 1200;
+    
+    private long lastOrderMillis = 0;
     private long currentPriceMillis = 0;
     private long lastStrategyPriceMillis = 0;
     private BigDecimal currentPrice = BigDecimal.ZERO;
@@ -131,27 +137,37 @@ public class tradePairProcess extends Thread {
     }
     
     private void doEnter(BigDecimal curPrice) {
-        BigDecimal summ_to_buy = quoteStartBalance.multiply(tradingBalancePercent.multiply(BigDecimal.valueOf(0.01)));
+        if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal summ_to_buy = quoteStartBalance.multiply(tradingBalancePercent.divide(BigDecimal.valueOf(100)));
         sold_price = normalizePrice(curPrice);
         sold_amount = normalizeQuantity(summ_to_buy.divide(curPrice, RoundingMode.HALF_DOWN), true);
         sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
         summ_to_buy = sold_price.multiply(sold_amount);
         base_strategy_sell_ignored = false;
         if (profitsChecker.canBuy(symbol, sold_amount, curPrice)) {
-            app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")\n", true, true);
+            app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
             long result = profitsChecker.Buy(symbol, sold_amount, curPrice, false);
             if (result >= 0) {
                 limitOrderId = result;
-                app.log("Successful!\n", true, true);
+                app.log("Successful!", true, true);
                 is_hodling = true;
+                lastOrderMillis = System.currentTimeMillis();
+                if (limitOrderId == 0) {
+                    strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
+                }
             } else {
-                app.log("Error!\n", true, true);
+                app.log("Error!", true, true);
             }
         } else {
-            app.log("Can't buy " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")\n");
+            app.log("Can't buy " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")");
         }
     }
     private void doExit(BigDecimal curPrice, boolean skip_check) {
+        if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
         BigDecimal new_sold_price = sold_amount.multiply(curPrice);
         BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
         BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
@@ -167,41 +183,68 @@ public class tradePairProcess extends Thread {
                     is_hodling = false;
                     orderToCancelOnSellUp.clear();
                     isTryingToSellUp = false;
+                    lastOrderMillis = System.currentTimeMillis();
+                    if (limitOrderId == 0) {
+                        strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
+                    }
                 } else {
-                    app.log("Error!\n", true, true);
+                    app.log("Error!", true, true);
                 }
             } else {
-                app.log("Can't sell " + sold_amount + " " + symbol + "\n", false, true);
+                app.log("Can't sell " + sold_amount + " " + symbol + "", false, true);
             }
         } else {
-            app.log(symbol + " - need to exit but profit ("+incomeWithoutComissionPercent+"%) is too low. Waiting...\n", false, true);
+            app.log(symbol + " - need to exit but profit ("+incomeWithoutComissionPercent+"%) is too low. Waiting...", false, true);
             base_strategy_sell_ignored = true;
         }
     }
     
     private void checkOrder() {
         Order order = client.getOrderStatus(new OrderStatusRequest(symbol, limitOrderId));
-        if (order != null && (
+        if(order != null) {
+            if (
                 order.getStatus() == OrderStatus.FILLED || 
                 order.getStatus() == OrderStatus.CANCELED ||
                 order.getStatus() == OrderStatus.EXPIRED ||
                 order.getStatus() == OrderStatus.REJECTED
-            )
-        ) {
-            limitOrderId = 0;
-            if (order.getStatus() != OrderStatus.FILLED) {
-                if(order.getSide() == OrderSide.BUY) {
-                    isTryingToSellUp = false;
-                    is_hodling = false;
-                    orderToCancelOnSellUp.clear();
-                    base_strategy_sell_ignored = false;
+            ) {
+                limitOrderId = 0;
+                if (order.getStatus() != OrderStatus.FILLED) {
+                    if(order.getSide() == OrderSide.BUY) {
+                        isTryingToSellUp = false;
+                        is_hodling = false;
+                        orderToCancelOnSellUp.clear();
+                        base_strategy_sell_ignored = false;
+                    } else {
+                        is_hodling = true;
+                    }
                 } else {
-                    is_hodling = true;
+                    if(order.getSide() == OrderSide.BUY) {
+                        strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
+                    } else {
+                        strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
+                    }
+                }
+                profitsChecker.finishOrder(symbol, order.getStatus() == OrderStatus.FILLED, new BigDecimal(order.getPrice()));
+                profitsChecker.updateAllBalances(true);
+                app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is finished! Status="+order.getStatus().name()+"; Price = "+order.getPrice(), true, true);
+            } else {
+                if(order.getSide() == OrderSide.BUY) {
+                    if (useBuyStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopBuyLimitTimeout) {
+                        app.log("We wait too long. Need to stop this "+symbol+"'s BUY order...");
+                        lastOrderMillis = System.currentTimeMillis();
+                        doLimitCancel();
+                        return;
+                    }
+                } else {
+                    if (useSellStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopSellLimitTimeout) {
+                        app.log("We wait too long. Need to stop this "+symbol+"'s SELL order...");
+                        lastOrderMillis = System.currentTimeMillis();
+                        doLimitCancel();
+                        return;
+                    }
                 }
             }
-            profitsChecker.finishOrder(symbol, order.getStatus() == OrderStatus.FILLED, sold_price);
-            profitsChecker.updateAllBalances(true);
-            app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is finished! Status="+order.getStatus().name()+"; Price = "+order.getPrice(), true, true);
         }
         profitsChecker.setPairPrice(symbol, currentPrice);
     }
@@ -327,7 +370,7 @@ public class tradePairProcess extends Thread {
         return price;
     }
     public BigDecimal normalizeNotionalQuantity(BigDecimal quantity, BigDecimal price) {
-        if (filterNotional) {
+        if (filterNotional && price.compareTo(BigDecimal.ZERO) > 0) {
             if (quantity.multiply(price).compareTo(filterMinNotional) < 0) {
                 quantity = filterMinNotional.divide(price);
                 quantity = normalizeQuantity(quantity, false);
@@ -816,5 +859,61 @@ public class tradePairProcess extends Thread {
 
     void setCheckOtherStrategies(boolean checkOtherStrategies) {
         this.checkOtherStrategies = checkOtherStrategies;
+    }
+
+    /**
+     * @return the useStopLimited
+     */
+    public boolean isUseBuyStopLimited() {
+        return useBuyStopLimited;
+    }
+
+    /**
+     * @param useBuyStopLimited the useStopLimited to set
+     */
+    public void setUseBuyStopLimited(boolean useBuyStopLimited) {
+        this.useBuyStopLimited = useBuyStopLimited;
+    }
+
+    /**
+     * @return the stopLimitTimeout
+     */
+    public int getStopBuyLimitTimeout() {
+        return stopBuyLimitTimeout;
+    }
+
+    /**
+     * @param stopBuyLimitTimeout the stopLimitTimeout to set
+     */
+    public void setStopBuyLimitTimeout(int stopBuyLimitTimeout) {
+        this.stopBuyLimitTimeout = stopBuyLimitTimeout;
+    }
+
+    /**
+     * @return the useSellStopLimited
+     */
+    public boolean isUseSellStopLimited() {
+        return useSellStopLimited;
+    }
+
+    /**
+     * @param useSellStopLimited the useSellStopLimited to set
+     */
+    public void setUseSellStopLimited(boolean useSellStopLimited) {
+        this.useSellStopLimited = useSellStopLimited;
+    }
+
+    /**
+     * @return the stopSellLimitTimeout
+     */
+    public int getStopSellLimitTimeout() {
+        return stopSellLimitTimeout;
+    }
+
+    /**
+     * @param stopSellLimitTimeout the stopSellLimitTimeout to set
+     */
+    public void setStopSellLimitTimeout(int stopSellLimitTimeout) {
+        this.stopSellLimitTimeout = stopSellLimitTimeout;
     }
 }

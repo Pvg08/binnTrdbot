@@ -109,6 +109,10 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefLoad(checkBoxStopLoss, "use_stop_loss");
         componentPrefLoad(spinnerStopGain, "stop_gain");
         componentPrefLoad(spinnerStopLoss, "stop_loss");
+        componentPrefLoad(checkBoxBuyStopLimited, "use_buy_stop_limited_timeout");
+        componentPrefLoad(spinnerBuyStopLimited, "buy_stop_limited_timeout");
+        componentPrefLoad(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
+        componentPrefLoad(spinnerSellStopLimited, "sell_stop_limited_timeout");
     }
 
     private int searchCurrencyFirstPair(String currencyPair, boolean is_hodling) {
@@ -197,6 +201,10 @@ public class mainApplication extends javax.swing.JFrame {
                         nproc.setLowHold(checkBoxLowHold.isSelected());
                         nproc.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
                         nproc.setStartDelay(pairs.size() * 1000 + 500);
+                        nproc.setUseBuyStopLimited(checkBoxBuyStopLimited.isSelected());
+                        nproc.setStopBuyLimitTimeout((Integer) spinnerBuyStopLimited.getValue());
+                        nproc.setUseSellStopLimited(checkBoxSellStopLimited.isSelected());
+                        nproc.setStopSellLimitTimeout((Integer) spinnerSellStopLimited.getValue());
                         nproc.start();
                         pairs.add(nproc);
                     } else {
@@ -208,6 +216,10 @@ public class mainApplication extends javax.swing.JFrame {
                         pairs.get(pair_index).setDelayTime((Integer) spinnerUpdateDelay.getValue());
                         pairs.get(pair_index).setLowHold(checkBoxLowHold.isSelected());
                         pairs.get(pair_index).setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
+                        pairs.get(pair_index).setUseSellStopLimited(checkBoxBuyStopLimited.isSelected());
+                        pairs.get(pair_index).setStopBuyLimitTimeout((Integer) spinnerBuyStopLimited.getValue());
+                        pairs.get(pair_index).setUseSellStopLimited(checkBoxSellStopLimited.isSelected());
+                        pairs.get(pair_index).setStopSellLimitTimeout((Integer) spinnerSellStopLimited.getValue());
                     }
                 }
             });
@@ -270,6 +282,12 @@ public class mainApplication extends javax.swing.JFrame {
         checkboxAutoFastorder = new javax.swing.JCheckBox();
         checkboxTestMode = new javax.swing.JCheckBox();
         checkBoxLimitedOrders = new javax.swing.JCheckBox();
+        checkBoxBuyStopLimited = new javax.swing.JCheckBox();
+        spinnerBuyStopLimited = new javax.swing.JSpinner();
+        jLabel12 = new javax.swing.JLabel();
+        checkBoxSellStopLimited = new javax.swing.JCheckBox();
+        spinnerSellStopLimited = new javax.swing.JSpinner();
+        jLabel13 = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
         checkBoxStopGain = new javax.swing.JCheckBox();
         checkBoxStopLoss = new javax.swing.JCheckBox();
@@ -445,6 +463,31 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        checkBoxBuyStopLimited.setText("Stop limited buy orders if waiting more than:");
+        checkBoxBuyStopLimited.setActionCommand("Stop limited  buy orders if waiting more than:");
+        checkBoxBuyStopLimited.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                checkBoxBuyStopLimitedStateChanged(evt);
+            }
+        });
+
+        spinnerBuyStopLimited.setEnabled(false);
+        spinnerBuyStopLimited.setValue(120);
+
+        jLabel12.setText("sec.");
+
+        checkBoxSellStopLimited.setText("Stop limited sell orders if waiting more than:");
+        checkBoxSellStopLimited.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                checkBoxSellStopLimitedStateChanged(evt);
+            }
+        });
+
+        spinnerSellStopLimited.setEnabled(false);
+        spinnerSellStopLimited.setValue(120);
+
+        jLabel13.setText("sec.");
+
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
         jPanel2Layout.setHorizontalGroup(
@@ -456,13 +499,25 @@ public class mainApplication extends javax.swing.JFrame {
                         .addComponent(jLabel5)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(spinnerUpdateDelay, javax.swing.GroupLayout.PREFERRED_SIZE, 68, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 107, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(checkboxAutoFastorder))
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(checkBoxLimitedOrders)
-                            .addComponent(checkboxTestMode))
-                        .addGap(0, 0, Short.MAX_VALUE)))
+                            .addComponent(checkboxTestMode)
+                            .addGroup(jPanel2Layout.createSequentialGroup()
+                                .addComponent(checkBoxBuyStopLimited)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerBuyStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel12))
+                            .addGroup(jPanel2Layout.createSequentialGroup()
+                                .addComponent(checkBoxSellStopLimited)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerSellStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel13)))
+                        .addGap(0, 46, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         jPanel2Layout.setVerticalGroup(
@@ -478,7 +533,17 @@ public class mainApplication extends javax.swing.JFrame {
                 .addComponent(checkboxTestMode)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(checkBoxLimitedOrders)
-                .addContainerGap(106, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(checkBoxBuyStopLimited)
+                    .addComponent(spinnerBuyStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel12))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(checkBoxSellStopLimited)
+                    .addComponent(spinnerSellStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel13))
+                .addContainerGap(51, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Main", jPanel2);
@@ -611,12 +676,12 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGap(161, 161, 161))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jScrollPane2)
+                            .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 254, Short.MAX_VALUE)
                             .addComponent(jLabel6)
                             .addComponent(jScrollPane1)
                             .addComponent(jLabel7)
-                            .addComponent(textFieldApiSecret)
-                            .addComponent(textFieldApiKey, javax.swing.GroupLayout.PREFERRED_SIZE, 254, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(textFieldApiKey, javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(textFieldApiSecret, javax.swing.GroupLayout.Alignment.TRAILING))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel8)
@@ -728,9 +793,9 @@ public class mainApplication extends javax.swing.JFrame {
             profitsChecker.setClient(client);
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
             profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
-            profitsChecker.showTradeComissionCurrency();
             profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
             profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
+            profitsChecker.showTradeComissionCurrency();
 
             log("ServerTime = " + client.getServerTime());
             log("");
@@ -846,8 +911,10 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonSellActionPerformed
 
     private void buttonSetPairsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetPairsActionPerformed
-        initPairs();
         profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
+        profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
+        profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
+        initPairs();
     }//GEN-LAST:event_buttonSetPairsActionPerformed
 
     private void buttonUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonUpdateActionPerformed
@@ -947,6 +1014,10 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefSave(checkBoxStopLoss, "use_stop_loss");
         componentPrefSave(spinnerStopGain, "stop_gain");
         componentPrefSave(spinnerStopLoss, "stop_loss");
+        componentPrefSave(checkBoxBuyStopLimited, "use_buy_stop_limited_timeout");
+        componentPrefSave(spinnerBuyStopLimited, "buy_stop_limited_timeout");
+        componentPrefSave(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
+        componentPrefSave(spinnerSellStopLimited, "sell_stop_limited_timeout");
     }//GEN-LAST:event_formWindowClosing
 
     private void checkBoxStopLossStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxStopLossStateChanged
@@ -956,6 +1027,14 @@ public class mainApplication extends javax.swing.JFrame {
     private void checkBoxStopGainStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxStopGainStateChanged
         spinnerStopGain.setEnabled(checkBoxStopGain.isSelected());
     }//GEN-LAST:event_checkBoxStopGainStateChanged
+
+    private void checkBoxBuyStopLimitedStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxBuyStopLimitedStateChanged
+        spinnerBuyStopLimited.setEnabled(checkBoxBuyStopLimited.isSelected());
+    }//GEN-LAST:event_checkBoxBuyStopLimitedStateChanged
+
+    private void checkBoxSellStopLimitedStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxSellStopLimitedStateChanged
+        spinnerSellStopLimited.setEnabled(checkBoxSellStopLimited.isSelected());
+    }//GEN-LAST:event_checkBoxSellStopLimitedStateChanged
 
     /**
      * @param args the command line arguments
@@ -1004,9 +1083,11 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonShowPlot;
     private javax.swing.JButton buttonStop;
     private javax.swing.JButton buttonUpdate;
+    private javax.swing.JCheckBox checkBoxBuyStopLimited;
     private javax.swing.JCheckBox checkBoxCheckOtherStrategies;
     private javax.swing.JCheckBox checkBoxLimitedOrders;
     private javax.swing.JCheckBox checkBoxLowHold;
+    private javax.swing.JCheckBox checkBoxSellStopLimited;
     private javax.swing.JCheckBox checkBoxStopGain;
     private javax.swing.JCheckBox checkBoxStopLoss;
     private javax.swing.JCheckBox checkboxAutoFastorder;
@@ -1015,6 +1096,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
+    private javax.swing.JLabel jLabel12;
+    private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
@@ -1037,6 +1120,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JTextArea logTextarea;
     private javax.swing.JTextArea mainTextarea;
     private javax.swing.JSpinner spinnerBuyPercent;
+    private javax.swing.JSpinner spinnerBuyStopLimited;
+    private javax.swing.JSpinner spinnerSellStopLimited;
     private javax.swing.JSpinner spinnerStopGain;
     private javax.swing.JSpinner spinnerStopLoss;
     private javax.swing.JSpinner spinnerUpdateDelay;
