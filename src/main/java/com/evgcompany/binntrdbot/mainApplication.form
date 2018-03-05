@@ -78,7 +78,8 @@
                       <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                   </Group>
                   <Group type="102" alignment="1" attributes="0">
-                      <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
+                      <Component id="buttonWebBrowserOpen" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="32767" attributes="0"/>
                       <Component id="ButtonStatistics" min="-2" max="-2" attributes="0"/>
                   </Group>
                   <Group type="102" alignment="0" attributes="0">
@@ -134,7 +135,10 @@
                           <Component id="buttonShowPlot" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Component id="ButtonStatistics" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="ButtonStatistics" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonWebBrowserOpen" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
                       <EmptySpace min="-2" pref="4" max="-2" attributes="0"/>
                   </Group>
                   <Group type="102" alignment="0" attributes="0">
@@ -435,7 +439,11 @@
                           </Group>
                           <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
+                                  <Group type="102" attributes="0">
+                                      <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="comboBoxLimitedMode" min="-2" pref="81" max="-2" attributes="0"/>
+                                  </Group>
                                   <Component id="checkboxTestMode" min="-2" max="-2" attributes="0"/>
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="checkBoxBuyStopLimited" min="-2" max="-2" attributes="0"/>
@@ -473,7 +481,10 @@
                       <EmptySpace type="separate" max="-2" attributes="0"/>
                       <Component id="checkboxTestMode" min="-2" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
-                      <Component id="checkBoxLimitedOrders" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="checkBoxLimitedOrders" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="comboBoxLimitedMode" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="checkBoxBuyStopLimited" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -486,7 +497,7 @@
                           <Component id="spinnerSellStopLimited" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel13" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="44" max="32767" attributes="0"/>
+                      <EmptySpace pref="41" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -528,6 +539,7 @@
               </Properties>
               <Events>
                 <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="checkBoxLimitedOrdersStateChanged"/>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxLimitedOrdersActionPerformed"/>
               </Events>
             </Component>
             <Component class="javax.swing.JCheckBox" name="checkBoxBuyStopLimited">
@@ -572,6 +584,23 @@
               <Properties>
                 <Property name="text" type="java.lang.String" value="sec."/>
               </Properties>
+            </Component>
+            <Component class="javax.swing.JComboBox" name="comboBoxLimitedMode">
+              <Properties>
+                <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
+                  <StringArray count="2">
+                    <StringItem index="0" value="Only Sell"/>
+                    <StringItem index="1" value="Sell and Buy"/>
+                  </StringArray>
+                </Property>
+                <Property name="enabled" type="boolean" value="false"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="comboBoxLimitedModeActionPerformed"/>
+              </Events>
+              <AuxValues>
+                <AuxValue name="JavaCodeGenerator_TypeParameters" type="java.lang.String" value="&lt;String&gt;"/>
+              </AuxValues>
             </Component>
           </SubComponents>
         </Container>
@@ -866,6 +895,15 @@
       </Properties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="ButtonStatisticsActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="buttonWebBrowserOpen">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Binance"/>
+        <Property name="enabled" type="boolean" value="false"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="buttonWebBrowserOpenActionPerformed"/>
       </Events>
     </Component>
   </SubComponents>

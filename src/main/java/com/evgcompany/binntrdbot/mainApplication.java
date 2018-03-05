@@ -10,7 +10,11 @@ import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.RateLimit;
+import java.awt.Desktop;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -18,6 +22,8 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javax.swing.DefaultListModel;
 import javax.swing.JCheckBox;
@@ -114,6 +120,7 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefLoad(spinnerBuyStopLimited, "buy_stop_limited_timeout");
         componentPrefLoad(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
         componentPrefLoad(spinnerSellStopLimited, "sell_stop_limited_timeout");
+        componentPrefLoad(comboBoxLimitedMode, "limited_mode");
     }
 
     private int searchCurrencyFirstPair(String currencyPair, boolean is_hodling) {
@@ -203,7 +210,6 @@ public class mainApplication extends javax.swing.JFrame {
                         nproc.setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
                         nproc.setBarInterval(comboBoxBarsInterval.getItemAt(interval_index));
                         nproc.setDelayTime((Integer) spinnerUpdateDelay.getValue());
-                        nproc.setLowHold(checkBoxLowHold.isSelected());
                         nproc.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
                         nproc.setStartDelay(pairs.size() * 1000 + 500);
                         nproc.setUseBuyStopLimited(checkBoxBuyStopLimited.isSelected());
@@ -220,7 +226,6 @@ public class mainApplication extends javax.swing.JFrame {
                         pairs.get(pair_index).setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
                         pairs.get(pair_index).setBarInterval(comboBoxBarsInterval.getItemAt(interval_index));
                         pairs.get(pair_index).setDelayTime((Integer) spinnerUpdateDelay.getValue());
-                        pairs.get(pair_index).setLowHold(checkBoxLowHold.isSelected());
                         pairs.get(pair_index).setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
                         pairs.get(pair_index).setUseSellStopLimited(checkBoxBuyStopLimited.isSelected());
                         pairs.get(pair_index).setStopBuyLimitTimeout((Integer) spinnerBuyStopLimited.getValue());
@@ -295,6 +300,7 @@ public class mainApplication extends javax.swing.JFrame {
         checkBoxSellStopLimited = new javax.swing.JCheckBox();
         spinnerSellStopLimited = new javax.swing.JSpinner();
         jLabel13 = new javax.swing.JLabel();
+        comboBoxLimitedMode = new javax.swing.JComboBox<>();
         jPanel1 = new javax.swing.JPanel();
         checkBoxStopGain = new javax.swing.JCheckBox();
         checkBoxStopLoss = new javax.swing.JCheckBox();
@@ -314,6 +320,7 @@ public class mainApplication extends javax.swing.JFrame {
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
         ButtonStatistics = new javax.swing.JButton();
+        buttonWebBrowserOpen = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -475,6 +482,11 @@ public class mainApplication extends javax.swing.JFrame {
                 checkBoxLimitedOrdersStateChanged(evt);
             }
         });
+        checkBoxLimitedOrders.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkBoxLimitedOrdersActionPerformed(evt);
+            }
+        });
 
         checkBoxBuyStopLimited.setText("Stop limited buy orders if waiting more than:");
         checkBoxBuyStopLimited.setActionCommand("Stop limited  buy orders if waiting more than:");
@@ -501,6 +513,14 @@ public class mainApplication extends javax.swing.JFrame {
 
         jLabel13.setText("sec.");
 
+        comboBoxLimitedMode.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Only Sell", "Sell and Buy" }));
+        comboBoxLimitedMode.setEnabled(false);
+        comboBoxLimitedMode.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                comboBoxLimitedModeActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
         jPanel2Layout.setHorizontalGroup(
@@ -516,7 +536,10 @@ public class mainApplication extends javax.swing.JFrame {
                         .addComponent(checkboxAutoFastorder))
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(checkBoxLimitedOrders)
+                            .addGroup(jPanel2Layout.createSequentialGroup()
+                                .addComponent(checkBoxLimitedOrders)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(comboBoxLimitedMode, javax.swing.GroupLayout.PREFERRED_SIZE, 81, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addComponent(checkboxTestMode)
                             .addGroup(jPanel2Layout.createSequentialGroup()
                                 .addComponent(checkBoxBuyStopLimited)
@@ -545,7 +568,9 @@ public class mainApplication extends javax.swing.JFrame {
                 .addGap(18, 18, 18)
                 .addComponent(checkboxTestMode)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxLimitedOrders)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(checkBoxLimitedOrders)
+                    .addComponent(comboBoxLimitedMode, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkBoxBuyStopLimited)
@@ -556,7 +581,7 @@ public class mainApplication extends javax.swing.JFrame {
                     .addComponent(checkBoxSellStopLimited)
                     .addComponent(spinnerSellStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(jLabel13))
-                .addContainerGap(44, Short.MAX_VALUE))
+                .addContainerGap(41, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Main", jPanel2);
@@ -718,6 +743,14 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        buttonWebBrowserOpen.setText("Binance");
+        buttonWebBrowserOpen.setEnabled(false);
+        buttonWebBrowserOpen.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonWebBrowserOpenActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -764,7 +797,8 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(jLabel11))
                         .addGap(0, 0, Short.MAX_VALUE))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addComponent(buttonWebBrowserOpen)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(ButtonStatistics))
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(buttonBuy)
@@ -812,7 +846,9 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(buttonCancelLimit)
                             .addComponent(buttonShowPlot))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(ButtonStatistics)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(ButtonStatistics)
+                            .addComponent(buttonWebBrowserOpen))
                         .addGap(4, 4, 4))
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
@@ -856,8 +892,10 @@ public class mainApplication extends javax.swing.JFrame {
             profitsChecker.setClient(client);
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
             profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
+            profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
             profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
             profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
+            profitsChecker.setLowHold(checkBoxLowHold.isSelected());
             profitsChecker.showTradeComissionCurrency();
 
             log("ServerTime = " + client.getServerTime());
@@ -892,6 +930,7 @@ public class mainApplication extends javax.swing.JFrame {
             buttonCancelLimit.setEnabled(checkBoxLimitedOrders.isSelected());
             buttonShowPlot.setEnabled(true);
             ButtonStatistics.setEnabled(true);
+            buttonWebBrowserOpen.setEnabled(true);
         } catch (Exception e) {
             log("Error: " + e.getMessage(), true, true);
             e.printStackTrace();
@@ -921,6 +960,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonCancelLimit.setEnabled(false);
         buttonShowPlot.setEnabled(false);
         ButtonStatistics.setEnabled(false);
+        buttonWebBrowserOpen.setEnabled(false);
     }//GEN-LAST:event_buttonStopActionPerformed
 
     private void buttonClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonClearActionPerformed
@@ -948,6 +988,7 @@ public class mainApplication extends javax.swing.JFrame {
         }
         heroesController.doSetPaused(is_paused);
         ButtonStatistics.setEnabled(true);
+        buttonWebBrowserOpen.setEnabled(true);
     }//GEN-LAST:event_buttonPauseActionPerformed
 
     private void buttonBuyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonBuyActionPerformed
@@ -980,6 +1021,7 @@ public class mainApplication extends javax.swing.JFrame {
         profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
         profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
         profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
+        profitsChecker.setLowHold(checkBoxLowHold.isSelected());
         initPairs();
     }//GEN-LAST:event_buttonSetPairsActionPerformed
 
@@ -1045,6 +1087,7 @@ public class mainApplication extends javax.swing.JFrame {
 
     private void checkboxTestModeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkboxTestModeStateChanged
         checkBoxLimitedOrders.setEnabled(!checkboxTestMode.isSelected());
+        comboBoxLimitedMode.setEnabled(checkBoxLimitedOrders.isSelected() && !checkboxTestMode.isSelected());
     }//GEN-LAST:event_checkboxTestModeStateChanged
 
     private void checkBoxLowHoldStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxLowHoldStateChanged
@@ -1085,6 +1128,7 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefSave(spinnerBuyStopLimited, "buy_stop_limited_timeout");
         componentPrefSave(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
         componentPrefSave(spinnerSellStopLimited, "sell_stop_limited_timeout");
+        componentPrefSave(comboBoxLimitedMode, "limited_mode");
     }//GEN-LAST:event_formWindowClosing
 
     private void checkBoxStopLossStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxStopLossStateChanged
@@ -1115,6 +1159,38 @@ public class mainApplication extends javax.swing.JFrame {
             }
         }
     }//GEN-LAST:event_ButtonStatisticsActionPerformed
+
+    private void buttonWebBrowserOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonWebBrowserOpenActionPerformed
+        if (Desktop.isDesktopSupported()) {
+            try {
+                if (pairs.size() > 0) {
+                    int curr_index = listCurrencies.getSelectedIndex();
+                    if (curr_index >= 0) {
+                        String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
+                        int pair_index = searchCurrencyFirstPair(currencyPair);
+                        if (pair_index >= 0 && pair_index < pairs.size()) {
+                            String url = "https://www.binance.com/tradeDetail.html?symbol="+pairs.get(pair_index).getBaseSymbol()+"_"+pairs.get(pair_index).getQuoteSymbol();
+                            Desktop.getDesktop().browse(new URI(url));
+                        }
+                    }
+                }
+            } catch (URISyntaxException ex) {
+                Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }//GEN-LAST:event_buttonWebBrowserOpenActionPerformed
+
+    private void checkBoxLimitedOrdersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxLimitedOrdersActionPerformed
+        comboBoxLimitedMode.setEnabled(checkBoxLimitedOrders.isSelected());
+    }//GEN-LAST:event_checkBoxLimitedOrdersActionPerformed
+
+    private void comboBoxLimitedModeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxLimitedModeActionPerformed
+        if (profitsChecker != null) {
+            profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
+        }
+    }//GEN-LAST:event_comboBoxLimitedModeActionPerformed
 
     /**
      * @param args the command line arguments
@@ -1164,6 +1240,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonShowPlot;
     private javax.swing.JButton buttonStop;
     private javax.swing.JButton buttonUpdate;
+    private javax.swing.JButton buttonWebBrowserOpen;
     private javax.swing.JCheckBox checkBoxBuyStopLimited;
     private javax.swing.JCheckBox checkBoxCheckOtherStrategies;
     private javax.swing.JCheckBox checkBoxLimitedOrders;
@@ -1175,6 +1252,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkboxTestMode;
     private javax.swing.JComboBox<String> comboBoxBarsCount;
     private javax.swing.JComboBox<String> comboBoxBarsInterval;
+    private javax.swing.JComboBox<String> comboBoxLimitedMode;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;

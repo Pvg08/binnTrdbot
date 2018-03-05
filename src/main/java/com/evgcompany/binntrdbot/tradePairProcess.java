@@ -67,7 +67,6 @@ public class tradePairProcess extends Thread {
     private boolean isTryingToSellUp = false;
     private boolean isTryingToBuyDip = false;
     private boolean sellUpAll = false;
-    private boolean lowHold = true;
     private boolean checkOtherStrategies = true;
     
     private List<Long> orderToCancelOnSellUp = new ArrayList<>();
@@ -171,7 +170,7 @@ public class tradePairProcess extends Thread {
         BigDecimal new_sold_price = sold_amount.multiply(curPrice);
         BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
         BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
-        if (skip_check || !lowHold || incomeWithoutComissionPercent.compareTo(tradeMinProfitPercent) > 0) {
+        if (skip_check || !profitsChecker.isLowHold() || incomeWithoutComissionPercent.compareTo(tradeMinProfitPercent) > 0) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
                 base_strategy_sell_ignored = false;
                 app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(new_sold_price) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
@@ -250,13 +249,13 @@ public class tradePairProcess extends Thread {
     }
     
     private void checkStatus() {
-        StrategiesAction saction = strategiesController.checkStatus(
+        StrategiesController.StrategiesAction saction = strategiesController.checkStatus(
             is_hodling, 
             !isTryingToBuyDip && !buyOnStart && checkOtherStrategies, 
-            isTryingToBuyDip ? StrategiesMode.BUY_DIP : (base_strategy_sell_ignored ? StrategiesMode.SELL_UP : StrategiesMode.NORMAL)
+            isTryingToBuyDip ? StrategiesController.StrategiesMode.BUY_DIP : (base_strategy_sell_ignored ? StrategiesController.StrategiesMode.SELL_UP : StrategiesController.StrategiesMode.NORMAL)
         );
-        if (saction == StrategiesAction.DO_ENTER || saction == StrategiesAction.DO_LEAVE) {
-            if (saction == StrategiesAction.DO_ENTER) {
+        if (saction == StrategiesController.StrategiesAction.DO_ENTER || saction == StrategiesController.StrategiesAction.DO_LEAVE) {
+            if (saction == StrategiesController.StrategiesAction.DO_ENTER) {
                 doEnter(lastStrategyCheckPrice);
             } else {
                 doExit(lastStrategyCheckPrice, false);
@@ -665,6 +664,9 @@ public class tradePairProcess extends Thread {
     public String getBaseSymbol() {
         return baseAssetSymbol;
     }
+    public String getQuoteSymbol() {
+        return quoteAssetSymbol;
+    }
     public boolean isHodling() {
         return is_hodling;
     }
@@ -831,20 +833,6 @@ public class tradePairProcess extends Thread {
      */
     public void setDelayTime(long delayTime) {
         this.delayTime = delayTime;
-    }
-
-    /**
-     * @return the lowHold
-     */
-    public boolean isLowHold() {
-        return lowHold;
-    }
-
-    /**
-     * @param lowHold the lowHold to set
-     */
-    public void setLowHold(boolean lowHold) {
-        this.lowHold = lowHold;
     }
 
     void setBuyOnStart(boolean buyOnStart) {

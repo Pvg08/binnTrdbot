@@ -26,24 +26,25 @@ import org.ta4j.core.indicators.keltner.*;
 import org.ta4j.core.indicators.statistics.*;
 import org.ta4j.core.trading.rules.*;
 
-class StrategyMarker {
-    String label = "";
-    double timeStamp = 0;
-    int typeIndex = 0;
-}
-
-enum StrategiesMode {
-   NORMAL, BUY_DIP, SELL_UP
-}
-enum StrategiesAction {
-   DO_NOTHING, DO_ENTER, DO_LEAVE
-}
-
 /**
  *
  * @author EVG_adm_T
  */
 public class StrategiesController {
+    
+    public class StrategyMarker {
+        String label = "";
+        double timeStamp = 0;
+        int typeIndex = 0;
+    }
+
+    public enum StrategiesMode {
+       NORMAL, BUY_DIP, SELL_UP
+    }
+    public enum StrategiesAction {
+       DO_NOTHING, DO_ENTER, DO_LEAVE
+    }
+    
     private mainApplication app = null;
     private tradeProfitsController profitsChecker = null;
     private TimeSeries series = null;
@@ -132,7 +133,7 @@ public class StrategiesController {
         }
         return new BaseStrategy(
                 new BooleanRule(false),
-                new BooleanRule(false)
+                addStopLossGain(new BooleanRule(false), series)
         );
     }
     
@@ -157,6 +158,27 @@ public class StrategiesController {
         );
     }
 
+    /**
+     * @param series a time series
+     * @return a dummy strategy
+     */
+    private Strategy buildBearishEngulfingEMAStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        EMAIndicator ema_long = new EMAIndicator(closePrice, 21);
+        EMAIndicator ema_short = new EMAIndicator(closePrice, 9);
+
+        Rule entryRule = new CrossedUpIndicatorRule(ema_short, ema_long);
+        
+        // Exit rule
+        Rule exitRule = new BooleanIndicatorRule(new BearishEngulfingIndicator(series));
+        
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
+    }
+    
     /**
      * @param series a time series
      * @return a strategy
@@ -250,6 +272,52 @@ public class StrategiesController {
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildBollinger2Strategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        
+        EMAIndicator avg14 = new EMAIndicator(closePrice, 14);
+        StandardDeviationIndicator sd14 = new StandardDeviationIndicator(closePrice, 14);
+        
+        BollingerBandsMiddleIndicator bollingerM = new BollingerBandsMiddleIndicator(avg14);
+        BollingerBandsLowerIndicator BBB = new BollingerBandsLowerIndicator(bollingerM, sd14, Decimal.TWO);
+        BollingerBandsUpperIndicator BBT = new BollingerBandsUpperIndicator(bollingerM, sd14, Decimal.TWO);
+        
+        Rule entryRule = new OverIndicatorRule(closePrice, BBB)
+                .and(new UnderIndicatorRule(new PreviousValueIndicator(closePrice, 1), new PreviousValueIndicator(BBB, 1)));
+        
+        Rule exitRule = new UnderIndicatorRule(closePrice, BBT)
+                .and(new OverIndicatorRule(new PreviousValueIndicator(closePrice, 1), new PreviousValueIndicator(BBT, 1)));
+        
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
+    }
+    
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildCMOStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        
+        CMOIndicator cmo = new CMOIndicator(closePrice, 50);
+        
+        Rule entryRule = new UnderIndicatorRule(cmo, Decimal.valueOf(-10));
+        
+        Rule exitRule = new OverIndicatorRule(cmo, Decimal.valueOf(10));
+        
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
+    }
     
     /**
      * @param series a time series
@@ -413,10 +481,6 @@ public class StrategiesController {
         // http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:aroon
         // AroonUpIndicator arronUp = new AroonUpIndicator(series, 5);
         
-        
-        
-        
-        
         // https://blokt.com/technical-analysis/cryptocurrency-indicators
         // https://hackernoon.com/my-top-3-favourite-indicators-for-technical-analysis-of-cryptocurrencies-b552f584776d
         
@@ -429,36 +493,29 @@ public class StrategiesController {
         IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
         IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
         
-        SMAIndicator shortSma = new SMAIndicator(closePrice, 5);
-        SMAIndicator longSma = new SMAIndicator(closePrice, 20);
+        EMAIndicator shortEma = new EMAIndicator(closePrice, 5);
+        EMAIndicator longEma = new EMAIndicator(closePrice, 20);
 
-        // We use a 2-period RSI indicator to identify buying
-        // or selling opportunities within the bigger trend.
         RSIIndicator rsi = new RSIIndicator(closePrice, 2);
-        
-        // Entry rule
-        // The long-term trend is up when a security is above its 200-period SMA.
-        Rule entryRule = new OverIndicatorRule(shortSma, longSma) // Trend
-                .and(new CrossedDownIndicatorRule(rsi, Decimal.valueOf(5))) // Signal 1
-                .and(new OverIndicatorRule(shortSma, closePrice)) // Signal 2
-                .and(new CrossedDownIndicatorRule(closePrice, kijunSen));
-        
-        // Exit rule
-        // The long-term trend is down when a security is below its 200-period SMA.
-        Rule exitRule = new UnderIndicatorRule(shortSma, longSma) // Trend
-                .and(new CrossedUpIndicatorRule(rsi, Decimal.valueOf(95))) // Signal 1
-                .and(new UnderIndicatorRule(shortSma, closePrice)) // Signal 2
-                .and(new CrossedUpIndicatorRule(closePrice, kijunSen));
+        SMAIndicator sma = new SMAIndicator(closePrice, 12);
+        MACDIndicator macd = new MACDIndicator(closePrice, 9, 15);
 
-        /*
-        .and(
-            new OrRule(
-                new StopLossRule(closePrice, Decimal.valueOf(3)),
-                new IsFallingRule(closePrice, 3, 0.9)
-            )
-        );        
-        */
-        
+        Rule entryRule = new CrossedDownIndicatorRule(closePrice, kijunSen)
+                //new OverIndicatorRule(shortEma, longEma)
+                //.and(new OverIndicatorRule(shortEma, closePrice))
+                //.and(new OverIndicatorRule(sma, closePrice))
+                //.and(new IsRisingRule(macd, 2))
+                .and(new UnderIndicatorRule(rsi, new ConstantIndicator(Decimal.valueOf(90))))
+                ;
+
+        Rule exitRule = new CrossedUpIndicatorRule(closePrice, kijunSen)
+                //new UnderIndicatorRule(shortEma, longEma)
+                //.and(new UnderIndicatorRule(shortEma, closePrice))
+                //.and(new UnderIndicatorRule(sma, closePrice))
+                //.and(new IsFallingRule(macd, 2))
+                .and(new OverIndicatorRule(rsi, new ConstantIndicator(Decimal.valueOf(10))))
+                ;
+
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
@@ -588,6 +645,9 @@ public class StrategiesController {
     
     private Rule addStopLossGain(Rule rule, TimeSeries series) {
         if (profitsChecker != null) {
+            if (profitsChecker.isLowHold()) {
+                rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeComissionPercent().multiply(BigDecimal.valueOf(2)))));
+            }
             if (profitsChecker.getStopLossPercent() != null) {
                 rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
             }
@@ -625,16 +685,17 @@ public class StrategiesController {
         app.log("Current "+groupName+" strategy ("+mainStrategy+") criterias:");
         TotalProfitCriterion totalProfit = new TotalProfitCriterion();
         app.log("Total profit: " + totalProfit.calculate(series, tradingRecord));
-        app.log("Total transaction cost (per 1): " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
-        app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
+        app.log("Total transaction cost: " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
         app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecord));
-        app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecord));
-        app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
         app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecord));
         app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecord));
         app.log("Buy-and-hold: " + new BuyAndHoldCriterion().calculate(series, tradingRecord));
-        app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
         app.log("");
+        app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecord));
+        app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecord));
+        app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecord));
+        app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecord));
+        app.log("");app.log("");
     }
     
     public void resetStrategies() {
@@ -867,8 +928,11 @@ public class StrategiesController {
         strategies.put("Ichimoku2", s -> buildIchimoku2Strategy(s));
         strategies.put("Ichimoku3", s -> buildIchimoku3Strategy(s));
         strategies.put("KAMA", s -> buildKAMAStrategy(s));
+        strategies.put("CMO", s -> buildCMOStrategy(s));
         strategies.put("Bollinger", s -> buildBollingerStrategy(s));
+        strategies.put("Bollinger2", s -> buildBollinger2Strategy(s));
         strategies.put("Keltner Channel", s -> buildKeltnerChannelStrategy(s));
+        strategies.put("Bearish Engulfing EMA", s -> buildBearishEngulfingEMAStrategy(s));
         strategies.put("My WIP Strategy", s -> buildMyMainStrategy(s));
         return strategies;
     }

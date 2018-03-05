@@ -35,6 +35,10 @@ import java.util.Map;
  */
 public class tradeProfitsController {
     
+    public enum LimitedOrderMode {
+        LOMODE_SELL, LOMODE_BUY, LOMODE_SELLANDBUY
+    }
+    
     private mainApplication app;
     private static final Semaphore SEMAPHORE = new Semaphore(1, true);
     private static final Semaphore SEMAPHORE_ADDCOIN = new Semaphore(1, true);
@@ -47,12 +51,14 @@ public class tradeProfitsController {
 
     private boolean isTestMode = false;
     private boolean isLimitedOrders = false;
+    private LimitedOrderMode limitedOrderMode = LimitedOrderMode.LOMODE_SELLANDBUY;
 
     private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
     private String tradeComissionCurrency = "BNB";
     
     private BigDecimal stopLossPercent = null;
     private BigDecimal stopGainPercent = null;
+    private boolean lowHold = true;
 
     private BinanceApiRestClient client = null;
     private Account account = null;
@@ -161,7 +167,7 @@ public class tradeProfitsController {
                 }
                 if (!isTestMode) {
                     NewOrderResponse newOrderResponse;
-                    if (isLimitedOrders) {
+                    if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_BUY)) {
                         //price = price / (1 + 0.01f * tradeComissionPercent);
                         newOrderResponse = client.newOrder(limitBuy(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
                         result = newOrderResponse.getOrderId();
@@ -243,7 +249,7 @@ public class tradeProfitsController {
                     Thread.sleep(750);
                 }
                 NewOrderResponse newOrderResponse;
-                if (isLimitedOrders) {
+                if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_SELL)) {
                     //price = price * (1 + 0.01f * tradeComissionPercent);
                     newOrderResponse = client.newOrder(limitSell(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
                     result = newOrderResponse.getOrderId();
@@ -573,5 +579,33 @@ public class tradeProfitsController {
      */
     public void setStopGainPercent(BigDecimal stopGainPercent) {
         this.stopGainPercent = stopGainPercent;
+    }
+    
+    /**
+     * @return the lowHold
+     */
+    public boolean isLowHold() {
+        return lowHold;
+    }
+
+    /**
+     * @param lowHold the lowHold to set
+     */
+    public void setLowHold(boolean lowHold) {
+        this.lowHold = lowHold;
+    }
+
+    /**
+     * @return the limitedOrderMode
+     */
+    public LimitedOrderMode getLimitedOrderMode() {
+        return limitedOrderMode;
+    }
+
+    /**
+     * @param limitedOrderMode the limitedOrderMode to set
+     */
+    public void setLimitedOrderMode(LimitedOrderMode limitedOrderMode) {
+        this.limitedOrderMode = limitedOrderMode;
     }
 }

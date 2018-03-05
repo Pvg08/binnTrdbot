@@ -164,7 +164,6 @@ public class HeroesController extends Thread {
                     nproc.setMainStrategy("No");
                     nproc.setBarInterval("1m");
                     nproc.setDelayTime(5);
-                    nproc.setLowHold(false);
                     nproc.setBuyOnStart(true);
                     app.getPairs().add(nproc);
                     nproc.start();
