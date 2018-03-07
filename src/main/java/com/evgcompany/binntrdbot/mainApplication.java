@@ -45,7 +45,7 @@ public class mainApplication extends javax.swing.JFrame {
     private BinanceApiRestClient client = null;
     private List<tradePairProcess> pairs = new ArrayList<>(0);
     private tradeProfitsController profitsChecker = new tradeProfitsController(this);
-    private HeroesController heroesController = new HeroesController(this);
+    private CoinRatingController coinRatingController = new CoinRatingController(this);
     
     private boolean is_paused = false;
     Preferences prefs = null;
@@ -82,7 +82,7 @@ public class mainApplication extends javax.swing.JFrame {
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         listProfit.setModel(profitsChecker.getListProfitModel());
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
-        listHeroes.setModel(heroesController.getListHeroesModel());
+        listHeroes.setModel(coinRatingController.getListHeroesModel());
         
         StrategiesController scontroller = new StrategiesController();
         List<String> s_items = new ArrayList<String>(scontroller.getStrategiesInitializerMap().keySet());
@@ -105,6 +105,7 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefLoad(checkboxTestMode, "test_mode");
         componentPrefLoad(checkBoxLowHold, "low_hold");
         componentPrefLoad(checkboxAutoFastorder, "auto_heroes");
+        componentPrefLoad(checkBoxAutoAnalyzer, "auto_anal");
         componentPrefLoad(checkBoxLimitedOrders, "limited_orders");
         componentPrefLoad(checkBoxCheckOtherStrategies, "strategies_add_check");
         componentPrefLoad(spinnerUpdateDelay, "update_delay");
@@ -173,6 +174,18 @@ public class mainApplication extends javax.swing.JFrame {
     }
     public tradeProfitsController getProfitsChecker() {
         return profitsChecker;
+    }
+    
+    private void initAPI() {
+        if (factory == null || client == null) {
+            factory = BinanceApiClientFactory.newInstance(
+                textFieldApiKey.getText(),
+                textFieldApiSecret.getText()
+            );
+            client = factory.newRestClient();
+            profitsChecker.setClient(client);
+            coinRatingController.setClient(client);
+        }
     }
     
     private void initPairs() {
@@ -291,7 +304,6 @@ public class mainApplication extends javax.swing.JFrame {
         jPanel2 = new javax.swing.JPanel();
         spinnerUpdateDelay = new javax.swing.JSpinner();
         jLabel5 = new javax.swing.JLabel();
-        checkboxAutoFastorder = new javax.swing.JCheckBox();
         checkboxTestMode = new javax.swing.JCheckBox();
         checkBoxLimitedOrders = new javax.swing.JCheckBox();
         checkBoxBuyStopLimited = new javax.swing.JCheckBox();
@@ -316,11 +328,21 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
         jLabel14 = new javax.swing.JLabel();
         comboBoxBarsCount = new javax.swing.JComboBox<>();
+        jPanel4 = new javax.swing.JPanel();
+        checkboxAutoFastorder = new javax.swing.JCheckBox();
+        checkBoxAutoAnalyzer = new javax.swing.JCheckBox();
+        spinnerScanRatingDelayTime = new javax.swing.JSpinner();
+        jLabel15 = new javax.swing.JLabel();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
         ButtonStatistics = new javax.swing.JButton();
         buttonWebBrowserOpen = new javax.swing.JButton();
+        comboBoxRatingSortby = new javax.swing.JComboBox<>();
+        comboBoxRatingSort = new javax.swing.JComboBox<>();
+        buttonRatingStart = new javax.swing.JButton();
+        buttonRatingStop = new javax.swing.JButton();
+        buttonRatingCheck = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -446,7 +468,7 @@ public class mainApplication extends javax.swing.JFrame {
 
         jLabel7.setText("Buy & sell log");
 
-        jLabel8.setText("Heroes");
+        jLabel8.setText("Coins rating");
 
         jLabel9.setText("Api Secret / Api Key:");
 
@@ -459,13 +481,6 @@ public class mainApplication extends javax.swing.JFrame {
         spinnerUpdateDelay.setValue(10);
 
         jLabel5.setText("Update delay:");
-
-        checkboxAutoFastorder.setText("Auto Heroes order");
-        checkboxAutoFastorder.addChangeListener(new javax.swing.event.ChangeListener() {
-            public void stateChanged(javax.swing.event.ChangeEvent evt) {
-                checkboxAutoFastorderStateChanged(evt);
-            }
-        });
 
         checkboxTestMode.setSelected(true);
         checkboxTestMode.setText("Test mode");
@@ -531,41 +546,34 @@ public class mainApplication extends javax.swing.JFrame {
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addComponent(jLabel5)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(spinnerUpdateDelay, javax.swing.GroupLayout.PREFERRED_SIZE, 68, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(checkboxAutoFastorder))
+                        .addComponent(spinnerUpdateDelay, javax.swing.GroupLayout.PREFERRED_SIZE, 68, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(jPanel2Layout.createSequentialGroup()
-                                .addComponent(checkBoxLimitedOrders)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(comboBoxLimitedMode, javax.swing.GroupLayout.PREFERRED_SIZE, 81, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addComponent(checkboxTestMode)
-                            .addGroup(jPanel2Layout.createSequentialGroup()
-                                .addComponent(checkBoxBuyStopLimited)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(spinnerBuyStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jLabel12))
-                            .addGroup(jPanel2Layout.createSequentialGroup()
-                                .addComponent(checkBoxSellStopLimited)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(spinnerSellStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jLabel13)))
-                        .addGap(0, 156, Short.MAX_VALUE)))
-                .addContainerGap())
+                        .addComponent(checkBoxLimitedOrders)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(comboBoxLimitedMode, javax.swing.GroupLayout.PREFERRED_SIZE, 81, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(checkboxTestMode)
+                    .addGroup(jPanel2Layout.createSequentialGroup()
+                        .addComponent(checkBoxBuyStopLimited)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(spinnerBuyStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabel12))
+                    .addGroup(jPanel2Layout.createSequentialGroup()
+                        .addComponent(checkBoxSellStopLimited)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(spinnerSellStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabel13)))
+                .addContainerGap(162, Short.MAX_VALUE))
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(checkboxAutoFastorder)
-                    .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(jLabel5)
-                        .addComponent(spinnerUpdateDelay, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(18, 18, 18)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel5)
+                    .addComponent(spinnerUpdateDelay, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(21, 21, 21)
                 .addComponent(checkboxTestMode)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
@@ -709,6 +717,60 @@ public class mainApplication extends javax.swing.JFrame {
 
         jTabbedPane2.addTab("Strategies", jPanel1);
 
+        checkboxAutoFastorder.setText("Auto order");
+        checkboxAutoFastorder.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                checkboxAutoFastorderStateChanged(evt);
+            }
+        });
+        checkboxAutoFastorder.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkboxAutoFastorderActionPerformed(evt);
+            }
+        });
+
+        checkBoxAutoAnalyzer.setText("Auto analyzer");
+
+        spinnerScanRatingDelayTime.setValue(5);
+        spinnerScanRatingDelayTime.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                spinnerScanRatingDelayTimeStateChanged(evt);
+            }
+        });
+
+        jLabel15.setText("Delay time:");
+
+        javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
+        jPanel4.setLayout(jPanel4Layout);
+        jPanel4Layout.setHorizontalGroup(
+            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(checkBoxAutoAnalyzer)
+                    .addComponent(checkboxAutoFastorder)
+                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addComponent(jLabel15)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.PREFERRED_SIZE, 82, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap(340, Short.MAX_VALUE))
+        );
+        jPanel4Layout.setVerticalGroup(
+            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(checkBoxAutoAnalyzer)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(checkboxAutoFastorder)
+                .addGap(18, 18, 18)
+                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel15))
+                .addContainerGap(105, Short.MAX_VALUE))
+        );
+
+        jTabbedPane2.addTab("Coins rating", jPanel4);
+
         jTextArea1.setColumns(20);
         jTextArea1.setLineWrap(true);
         jTextArea1.setRows(5);
@@ -751,6 +813,38 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "% last hour", "% from prog start", "% 24hr", "Events count", "Last event date", "Volatility", "Calculated rating" }));
+        comboBoxRatingSortby.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                comboBoxRatingSortbyActionPerformed(evt);
+            }
+        });
+
+        comboBoxRatingSort.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "ASC", "DESC" }));
+        comboBoxRatingSort.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                comboBoxRatingSortActionPerformed(evt);
+            }
+        });
+
+        buttonRatingStart.setText("Start");
+        buttonRatingStart.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonRatingStartActionPerformed(evt);
+            }
+        });
+
+        buttonRatingStop.setText("Stop");
+        buttonRatingStop.setEnabled(false);
+        buttonRatingStop.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonRatingStopActionPerformed(evt);
+            }
+        });
+
+        buttonRatingCheck.setText("Check");
+        buttonRatingCheck.setEnabled(false);
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -758,58 +852,74 @@ public class mainApplication extends javax.swing.JFrame {
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(layout.createSequentialGroup()
+                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addComponent(buttonClear, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(jLabel9))
+                            .addGap(161, 161, 161))
+                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 254, Short.MAX_VALUE)
+                                .addComponent(jScrollPane1)
+                                .addComponent(jLabel7)
+                                .addComponent(textFieldApiKey, javax.swing.GroupLayout.Alignment.TRAILING)
+                                .addComponent(textFieldApiSecret, javax.swing.GroupLayout.Alignment.TRAILING))
+                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(buttonClear, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jLabel9))
-                        .addGap(161, 161, 161))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 254, Short.MAX_VALUE)
-                            .addComponent(jLabel6)
-                            .addComponent(jScrollPane1)
-                            .addComponent(jLabel7)
-                            .addComponent(textFieldApiKey, javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addComponent(textFieldApiSecret, javax.swing.GroupLayout.Alignment.TRAILING))
+                        .addComponent(jLabel6)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel8)
-                    .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 209, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addComponent(textFieldTradePairs)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(buttonSetPairs))
-                    .addComponent(jTabbedPane2)
-                    .addComponent(jScrollPane3)
-                    .addComponent(jScrollPane4)
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                            .addComponent(jLabel8)
+                            .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 209, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addGroup(layout.createSequentialGroup()
-                                .addComponent(buttonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(comboBoxRatingSortby, javax.swing.GroupLayout.PREFERRED_SIZE, 129, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonStop, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(comboBoxRatingSort, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                                .addComponent(textFieldTradePairs)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonPause, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addComponent(jLabel1)
-                            .addComponent(jLabel10)
-                            .addComponent(jLabel11))
-                        .addGap(0, 0, Short.MAX_VALUE))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                        .addComponent(buttonWebBrowserOpen)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(ButtonStatistics))
+                                .addComponent(buttonSetPairs))
+                            .addComponent(jTabbedPane2)
+                            .addComponent(jScrollPane3)
+                            .addComponent(jScrollPane4)
+                            .addGroup(layout.createSequentialGroup()
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addComponent(buttonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(buttonStop, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(buttonPause, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(jLabel1)
+                                    .addComponent(jLabel10)
+                                    .addComponent(jLabel11))
+                                .addGap(0, 0, Short.MAX_VALUE))
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                                .addComponent(buttonWebBrowserOpen)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(ButtonStatistics))
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(buttonBuy)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonSell)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonCancelLimit)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonUpdate)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(buttonShowPlot))))
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(buttonBuy)
+                        .addComponent(buttonRatingStart)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(buttonSell)
+                        .addComponent(buttonRatingStop)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(buttonCancelLimit)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(buttonUpdate)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(buttonShowPlot)))
+                        .addComponent(buttonRatingCheck)
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
@@ -837,7 +947,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jLabel10)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane3)
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 127, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonBuy)
@@ -856,7 +966,12 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(jLabel8))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jScrollPane5)
+                            .addGroup(layout.createSequentialGroup()
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(comboBoxRatingSortby, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(comboBoxRatingSort, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jScrollPane5))
                             .addGroup(layout.createSequentialGroup()
                                 .addComponent(textFieldApiSecret, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -864,13 +979,17 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(jLabel6)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 188, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 214, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(9, 9, 9)
                                 .addComponent(jLabel7)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 311, Short.MAX_VALUE)))))
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 269, Short.MAX_VALUE)))))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(buttonClear))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(buttonClear)
+                    .addComponent(buttonRatingStart)
+                    .addComponent(buttonRatingStop)
+                    .addComponent(buttonRatingCheck)))
         );
 
         pack();
@@ -881,15 +1000,7 @@ public class mainApplication extends javax.swing.JFrame {
         is_paused = false;
         buttonRun.setEnabled(false);
         try {
-            factory = BinanceApiClientFactory.newInstance(
-                textFieldApiKey.getText(),
-                textFieldApiSecret.getText()
-            );
-            client = factory.newRestClient();
-            heroesController.setClient(client);
-            heroesController.setLowHold(checkBoxLowHold.isSelected());
-            heroesController.setAutoOrder(checkboxAutoFastorder.isSelected());
-            profitsChecker.setClient(client);
+            initAPI();
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
             profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
             profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
@@ -917,7 +1028,6 @@ public class mainApplication extends javax.swing.JFrame {
             });
 
             log("", true);
-            heroesController.start();
             initPairs();
 
             checkboxTestMode.setEnabled(false);
@@ -949,8 +1059,6 @@ public class mainApplication extends javax.swing.JFrame {
             pairs.clear();
         }
         listHeroes.setModel(new DefaultListModel<String>());
-        heroesController.doStop();
-        heroesController = null;
         buttonRun.setEnabled(true);
         checkboxTestMode.setEnabled(true);
         buttonBuy.setEnabled(false);
@@ -986,7 +1094,7 @@ public class mainApplication extends javax.swing.JFrame {
                 pair.doSetPaused(is_paused);
             });
         }
-        heroesController.doSetPaused(is_paused);
+        coinRatingController.doSetPaused(is_paused);
         ButtonStatistics.setEnabled(true);
         buttonWebBrowserOpen.setEnabled(true);
     }//GEN-LAST:event_buttonPauseActionPerformed
@@ -1091,14 +1199,14 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkboxTestModeStateChanged
 
     private void checkBoxLowHoldStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxLowHoldStateChanged
-        if (heroesController != null) {
-            heroesController.setLowHold(checkBoxLowHold.isSelected());
+        if (coinRatingController != null) {
+            coinRatingController.setLowHold(checkBoxLowHold.isSelected());
         }
     }//GEN-LAST:event_checkBoxLowHoldStateChanged
 
     private void checkboxAutoFastorderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkboxAutoFastorderStateChanged
-        if (heroesController != null) {
-            heroesController.setAutoOrder(checkboxAutoFastorder.isSelected());
+        if (coinRatingController != null) {
+            coinRatingController.setAutoOrder(checkboxAutoFastorder.isSelected());
         }
     }//GEN-LAST:event_checkboxAutoFastorderStateChanged
 
@@ -1113,6 +1221,7 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefSave(checkboxTestMode, "test_mode");
         componentPrefSave(checkBoxLowHold, "low_hold");
         componentPrefSave(checkboxAutoFastorder, "auto_heroes");
+        componentPrefSave(checkBoxAutoAnalyzer, "auto_anal");
         componentPrefSave(checkBoxLimitedOrders, "limited_orders");
         componentPrefSave(checkBoxCheckOtherStrategies, "strategies_add_check");
         componentPrefSave(spinnerUpdateDelay, "update_delay");
@@ -1192,6 +1301,48 @@ public class mainApplication extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_comboBoxLimitedModeActionPerformed
 
+    private void checkboxAutoFastorderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoFastorderActionPerformed
+        if (coinRatingController != null) {
+            coinRatingController.setAutoOrder(checkboxAutoFastorder.isSelected());
+        }
+    }//GEN-LAST:event_checkboxAutoFastorderActionPerformed
+
+    private void buttonRatingStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRatingStartActionPerformed
+        initAPI();
+        coinRatingController.setLowHold(checkBoxLowHold.isSelected());
+        coinRatingController.setAutoOrder(checkboxAutoFastorder.isSelected());
+        coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
+        coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
+        comboBoxRatingSortActionPerformed(null);
+        comboBoxRatingSortbyActionPerformed(null);
+        coinRatingController.start();
+        buttonRatingStart.setEnabled(false);
+        buttonRatingCheck.setEnabled(true);
+        buttonRatingStop.setEnabled(true);
+    }//GEN-LAST:event_buttonRatingStartActionPerformed
+
+    private void buttonRatingStopActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRatingStopActionPerformed
+        coinRatingController.doStop();
+        buttonRatingStart.setEnabled(true);
+        buttonRatingCheck.setEnabled(false);
+        buttonRatingStop.setEnabled(false);
+    }//GEN-LAST:event_buttonRatingStopActionPerformed
+
+    private void comboBoxRatingSortActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxRatingSortActionPerformed
+        coinRatingController.setSortAsc(comboBoxRatingSort.getSelectedIndex() == 0);
+    }//GEN-LAST:event_comboBoxRatingSortActionPerformed
+
+    private void comboBoxRatingSortbyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxRatingSortbyActionPerformed
+        int sindex = comboBoxRatingSortby.getSelectedIndex();
+        if (sindex < 0) sindex = 0;
+        else if (sindex > CoinRatingController.CoinRatingSort.values().length-1) sindex = CoinRatingController.CoinRatingSort.values().length-1;
+        coinRatingController.setSortby(CoinRatingController.CoinRatingSort.values()[sindex]);
+    }//GEN-LAST:event_comboBoxRatingSortbyActionPerformed
+
+    private void spinnerScanRatingDelayTimeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spinnerScanRatingDelayTimeStateChanged
+        coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
+    }//GEN-LAST:event_spinnerScanRatingDelayTimeStateChanged
+
     /**
      * @param args the command line arguments
      */
@@ -1234,6 +1385,9 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonCancelLimit;
     private javax.swing.JButton buttonClear;
     private javax.swing.JButton buttonPause;
+    private javax.swing.JButton buttonRatingCheck;
+    private javax.swing.JButton buttonRatingStart;
+    private javax.swing.JButton buttonRatingStop;
     private javax.swing.JButton buttonRun;
     private javax.swing.JButton buttonSell;
     private javax.swing.JButton buttonSetPairs;
@@ -1241,6 +1395,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonStop;
     private javax.swing.JButton buttonUpdate;
     private javax.swing.JButton buttonWebBrowserOpen;
+    private javax.swing.JCheckBox checkBoxAutoAnalyzer;
     private javax.swing.JCheckBox checkBoxBuyStopLimited;
     private javax.swing.JCheckBox checkBoxCheckOtherStrategies;
     private javax.swing.JCheckBox checkBoxLimitedOrders;
@@ -1253,12 +1408,15 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JComboBox<String> comboBoxBarsCount;
     private javax.swing.JComboBox<String> comboBoxBarsInterval;
     private javax.swing.JComboBox<String> comboBoxLimitedMode;
+    private javax.swing.JComboBox<String> comboBoxRatingSort;
+    private javax.swing.JComboBox<String> comboBoxRatingSortby;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
     private javax.swing.JLabel jLabel12;
     private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel14;
+    private javax.swing.JLabel jLabel15;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
@@ -1270,6 +1428,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
+    private javax.swing.JPanel jPanel4;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
@@ -1285,6 +1444,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JTextArea mainTextarea;
     private javax.swing.JSpinner spinnerBuyPercent;
     private javax.swing.JSpinner spinnerBuyStopLimited;
+    private javax.swing.JSpinner spinnerScanRatingDelayTime;
     private javax.swing.JSpinner spinnerSellStopLimited;
     private javax.swing.JSpinner spinnerStopGain;
     private javax.swing.JSpinner spinnerStopLoss;
