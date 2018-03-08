@@ -30,8 +30,8 @@ public class currencyPairItem {
     
     private int listIndex = -1;
     
-    private static DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static DecimalFormat df6 = new DecimalFormat("0.######");
+    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
+    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     public currencyPairItem(currencyItem base_item, currencyItem quote_item, String symbolPair) {
         this.base_item = base_item;

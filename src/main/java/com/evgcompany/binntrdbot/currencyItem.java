@@ -21,8 +21,8 @@ public class currencyItem {
     
     private int orders_count = 0;
     
-    private static DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static DecimalFormat df6 = new DecimalFormat("0.######");
+    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
+    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     private boolean pair_key = false;
     private int active_orders = 0;

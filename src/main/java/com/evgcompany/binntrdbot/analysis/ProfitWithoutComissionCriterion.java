@@ -6,8 +6,6 @@
 package com.evgcompany.binntrdbot.analysis;
 
 import java.util.List;
-import org.ta4j.core.Decimal;
-import org.ta4j.core.Order;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
 import org.ta4j.core.TimeSeriesManager;
@@ -23,8 +21,8 @@ import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
  */
 public class ProfitWithoutComissionCriterion extends AbstractAnalysisCriterion {
 
-    private TotalProfitCriterion profit;
-    private LinearTransactionCostCriterion transaction_cost;
+    private final TotalProfitCriterion profit;
+    private final LinearTransactionCostCriterion transaction_cost;
 
     public ProfitWithoutComissionCriterion(double comission) {
         profit = new TotalProfitCriterion();

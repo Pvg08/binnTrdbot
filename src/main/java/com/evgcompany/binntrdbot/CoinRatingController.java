@@ -5,19 +5,14 @@
  */
 package com.evgcompany.binntrdbot;
 
-import com.binance.api.client.BinanceApiRestClient;
-import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
-import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.SymbolInfo;
-import com.binance.api.client.domain.market.Candlestick;
-import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.domain.market.TickerPrice;
+import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import java.io.IOException;
 import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +29,7 @@ import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
 import javax.swing.JProgressBar;
 import org.json.*;
+import org.ta4j.core.Bar;
 
 /**
  *
@@ -92,28 +88,28 @@ public class CoinRatingController extends Thread {
         CR_CALCULATED_RATING
     }
     
-    private mainApplication app;
-    BinanceApiRestClient client = null;
+    private final mainApplication app;
+    TradingAPIAbstractInterface client = null;
     private boolean lowHold = true;
     private boolean autoOrder = true;
     private boolean analyzer = false;
     private CoinRatingSort sortby = CoinRatingSort.CR_RANK;
     private boolean sortAsc = true;
 
-    Map<String, coinRatingLog> heroesMap = new HashMap<String, coinRatingLog>();
-    Map<String, JSONObject> coinRanks = new HashMap<String, JSONObject>();
+    Map<String, coinRatingLog> heroesMap = new HashMap<>();
+    Map<String, JSONObject> coinRanks = new HashMap<>();
 
     private long delayTime = 2;
     private long updateTime = 10;
     private boolean have_all_coins_info = false;
     
-    private static DecimalFormat df3p = new DecimalFormat("0.##%");
-    private static DecimalFormat df3 = new DecimalFormat("0.##");
-    private static DecimalFormat df6 = new DecimalFormat("0.#####");
+    private static final DecimalFormat df3p = new DecimalFormat("0.##%");
+    private static final DecimalFormat df3 = new DecimalFormat("0.##");
+    private static final DecimalFormat df6 = new DecimalFormat("0.#####");
     private boolean need_stop = false;
     private boolean paused = false;
-    private DefaultListModel<String> listHeroesModel = new DefaultListModel<String>();
-    private List<String> accountCoins = new ArrayList<>(0);
+    private final DefaultListModel<String> listHeroesModel = new DefaultListModel<>();
+    private final List<String> accountCoins = new ArrayList<>(0);
 
     private coinRatingLog entered = null;
     private JProgressBar progressBar = null;
@@ -154,30 +150,36 @@ public class CoinRatingController extends Thread {
     
     private void updatePair(coinRatingLog curr) {
         curr.update_counter++;
-        List<Candlestick> bars_h = client.getCandlestickBars(curr.symbol, CandlestickInterval.FIVE_MINUTES, 13, System.currentTimeMillis() - 60*60*1000, System.currentTimeMillis() + 10000);
-        List<Candlestick> bars_d = client.getCandlestickBars(curr.symbol, CandlestickInterval.TWO_HOURLY, 13, System.currentTimeMillis() - 24*60*60*1000, System.currentTimeMillis() + 100000);
+        List<Bar> bars_h = client.getBars(curr.symbol, "5m", 13, System.currentTimeMillis() - 60*60*1000, System.currentTimeMillis() + 10000);
+        List<Bar> bars_d = client.getBars(curr.symbol, "2h", 13, System.currentTimeMillis() - 24*60*60*1000, System.currentTimeMillis() + 100000);
         if (bars_h.size() > 1) {
-            curr.hour_ago_price = Float.parseFloat(bars_h.get(0).getClose());
+            curr.hour_ago_price = bars_h.get(0).getClosePrice().floatValue();
             curr.volatility = 0f;
             curr.hour_volume = 0f;
             for(int i=0; i<bars_h.size(); i++) {
-                float min_price = Float.parseFloat(bars_h.get(i).getLow());
-                float max_price = Float.parseFloat(bars_h.get(i).getHigh());
-                float open_price = Float.parseFloat(bars_h.get(i).getOpen());
-                float close_price = Float.parseFloat(bars_h.get(i).getClose());
+                float min_price = bars_h.get(i).getMinPrice().floatValue();
+                float max_price = bars_h.get(i).getMaxPrice().floatValue();
+                float open_price = bars_h.get(i).getOpenPrice().floatValue();
+                float close_price = bars_h.get(i).getClosePrice().floatValue();
                 curr.volatility += Math.abs((open_price - min_price)/open_price);
                 curr.volatility += Math.abs((close_price - min_price)/close_price);
                 curr.volatility += Math.abs((max_price - open_price)/open_price);
                 curr.volatility += Math.abs((max_price - close_price)/close_price);
-                curr.hour_volume += Float.parseFloat(bars_h.get(i).getVolume());
+                curr.hour_volume += bars_h.get(i).getVolume().floatValue();
             }
             curr.volatility /= bars_h.size()*4;
+            
+            /*BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
+            series.addBar(bar);
+            ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+            StandardDeviationIndicator vol_indicator = new StandardDeviationIndicator(closePrice, bars_h.size());*/
+            
         }
         if (bars_d.size() > 1) {
-            curr.day_ago_price = Float.parseFloat(bars_d.get(0).getClose());
+            curr.day_ago_price = bars_d.get(0).getClosePrice().floatValue();
             curr.day_volume = 0f;
             for(int i=0; i<bars_d.size(); i++) {
-                curr.day_volume += Float.parseFloat(bars_d.get(i).getVolume());
+                curr.day_volume += bars_d.get(i).getVolume().floatValue();
             }
         }
     }
@@ -227,8 +229,7 @@ public class CoinRatingController extends Thread {
         
         app.log("-----------------------------------");
         app.log("Analyzing pair " + curr.symbol + ":");
-        ExchangeInfo info = client.getExchangeInfo();
-        SymbolInfo pair_sinfo = info.getSymbolInfo(curr.symbol);
+        SymbolInfo pair_sinfo = client.getSymbolInfo(curr.symbol);
         
         int dips_50p = 0;
         int dips_25p = 0;
@@ -243,7 +244,7 @@ public class CoinRatingController extends Thread {
         
         updatePair(curr);
         
-        List<Candlestick> bars = client.getCandlestickBars(curr.symbol, CandlestickInterval.TWO_HOURLY);
+        List<Bar> bars = client.getBars(curr.symbol, "2h");
         
         app.log("Base = " + pair_sinfo.getBaseAsset());
         app.log("Base name = " + curr.fullname);
@@ -253,19 +254,18 @@ public class CoinRatingController extends Thread {
         app.log("Current volatility = " + df6.format(curr.volatility));
         
         if (bars.size() > 0) {
-            app.log("Price = " + bars.get(bars.size()-1).getClose());
+            app.log("Price = " + bars.get(bars.size()-1).getClosePrice());
             String timeframe = df3.format(2.0*bars.size()/24) + "d";
             app.log("");
             app.log("Timeframe = " + timeframe);
         }
 
         for(int i=0; i<bars.size(); i++) {
-            Candlestick bar = bars.get(i);
-            float open = Float.parseFloat(bar.getOpen());
-            float close = Float.parseFloat(bar.getClose());
-            float mid = 0.5f * (open + close);
-            float min = Float.parseFloat(bar.getLow());
-            float max = Float.parseFloat(bar.getHigh());
+            Bar bar = bars.get(i);
+            float open = bar.getOpenPrice().floatValue();
+            float close = bar.getClosePrice().floatValue();
+            float min = bar.getMinPrice().floatValue();
+            float max = bar.getMaxPrice().floatValue();
             
             float dip_p = 100 * (open - min) / open;
             float peak_p = 100 * (max - open) / open;
@@ -281,7 +281,7 @@ public class CoinRatingController extends Thread {
             
             if (dip_p > 25 && change_p > -5) {
                 h_bars++;
-                last_hbar_info = DateTimeFormatter.ofPattern("dd/MM/yyyy - hh:mm").format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(bar.getOpenTime()), ZoneId.systemDefault()));
+                last_hbar_info = DateTimeFormatter.ofPattern("dd/MM/yyyy - hh:mm").format(bar.getBeginTime());
                 last_hbar_info += " (DIP "+df3.format(dip_p)+"; CHANGE "+df3.format(change_p)+")";
             }
         }
@@ -323,7 +323,7 @@ public class CoinRatingController extends Thread {
                 Date date = sdf.parse(last_anno);
                 curr.last_event_anno_millis = date.toInstant().toEpochMilli();
             }
-        } catch (Exception ex) {
+        } catch (IOException | ParseException | JSONException ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
         }
         
@@ -344,7 +344,7 @@ public class CoinRatingController extends Thread {
                     coinRanks.put(symbol_name, coins.getJSONObject(i));
                 }            
             }
-        } catch (Exception ex) {
+        } catch (IOException | JSONException ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -366,9 +366,10 @@ public class CoinRatingController extends Thread {
     }
 
     private static Map<String, coinRatingLog> sortByComparator(Map<String, coinRatingLog> unsortMap, final boolean order) {
-        List<Entry<String, coinRatingLog>> list = new LinkedList<Entry<String, coinRatingLog>>(unsortMap.entrySet());
+        List<Entry<String, coinRatingLog>> list = new LinkedList<>(unsortMap.entrySet());
         // Sorting the list based on values
         Collections.sort(list, new Comparator<Entry<String, coinRatingLog>>() {
+            @Override
             public int compare(Entry<String, coinRatingLog> o1,
                     Entry<String, coinRatingLog> o2) {
                 if (order) {
@@ -379,7 +380,7 @@ public class CoinRatingController extends Thread {
             }
         });
         // Maintaining insertion order with the help of LinkedList
-        Map<String, coinRatingLog> sortedMap = new LinkedHashMap<String, coinRatingLog>();
+        Map<String, coinRatingLog> sortedMap = new LinkedHashMap<>();
         for (Entry<String, coinRatingLog> entry : list) {
             sortedMap.put(entry.getKey(), entry.getValue());
         }
@@ -549,8 +550,7 @@ public class CoinRatingController extends Thread {
 
         doWait(1000);
 
-        Account account = app.getProfitsChecker().getAccount();
-        List<AssetBalance> allBalances = account.getBalances();
+        List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
             if (Float.parseFloat(balance.getFree()) > 0 /*&& !balance.getAsset().equals("BNB") && !balance.getAsset().equals("BTC")*/) {
                 accountCoins.add(balance.getAsset());
@@ -685,7 +685,7 @@ public class CoinRatingController extends Thread {
         return listHeroesModel;
     }
 
-    void setClient(BinanceApiRestClient _client) {
+    void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
     }
 

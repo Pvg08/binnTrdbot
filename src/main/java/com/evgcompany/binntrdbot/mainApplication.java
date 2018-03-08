@@ -5,11 +5,8 @@
  */
 package com.evgcompany.binntrdbot;
 
-import com.binance.api.client.BinanceApiClientFactory;
-import com.binance.api.client.BinanceApiRestClient;
-import com.binance.api.client.domain.account.Account;
-import com.binance.api.client.domain.account.AssetBalance;
-import com.binance.api.client.domain.general.RateLimit;
+import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.api.TradingAPIBinance;
 import java.awt.Desktop;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -39,10 +36,10 @@ import javax.swing.text.DefaultCaret;
  */
 public class mainApplication extends javax.swing.JFrame {
 
+    private TradingAPIAbstractInterface client = null;
+    
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
-    private BinanceApiClientFactory factory = null;
-    private BinanceApiRestClient client = null;
     private List<tradePairProcess> pairs = new ArrayList<>(0);
     private tradeProfitsController profitsChecker = new tradeProfitsController(this);
     private CoinRatingController coinRatingController = new CoinRatingController(this);
@@ -85,12 +82,11 @@ public class mainApplication extends javax.swing.JFrame {
         listHeroes.setModel(coinRatingController.getListHeroesModel());
         
         StrategiesController scontroller = new StrategiesController();
-        List<String> s_items = new ArrayList<String>(scontroller.getStrategiesInitializerMap().keySet());
+        List<String> s_items = new ArrayList<>(scontroller.getStrategiesInitializerMap().keySet());
         java.util.Collections.sort(s_items);
         s_items.forEach((strategy_name)->{
             ComboBoxMainStrategy.addItem(strategy_name);
         });
-        scontroller = null;
         
         prefs = Preferences.userNodeForPackage(this.getClass());
         setBounds(
@@ -147,7 +143,7 @@ public class mainApplication extends javax.swing.JFrame {
             logTextarea.append(txt);
             logTextarea.append("\n");
             SEMAPHORE_LOG.release();
-        } catch (Exception e) {}
+        } catch (InterruptedException e) {}
     }
     public void log(String txt, boolean is_main, boolean with_date) {
         try {
@@ -163,7 +159,7 @@ public class mainApplication extends javax.swing.JFrame {
                 mainTextarea.append("\n");
             }
             SEMAPHORE_LOG.release();
-        } catch (Exception e) {}
+        } catch (InterruptedException e) {}
     }
     public void log(String txt, boolean is_main) {
         log(txt, is_main, false);
@@ -177,12 +173,9 @@ public class mainApplication extends javax.swing.JFrame {
     }
     
     private void initAPI() {
-        if (factory == null || client == null) {
-            factory = BinanceApiClientFactory.newInstance(
-                textFieldApiKey.getText(),
-                textFieldApiSecret.getText()
-            );
-            client = factory.newRestClient();
+        if (client == null) {
+            client = new TradingAPIBinance(textFieldApiSecret.getText(), textFieldApiKey.getText());
+            client.connect();
             profitsChecker.setClient(client);
             coinRatingController.setClient(client);
         }
@@ -1027,7 +1020,7 @@ public class mainApplication extends javax.swing.JFrame {
             profitsChecker.setLowHold(checkBoxLowHold.isSelected());
             profitsChecker.showTradeComissionCurrency();
 
-            log("ServerTime = " + client.getServerTime());
+            /*log("ServerTime = " + client.getServerTime());
             log("");
             log("Balances:", true);
             Account account = profitsChecker.getAccount();
@@ -1037,13 +1030,13 @@ public class mainApplication extends javax.swing.JFrame {
                     log(balance.getAsset() + " = " + balance.getFree() + " / " + balance.getLocked(), true);
                 }
             });
-
+            
             log("", true);
             log("Limits:", true);
             List<RateLimit> limits = client.getExchangeInfo().getRateLimits();
             limits.forEach((limit)->{
                 log(limit.getRateLimitType().name() + " " + limit.getInterval().name() + " " + limit.getLimit(), true);
-            });
+            });*/
 
             log("", true);
             initPairs();
@@ -1061,7 +1054,6 @@ public class mainApplication extends javax.swing.JFrame {
             buttonWebBrowserOpen.setEnabled(true);
         } catch (Exception e) {
             log("Error: " + e.getMessage(), true, true);
-            e.printStackTrace();
             buttonRun.setEnabled(true);
         }
     }//GEN-LAST:event_buttonRunActionPerformed
@@ -1076,7 +1068,7 @@ public class mainApplication extends javax.swing.JFrame {
             });
             pairs.clear();
         }
-        listHeroes.setModel(new DefaultListModel<String>());
+        listHeroes.setModel(new DefaultListModel<>());
         buttonRun.setEnabled(true);
         checkboxTestMode.setEnabled(true);
         buttonBuy.setEnabled(false);
@@ -1301,9 +1293,7 @@ public class mainApplication extends javax.swing.JFrame {
                         }
                     }
                 }
-            } catch (URISyntaxException ex) {
-                Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IOException ex) {
+            } catch (URISyntaxException | IOException ex) {
                 Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
@@ -1391,10 +1381,8 @@ public class mainApplication extends javax.swing.JFrame {
         //</editor-fold>
 
         /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new mainApplication().setVisible(true);
-            }
+        java.awt.EventQueue.invokeLater(() -> {
+            new mainApplication().setVisible(true);
         });
     }
 

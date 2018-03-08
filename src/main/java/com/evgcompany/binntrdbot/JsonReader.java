@@ -32,14 +32,11 @@ public class JsonReader {
     }
 
     public static JSONObject readJsonFromUrl(String url) throws IOException, JSONException {
-        InputStream is = new URL(url).openStream();
-        try {
+        try (InputStream is = new URL(url).openStream()) {
             BufferedReader rd = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
             String jsonText = "{\"DATA\":" + readAll(rd) + "}";
             JSONObject json = new JSONObject(jsonText);
             return json;
-        } finally {
-            is.close();
         }
     }
 }

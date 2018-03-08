@@ -5,26 +5,15 @@
  */
 package com.evgcompany.binntrdbot;
 
-import com.binance.api.client.BinanceApiRestClient;
+import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
-import com.binance.api.client.domain.TimeInForce;
-import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.NewOrderResponse;
+import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.text.DecimalFormat;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
-
-import static com.binance.api.client.domain.account.NewOrder.limitBuy;
-import static com.binance.api.client.domain.account.NewOrder.limitSell;
-import static com.binance.api.client.domain.account.NewOrder.marketBuy;
-import static com.binance.api.client.domain.account.NewOrder.marketSell;
-import com.binance.api.client.domain.account.Order;
-import com.binance.api.client.domain.account.Trade;
-import com.binance.api.client.domain.account.request.CancelOrderRequest;
-import com.binance.api.client.domain.account.request.OrderStatusRequest;
-import com.binance.api.client.domain.market.TickerStatistics;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,32 +28,31 @@ public class tradeProfitsController {
         LOMODE_SELL, LOMODE_BUY, LOMODE_SELLANDBUY
     }
     
-    private mainApplication app;
+    private final mainApplication app;
     private static final Semaphore SEMAPHORE = new Semaphore(1, true);
     private static final Semaphore SEMAPHORE_ADDCOIN = new Semaphore(1, true);
 
-    private Map<String, currencyItem> curr_map = new HashMap<String, currencyItem>();
-    private Map<String, currencyPairItem> pair_map = new HashMap<String, currencyPairItem>();
+    private final Map<String, currencyItem> curr_map = new HashMap<>();
+    private final Map<String, currencyPairItem> pair_map = new HashMap<>();
 
-    private DefaultListModel<String> listProfitModel = new DefaultListModel<String>();
-    private DefaultListModel<String> listCurrenciesModel = new DefaultListModel<String>();
+    private final DefaultListModel<String> listProfitModel = new DefaultListModel<>();
+    private final DefaultListModel<String> listCurrenciesModel = new DefaultListModel<>();
 
     private boolean isTestMode = false;
     private boolean isLimitedOrders = false;
     private LimitedOrderMode limitedOrderMode = LimitedOrderMode.LOMODE_SELLANDBUY;
 
     private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
-    private String tradeComissionCurrency = "BNB";
+    private final String tradeComissionCurrency = "BNB";
     
     private BigDecimal stopLossPercent = null;
     private BigDecimal stopGainPercent = null;
     private boolean lowHold = true;
 
-    private BinanceApiRestClient client = null;
-    private Account account = null;
+    private TradingAPIAbstractInterface client = null;
 
-    private static DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static DecimalFormat df6 = new DecimalFormat("0.######");
+    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
+    private static final DecimalFormat df6 = new DecimalFormat("0.######");
 
     public tradeProfitsController(mainApplication _app) {
         app = _app;
@@ -86,22 +74,6 @@ public class tradeProfitsController {
             updateAllBalances(false);
             listProfitModel.addElement(cbase.toString());
         }
-    }
-    
-    private BigDecimal getLastTradePrice(String symbolPair, boolean isBuyer) {
-        int i, imax = -1;
-        long max_buy_time = 0;
-        List<Trade> myTrades = client.getMyTrades(symbolPair);
-        for (i=0; i < myTrades.size(); i++) {
-            if (myTrades.get(i).isBuyer() == isBuyer && max_buy_time < myTrades.get(i).getTime()) {
-                max_buy_time = myTrades.get(i).getTime();
-                imax = i;
-            }
-        }
-        if (imax >= 0) {
-            return new BigDecimal(myTrades.get(imax).getPrice());
-        }
-        return BigDecimal.ZERO;
     }
     
     public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
@@ -126,10 +98,7 @@ public class tradeProfitsController {
             if (pair_map.containsKey(comission_pair)) {
                 pair_price = pair_map.get(comission_pair).getPrice();
             } else {
-                TickerStatistics tc = client.get24HrPriceStatistics(comission_pair);
-                if (tc != null && !tc.getLastPrice().isEmpty()) {
-                    pair_price = new BigDecimal(tc.getLastPrice());
-                }
+                pair_price = client.getCurrentPrice(comission_pair);
             }
             if (pair_price != null && pair_price.compareTo(BigDecimal.ZERO) > 0) {
                 currencyItem ccomm = curr_map.get(tradeComissionCurrency);
@@ -166,20 +135,17 @@ public class tradeProfitsController {
                     return -1;
                 }
                 if (!isTestMode) {
-                    NewOrderResponse newOrderResponse;
                     if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_BUY)) {
                         //price = price / (1 + 0.01f * tradeComissionPercent);
-                        newOrderResponse = client.newOrder(limitBuy(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
-                        result = newOrderResponse.getOrderId();
+                        result = client.order(true, false, symbolPair, baseAmount, price);
                     } else {
-                        newOrderResponse = client.newOrder(marketBuy(symbolPair, df5.format(baseAmount).replace(".","").replace(",",".")));
-                        result = newOrderResponse.getOrderId();
+                        result = client.order(true, true, symbolPair, baseAmount, price);
                     }
-                    if (newOrderResponse != null && newOrderResponse.getOrderId() > 0) {
+                    if (result > 0) {
                         pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
-                        app.log("Order id = " + newOrderResponse.getOrderId(), false, true);
+                        app.log("Order id = " + result, false, true);
                         Thread.sleep(550);
-                        Order mord = client.getOrderStatus(new OrderStatusRequest(newOrderResponse.getSymbol(), newOrderResponse.getOrderId()));
+                        Order mord = client.getOrderStatus(symbolPair, result);
                         if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
                             pair.rollbackTransaction();
                             app.log("Order cancelled!", true, true);
@@ -187,7 +153,7 @@ public class tradeProfitsController {
                             return -1;
                         } else if (mord.getStatus() == OrderStatus.FILLED) {
                             pair.confirmTransaction();
-                            BigDecimal lastTradePrice = getLastTradePrice(symbolPair, true);
+                            BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, true);
                             if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                                 app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
                                 price = lastTradePrice;
@@ -243,25 +209,22 @@ public class tradeProfitsController {
             if (!isTestMode) {
                 if (!OrderToCancel.isEmpty()) {
                     OrderToCancel.forEach((order_id)->{
-                        client.cancelOrder(new CancelOrderRequest(symbolPair, order_id));
+                        client.cancelOrder(symbolPair, order_id);
                         app.log("Canceling LimitOrder "+order_id+"!", true, true);
                     });
                     Thread.sleep(750);
                 }
                 NewOrderResponse newOrderResponse;
                 if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_SELL)) {
-                    //price = price * (1 + 0.01f * tradeComissionPercent);
-                    newOrderResponse = client.newOrder(limitSell(symbolPair, TimeInForce.GTC, df5.format(baseAmount).replace(".","").replace(",","."), df5.format(price).replace(".","").replace(",",".")));
-                    result = newOrderResponse.getOrderId();
+                    result = client.order(false, false, symbolPair, baseAmount, price);
                 } else {
-                    newOrderResponse = client.newOrder(marketSell(symbolPair, df5.format(baseAmount).replace(".","").replace(",",".")));
-                    result = newOrderResponse.getOrderId();
+                    result = client.order(false, true, symbolPair, baseAmount, price);
                 }
-                if (newOrderResponse != null && newOrderResponse.getOrderId() > 0) {
+                if (result > 0) {
                     pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
-                    app.log("Order id = " + newOrderResponse.getOrderId(), false, true);
+                    app.log("Order id = " + result, false, true);
                     Thread.sleep(550);
-                    Order mord = client.getOrderStatus(new OrderStatusRequest(newOrderResponse.getSymbol(), newOrderResponse.getOrderId()));
+                    Order mord = client.getOrderStatus(symbolPair, result);
                     if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
                         pair.rollbackTransaction();
                         app.log("Order cancelled!", true, true);
@@ -269,7 +232,7 @@ public class tradeProfitsController {
                         return -1;
                     } else if (mord.getStatus() == OrderStatus.FILLED) {
                         pair.confirmTransaction();
-                        BigDecimal lastTradePrice = getLastTradePrice(symbolPair, false);
+                        BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, false);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                             app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
                             price = lastTradePrice;
@@ -325,8 +288,7 @@ public class tradeProfitsController {
     
     public void updateAllBalances(boolean updateLists) {
         if (client != null) {
-            account = client.getAccount();
-            List<AssetBalance> allBalances = account.getBalances();
+            List<AssetBalance> allBalances = client.getAllBalances();
             for (int i = 0; i < allBalances.size(); i++) {
                 String symbol = allBalances.get(i).getAsset().toUpperCase();
                 if (curr_map.containsKey(symbol)) {
@@ -384,7 +346,7 @@ public class tradeProfitsController {
         boolean symbol_updated = false;
         for (Map.Entry<String, currencyPairItem> entry : pair_map.entrySet()) {
             currencyPairItem curr = entry.getValue();
-            if (curr != null && curr.getSymbolBase() == symbolBase) {
+            if (curr != null && curr.getSymbolBase().equals(symbolBase)) {
                 symbol_updated = true;
                 if (curr.getListIndex() >= 0) {
                     listCurrenciesModel.set(curr.getListIndex(), curr.toString());
@@ -477,16 +439,11 @@ public class tradeProfitsController {
         return listCurrenciesModel;
     }
 
-    /**
-     * @return the account
-     */
-    public Account getAccount() {
-        return account;
-    }
-
-    public void setClient(BinanceApiRestClient _client) {
+    public void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
-        account = client.getAccount();
+    }
+    public TradingAPIAbstractInterface getClient() {
+        return client;
     }
 
     public String getNthCurrencyPair(int n) {
@@ -531,11 +488,9 @@ public class tradeProfitsController {
             int list_index_to_remove = pair_map.get(symbolPair).getListIndex();
             listCurrenciesModel.remove(list_index_to_remove);
             pair_map.remove(symbolPair);
-            for (Map.Entry<String, currencyPairItem> entry : pair_map.entrySet()) {
-                if (entry.getValue().getListIndex() > list_index_to_remove) {
-                    entry.getValue().setListIndex(entry.getValue().getListIndex() - 1);
-                }
-            }
+            pair_map.entrySet().stream().filter((entry) -> (entry.getValue().getListIndex() > list_index_to_remove)).forEachOrdered((entry) -> {
+                entry.getValue().setListIndex(entry.getValue().getListIndex() - 1);
+            });
         }
     }
 

@@ -43,16 +43,16 @@ import org.ta4j.core.TimeSeries;
  * @author EVG_Adminer
  */
 public class CurrencyPlot extends JFrame implements ChangeListener {
-    private static int SLIDER_INITIAL_VALUE = 100;
-    private JSlider slider;
-    private DateAxis domainAxis;
-    private XYPlot mainPlot;
+    private static final int SLIDER_INITIAL_VALUE = 100;
+    private final JSlider slider;
+    private final DateAxis domainAxis;
+    private final XYPlot mainPlot;
     private int lastValue = SLIDER_INITIAL_VALUE;
     
     private double maxVolume = 0;
 
     // (milliseconds, seconds, minutes, hours, days)
-    private int delta = 1000 * 60 * 10;
+    private final int delta = 1000 * 60 * 10;
     
     private TimeSeries tseries = null;
     
@@ -161,20 +161,8 @@ public class CurrencyPlot extends JFrame implements ChangeListener {
             lastValue = value;
         }
     
-    
     protected AbstractXYDataset getDataSet(String stockSymbol) {
-        //This is the dataset we are going to create
-        DefaultOHLCDataset result = null;
-        //This is the data needed for the dataset
-        OHLCDataItem[] data;
-
-        //This is where we go get the data, replace with your own data source
-        data = getData();
-
-        //Create a dataset, an Open, High, Low, Close dataset
-        result = new DefaultOHLCDataset(stockSymbol, data);
-        
-        return result;
+        return new DefaultOHLCDataset(stockSymbol, getData());
     }
     //This method uses yahoo finance to get the OHLC data
     protected OHLCDataItem[] getData() {
@@ -198,7 +186,6 @@ public class CurrencyPlot extends JFrame implements ChangeListener {
             }
         }
         catch (Exception e) {
-            e.printStackTrace();
         }
         //Data from Yahoo is from newest to oldest. Reverse so it is oldest to newest
 

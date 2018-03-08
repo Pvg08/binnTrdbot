@@ -5,30 +5,23 @@
  */
 package com.evgcompany.binntrdbot;
 
-import com.binance.api.client.BinanceApiClientFactory;
-import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
-import com.binance.api.client.domain.account.request.CancelOrderRequest;
-import com.binance.api.client.domain.account.request.OrderRequest;
-import com.binance.api.client.domain.account.request.OrderStatusRequest;
 import com.binance.api.client.domain.event.CandlestickEvent;
 import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.SymbolFilter;
 import com.binance.api.client.domain.general.SymbolInfo;
-import com.binance.api.client.domain.market.Candlestick;
-import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.exception.BinanceApiException;
+import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -40,10 +33,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.ta4j.core.Bar;
-import org.ta4j.core.BaseBar;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.TimeSeries;
-
 
 /**
  *
@@ -53,7 +44,7 @@ public class tradePairProcess extends Thread {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     BinanceApiWebSocketClient client_s = null;
-    BinanceApiRestClient client;
+    TradingAPIAbstractInterface client;
     private String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
@@ -89,7 +80,7 @@ public class tradePairProcess extends Thread {
     
     private CurrencyPlot plot = null;
     
-    private CandlestickInterval barInterval;
+    private String barInterval;
     private int barSeconds;
     private int barQueryCount = 1;
     private boolean need_bar_reset = false;
@@ -121,12 +112,11 @@ public class tradePairProcess extends Thread {
     private int stopSellLimitTimeout = 1200;
     
     private long lastOrderMillis = 0;
-    private long currentPriceMillis = 0;
     private long lastStrategyPriceMillis = 0;
     private BigDecimal currentPrice = BigDecimal.ZERO;
     private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
-    public tradePairProcess(mainApplication application, BinanceApiRestClient rclient, tradeProfitsController rprofitsChecker, String pair) {
+    public tradePairProcess(mainApplication application, TradingAPIAbstractInterface rclient, tradeProfitsController rprofitsChecker, String pair) {
         app = application;
         symbol = pair;
         client = rclient;
@@ -199,7 +189,7 @@ public class tradePairProcess extends Thread {
     }
     
     private void checkOrder() {
-        Order order = client.getOrderStatus(new OrderStatusRequest(symbol, limitOrderId));
+        Order order = client.getOrderStatus(symbol, limitOrderId);
         if(order != null) {
             if (
                 order.getStatus() == OrderStatus.FILLED || 
@@ -281,11 +271,11 @@ public class tradePairProcess extends Thread {
         try { Thread.sleep(ms);} catch(InterruptedException e) {}
     }
     
-    private void addBar(Candlestick nbar) {
+    private void addBar(Bar nbar) {
         addBars(Arrays.asList(nbar));
     }
     
-    private void addBars(List<Candlestick> nbars) {
+    private void addBars(List<Bar> nbars) {
         try {
             SEMAPHORE_ADD.acquire();
         } catch (InterruptedException ex) {
@@ -296,40 +286,23 @@ public class tradePairProcess extends Thread {
             if (series.getBarCount() > 0) {
                 long last_end_time = series.getLastBar().getEndTime().toInstant().toEpochMilli();
                 lastEndTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(last_end_time), ZoneId.systemDefault());
-                
-                //System.out.println(last_end_time);
-                //System.out.println(lastEndTime);
             }
-            
-            //System.out.println(lastEndTime);
-            
             for(int i=0; i<nbars.size(); i++) {
-                
-                //System.out.println(i);
-                //System.out.println(nbars.get(i));
-                
-                Candlestick stick = nbars.get(i);
-                Duration barDuration = Duration.ofSeconds(barSeconds);
-                ZonedDateTime endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(stick.getCloseTime()), ZoneId.systemDefault());
-                Bar newbar = new BaseBar(barDuration, endTime, Decimal.valueOf(stick.getOpen()), Decimal.valueOf(stick.getHigh()), Decimal.valueOf(stick.getLow()), Decimal.valueOf(stick.getClose()), Decimal.valueOf(stick.getVolume()), Decimal.valueOf(stick.getQuoteAssetVolume()));
+                Bar stick = nbars.get(i);
+                ZonedDateTime endTime = stick.getEndTime();
                 boolean updated = false;
                 if (lastEndTime != null) {
-                    //System.out.println(lastEndTime + "   ***   " + endTime);
                     if (lastEndTime.equals(endTime)) {
                         List<Bar> clist = series.getBarData();
-                        clist.set(clist.size()-1, newbar);
+                        clist.set(clist.size()-1, stick);
                         updated = true;
-                        //System.out.println("last bar Updated!");
                     } else if (lastEndTime.isAfter(endTime)) {
                         updated = true;
-                        //System.out.println("bad bar!");
                     }
                 }
                 if (!updated) {
-                    series.addBar(newbar);
-                    //System.out.println("new bar added!");
+                    series.addBar(stick);
                 }
-                //System.out.println(newbar);
             }
         }
         SEMAPHORE_ADD.release();
@@ -379,28 +352,21 @@ public class tradePairProcess extends Thread {
     }
     
     private void tryStartSellUpSeq() {
-        int i, imax = -1;
-        long max_buy_time = 0;
+        int i;
         
-        List<Trade> myTrades = client.getMyTrades(symbol);
-        for (i=0; i < myTrades.size(); i++) {
-            if (myTrades.get(i).isBuyer() && max_buy_time < myTrades.get(i).getTime()) {
-                max_buy_time = myTrades.get(i).getTime();
-                imax = i;
-            }
-        }
-        if (imax >= 0) {
-            BigDecimal lastBuyPrice = new BigDecimal(myTrades.get(imax).getPrice());
-            BigDecimal lastBuyQty = new BigDecimal(myTrades.get(imax).getQty());
+        Trade last = client.getLastTrade(symbol);
+        if (last != null) {
+            BigDecimal lastBuyPrice = new BigDecimal(last.getPrice());
+            BigDecimal lastBuyQty = new BigDecimal(last.getQty());
             
-            AssetBalance qbalance = profitsChecker.getAccount().getAssetBalance(baseAssetSymbol);
+            AssetBalance qbalance = profitsChecker.getClient().getAssetBalance(baseAssetSymbol);
             BigDecimal free_cnt = new BigDecimal(qbalance.getFree());
             BigDecimal order_cnt = BigDecimal.ZERO;
             
             orderToCancelOnSellUp.clear();
             
             if (free_cnt.compareTo(BigDecimal.ZERO)==0 || sellUpAll) {
-                List<Order> openOrders = client.getOpenOrders(new OrderRequest(symbol));
+                List<Order> openOrders = client.getOpenOrders(symbol);
                 for (i=0; i < openOrders.size(); i++) {
                     if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL) {
                         orderToCancelOnSellUp.add(openOrders.get(i).getOrderId());
@@ -434,9 +400,9 @@ public class tradePairProcess extends Thread {
     private void addPreBars(int count, int size, long lastbar_from, long lastbar_to) {
         if (count > 0) {
             long period = Math.floorDiv(lastbar_to - lastbar_from + 1, 1000) * 1000;
-            List<Candlestick> bars_pre = client.getCandlestickBars(symbol, barInterval, size, lastbar_from - period + barSeconds * 1000 * 30, lastbar_from + barSeconds * 1000 * 30);
+            List<Bar> bars_pre = client.getBars(symbol, barInterval, size, lastbar_from - period + barSeconds * 1000 * 30, lastbar_from + barSeconds * 1000 * 30);
             if (bars_pre.size() > 0) {
-                addPreBars(count-1, bars_pre.size(), bars_pre.get(0).getOpenTime(), bars_pre.get(bars_pre.size()-1).getCloseTime());
+                addPreBars(count-1, bars_pre.size(), bars_pre.get(0).getBeginTime().toInstant().toEpochMilli(), bars_pre.get(bars_pre.size()-1).getEndTime().toInstant().toEpochMilli());
                 addBars(bars_pre);
             }
         }
@@ -451,10 +417,6 @@ public class tradePairProcess extends Thread {
             }
             socket = null;
         }
-        if (client_s != null) {
-            client_s.close();
-            client_s = null;
-        }
     }
     
     private void resetSeries() {
@@ -465,61 +427,43 @@ public class tradePairProcess extends Thread {
         
         //long ctime = SyncedTime.getInstance(-1).currentTimeMillis();
         //List<Candlestick> bars = client.getCandlestickBars(symbol, barInterval, barQueryCount * 2, ctime - barQueryCount * barSeconds * 1000, ctime);
-        List<Candlestick> bars = client.getCandlestickBars(symbol, barInterval);
+        List<Bar> bars = client.getBars(symbol, barInterval);
         if (bars.size() >= 2 && barQueryCount > 1) {
-            addPreBars(barQueryCount-1, bars.size(), bars.get(0).getOpenTime(), bars.get(bars.size()-1).getCloseTime());
+            addPreBars(barQueryCount-1, bars.size(), bars.get(0).getBeginTime().toInstant().toEpochMilli(), bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli());
         }
         if (bars.size() > 0) {
             addBars(bars);
-            last_time = bars.get(bars.size() - 1).getOpenTime();
+            last_time = bars.get(bars.size() - 1).getBeginTime().toInstant().toEpochMilli();
             lastStrategyPriceMillis = System.currentTimeMillis();
-            lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClose());
-            currentPriceMillis = lastStrategyPriceMillis;
+            lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
         }
         
-        client_s = BinanceApiClientFactory.newInstance().newWebSocketClient();
-        socket = client_s.onCandlestickEvent(symbol.toLowerCase(), barInterval, response -> {
-            if (socket != null) {
-                Candlestick nbar = new Candlestick();
-                nbar.setClose(response.getClose());
-                nbar.setCloseTime(response.getCloseTime());
-                nbar.setHigh(response.getHigh());
-                nbar.setLow(response.getLow());
-                nbar.setNumberOfTrades(response.getNumberOfTrades());
-                nbar.setOpen(response.getOpen());
-                nbar.setOpenTime(response.getOpenTime());
-                nbar.setQuoteAssetVolume(response.getQuoteAssetVolume());
-                nbar.setTakerBuyBaseAssetVolume(response.getTakerBuyBaseAssetVolume());
-                nbar.setTakerBuyQuoteAssetVolume(response.getTakerBuyQuoteAssetVolume());
-                nbar.setVolume(response.getVolume());
-                addBar(nbar);
-                if (last_time < nbar.getOpenTime()) {
-                    last_time = nbar.getOpenTime();
-                }
-                currentPriceMillis = System.currentTimeMillis();
-                currentPrice = new BigDecimal(response.getClose());
-                if (profitsChecker != null) {
-                    profitsChecker.setPairPrice(symbol, currentPrice);
-                }
+        socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, nbar -> {
+            addBar(nbar);
+            if (last_time < nbar.getBeginTime().toInstant().toEpochMilli()) {
+                last_time = nbar.getBeginTime().toInstant().toEpochMilli();
+            }
+            currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
+            if (profitsChecker != null) {
+                profitsChecker.setPairPrice(symbol, currentPrice);
             }
         });
     }
     private void nextBars() {
-        List<Candlestick> bars = null;
+        List<Bar> bars = null;
         if (need_bar_reset) {
             resetSeries();
             strategiesController.resetStrategies();
         } else {
-            bars = client.getCandlestickBars(symbol, barInterval, 500, last_time, last_time + barSeconds * 2000);
+            bars = client.getBars(symbol, barInterval, 500, last_time, last_time + barSeconds * 2000);
             addBars(bars);
         }
         if (bars != null && bars.size() > 0) {
-            last_time = bars.get(bars.size() - 1).getOpenTime();
+            last_time = bars.get(bars.size() - 1).getBeginTime().toInstant().toEpochMilli();
             //app.log(symbol + ": price=" + bars.get(bars.size() - 1).getClose() + "; volume=" + bars.get(bars.size() - 1).getVolume() + "; bars=" + series.getBarCount(), false, true);
             lastStrategyPriceMillis = System.currentTimeMillis();
-            lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClose());
-            currentPriceMillis = lastStrategyPriceMillis;
+            lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
         }
     }
@@ -685,7 +629,7 @@ public class tradePairProcess extends Thread {
 
     public void doLimitCancel() {
         if (limitOrderId > 0) {
-            client.cancelOrder(new CancelOrderRequest(symbol, limitOrderId));
+            client.cancelOrder(symbol, limitOrderId);
             doWait(1000);
             checkOrder();
         }
@@ -793,24 +737,16 @@ public class tradePairProcess extends Thread {
      */
     public void setBarInterval(String _barInterval) {
         int newSeconds = barSeconds;
-        if ("1m".equals(_barInterval)) {
-            barInterval = CandlestickInterval.ONE_MINUTE;
-            newSeconds = 60;
-        } else if ("5m".equals(_barInterval)) {
-            barInterval = CandlestickInterval.FIVE_MINUTES;
-            newSeconds = 60 * 5;
-        } else if ("15m".equals(_barInterval)) {
-            barInterval = CandlestickInterval.FIFTEEN_MINUTES;
-            newSeconds = 60 * 15;
-        } else if ("30m".equals(_barInterval)) {
-            barInterval = CandlestickInterval.HALF_HOURLY;
-            newSeconds = 60 * 30;
-        } else if ("1h".equals(_barInterval)) {
-            barInterval = CandlestickInterval.HOURLY;
-            newSeconds = 60 * 60;
-        } else if ("2h".equals(_barInterval)) {
-            barInterval = CandlestickInterval.TWO_HOURLY;
-            newSeconds = 60 * 120;
+        if (
+                "1m".equals(_barInterval) || 
+                "5m".equals(_barInterval) || 
+                "15m".equals(_barInterval) || 
+                "30m".equals(_barInterval) || 
+                "1h".equals(_barInterval) || 
+                "2h".equals(_barInterval)
+            ) {
+            barInterval = _barInterval;
+            newSeconds = client.barIntervalToSeconds(_barInterval);
         }
         if (newSeconds != barSeconds) {
             barSeconds = newSeconds;
