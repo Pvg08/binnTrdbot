@@ -13,8 +13,8 @@ import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
 import com.binance.api.client.domain.market.TickerPrice;
-import com.binance.api.client.domain.market.TickerStatistics;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -22,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -31,8 +32,8 @@ import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
+import javax.swing.JProgressBar;
 import org.json.*;
-
 
 /**
  *
@@ -62,8 +63,8 @@ public class CoinRatingController extends Thread {
         Float current_price = 0f;
         Float hour_ago_price = 0f;
         Float day_ago_price = 0f;
-        Float hour_ago_volume = 0f;
-        Float day_ago_volume = 0f;
+        Float hour_volume = 0f;
+        Float day_volume = 0f;
         Float volatility = 0f;
         int up_counter = 0;
         
@@ -75,16 +76,18 @@ public class CoinRatingController extends Thread {
         int update_counter = 0;
         
         String last_event_date;
+        long last_event_anno_millis = 0;
+        int rating = 0;
     }
     
     enum CoinRatingSort {
         CR_RANK,
         CR_MARKET_CAP,
-        CR_LAST_HOUR_PRICEUP,
         CR_PROGSTART_PRICEUP,
+        CR_LAST_HOUR_PRICEUP,
         CR_24HR_PRICEUP,
         CR_EVENTS_COUNT,
-        CR_LAST_EVENT_DATE,
+        CR_LAST_EVENT_ANNO_DATE,
         CR_VOLATILITY,
         CR_CALCULATED_RATING
     }
@@ -100,7 +103,10 @@ public class CoinRatingController extends Thread {
     Map<String, coinRatingLog> heroesMap = new HashMap<String, coinRatingLog>();
     Map<String, JSONObject> coinRanks = new HashMap<String, JSONObject>();
 
-    private long delayTime = 20;
+    private long delayTime = 2;
+    private long updateTime = 10;
+    private boolean have_all_coins_info = false;
+    
     private static DecimalFormat df3p = new DecimalFormat("0.##%");
     private static DecimalFormat df3 = new DecimalFormat("0.##");
     private static DecimalFormat df6 = new DecimalFormat("0.#####");
@@ -110,12 +116,14 @@ public class CoinRatingController extends Thread {
     private List<String> accountCoins = new ArrayList<>(0);
 
     private coinRatingLog entered = null;
+    private JProgressBar progressBar = null;
 
     public CoinRatingController(mainApplication application) {
         app = application;
     }
 
     private void checkFromTop() {
+        int non_zero_count = 0;
         int min_counter = -1;
         String min_key = "";
         for (Entry<String, coinRatingLog> entry : heroesMap.entrySet()) {
@@ -124,6 +132,9 @@ public class CoinRatingController extends Thread {
                 min_counter = curr.update_counter;
                 min_key = entry.getKey();
             }
+            if (curr.update_counter > 0) {
+                non_zero_count++;
+            }
         }
         if (!min_key.isEmpty()) {
             if (heroesMap.get(min_key).update_counter == 0) {
@@ -131,6 +142,13 @@ public class CoinRatingController extends Thread {
             } else {
                 updatePair(heroesMap.get(min_key));
             }
+        }
+        if (progressBar != null) {
+            progressBar.setMaximum(heroesMap.size());
+            progressBar.setValue(non_zero_count);
+        }
+        if (min_counter > 0) {
+            have_all_coins_info = true;
         }
     }
     
@@ -141,7 +159,7 @@ public class CoinRatingController extends Thread {
         if (bars_h.size() > 1) {
             curr.hour_ago_price = Float.parseFloat(bars_h.get(0).getClose());
             curr.volatility = 0f;
-            curr.hour_ago_volume = 0f;
+            curr.hour_volume = 0f;
             for(int i=0; i<bars_h.size(); i++) {
                 float min_price = Float.parseFloat(bars_h.get(i).getLow());
                 float max_price = Float.parseFloat(bars_h.get(i).getHigh());
@@ -151,16 +169,56 @@ public class CoinRatingController extends Thread {
                 curr.volatility += Math.abs((close_price - min_price)/close_price);
                 curr.volatility += Math.abs((max_price - open_price)/open_price);
                 curr.volatility += Math.abs((max_price - close_price)/close_price);
-                curr.hour_ago_volume += Float.parseFloat(bars_h.get(i).getVolume());
+                curr.hour_volume += Float.parseFloat(bars_h.get(i).getVolume());
             }
             curr.volatility /= bars_h.size()*4;
         }
         if (bars_d.size() > 1) {
             curr.day_ago_price = Float.parseFloat(bars_d.get(0).getClose());
-            curr.day_ago_volume = 0f;
+            curr.day_volume = 0f;
             for(int i=0; i<bars_d.size(); i++) {
-                curr.day_ago_volume += Float.parseFloat(bars_d.get(i).getVolume());
+                curr.day_volume += Float.parseFloat(bars_d.get(i).getVolume());
             }
+        }
+    }
+    
+    private void calculateRating(coinRatingLog curr) {
+        curr.rating = 0;
+        if (curr.last_event_anno_millis < 1*60*60*1000) {
+            curr.rating++;
+        }
+        if (curr.last_event_anno_millis < 24*60*60*1000) {
+            curr.rating++;
+        }
+        if (curr.events_count > 10) {
+            curr.rating++;
+        }
+        if (curr.events_count > 50) {
+            curr.rating++;
+        }
+        if (curr.market_cap > 20000000) {
+            curr.rating++;
+        }
+        if (curr.market_cap > 100000000) {
+            curr.rating++;
+        }
+        if (curr.market_cap > 500000000) {
+            curr.rating++;
+        }
+        if (curr.volatility > 0.01) {
+            curr.rating++;
+        }
+        if (curr.volatility > 0.1) {
+            curr.rating++;
+        }
+        if (curr.volatility > 0.3) {
+            curr.rating++;
+        }
+        if (curr.hour_ago_price > 0 && curr.hour_ago_price < curr.current_price) {
+            curr.rating++;
+        }
+        if (curr.day_ago_price > 0 && curr.day_ago_price < curr.current_price) {
+            curr.rating++;
         }
     }
     
@@ -260,10 +318,16 @@ public class CoinRatingController extends Thread {
                 app.log("Last event: " + events.getJSONObject(0).optString("caption_ru", "-"));
                 app.log("Last event date: " + events.getJSONObject(0).optString("start_date", "-"));
                 curr.last_event_date = events.getJSONObject(0).optString("start_date", "");
+                String last_anno = events.getJSONObject(0).optString("public_date", "");
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-M-dd HH:mm");
+                Date date = sdf.parse(last_anno);
+                curr.last_event_anno_millis = date.toInstant().toEpochMilli();
             }
         } catch (Exception ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
         }
+        
+        calculateRating(curr);
         
         app.log("-----------------------------------");
     }
@@ -326,24 +390,36 @@ public class CoinRatingController extends Thread {
     private void updateList() {
         
         for (Entry<String, coinRatingLog> entry : heroesMap.entrySet()) {
-            if (sortby == CoinRatingSort.CR_RANK) {
-                entry.getValue().sort = (float) entry.getValue().rank;
-            } else if (sortby == CoinRatingSort.CR_MARKET_CAP) {
-                entry.getValue().sort = (float) entry.getValue().market_cap;
-            } else if (sortby == CoinRatingSort.CR_PROGSTART_PRICEUP) {
-                entry.getValue().sort = (float) entry.getValue().percent_from_begin;
-            } else if (sortby == CoinRatingSort.CR_24HR_PRICEUP) {
-                entry.getValue().sort = (float) entry.getValue().percent_day;
-            } else if (sortby == CoinRatingSort.CR_LAST_HOUR_PRICEUP) {
-                entry.getValue().sort = (float) entry.getValue().percent_hour;
-            } else if (sortby == CoinRatingSort.CR_EVENTS_COUNT) {
-                entry.getValue().sort = (float) entry.getValue().events_count;
-            } else if (sortby == CoinRatingSort.CR_CALCULATED_RATING) {
-                entry.getValue().sort = (float) entry.getValue().market_cap; // @todo
-            } else if (sortby == CoinRatingSort.CR_VOLATILITY) {
-                entry.getValue().sort = (float) entry.getValue().volatility;
-            } else if (sortby == CoinRatingSort.CR_LAST_EVENT_DATE) {
-                entry.getValue().sort = (float) entry.getValue().market_cap; // @todo
+            if (null != sortby) switch (sortby) {
+                case CR_RANK:
+                    entry.getValue().sort = (float) entry.getValue().rank;
+                    break;
+                case CR_MARKET_CAP:
+                    entry.getValue().sort = (float) entry.getValue().market_cap;
+                    break;
+                case CR_PROGSTART_PRICEUP:
+                    entry.getValue().sort = (float) entry.getValue().percent_from_begin;
+                    break;
+                case CR_24HR_PRICEUP:
+                    entry.getValue().sort = (float) entry.getValue().percent_day;
+                    break;
+                case CR_LAST_HOUR_PRICEUP:
+                    entry.getValue().sort = (float) entry.getValue().percent_hour;
+                    break;
+                case CR_EVENTS_COUNT:
+                    entry.getValue().sort = (float) entry.getValue().events_count;
+                    break;
+                case CR_CALCULATED_RATING:
+                    entry.getValue().sort = (float) entry.getValue().rating;
+                    break;
+                case CR_VOLATILITY:
+                    entry.getValue().sort = (float) entry.getValue().volatility;
+                    break;
+                case CR_LAST_EVENT_ANNO_DATE:
+                    entry.getValue().sort = (float) entry.getValue().last_event_anno_millis;
+                    break;
+                default:
+                    break;
             }
         }
         
@@ -354,10 +430,41 @@ public class CoinRatingController extends Thread {
             if (curr != null) {
                 String text;
                 text = (curr.rank > 0 && curr.rank < 9999) ? "(" + curr.rank + ") " : "";
-                text += curr.symbol + ": " + df3p.format(curr.percent_from_begin) + " * " + df3p.format(curr.percent_last);
-                if (curr.up_counter > 1) {
-                    text += " [" + curr.up_counter + "]";
+                text += curr.symbol + ": ";
+                
+                if (null != sortby) switch (sortby) {
+                    case CR_MARKET_CAP:
+                        text += df3.format(curr.market_cap);
+                        break;
+                    case CR_PROGSTART_PRICEUP:
+                        text += df3p.format(curr.percent_from_begin) + " * " + df3p.format(curr.percent_last);
+                        if (curr.up_counter > 1) {
+                            text += " [" + curr.up_counter + "]";
+                        }
+                        break;
+                    case CR_24HR_PRICEUP:
+                        text += df3p.format(curr.percent_day);
+                        break;
+                    case CR_LAST_HOUR_PRICEUP:
+                        text += df3p.format(curr.percent_hour);
+                        break;
+                    case CR_EVENTS_COUNT:
+                        text += curr.events_count;
+                        break;
+                    case CR_CALCULATED_RATING:
+                        text += curr.rating;
+                        break;
+                    case CR_VOLATILITY:
+                        text += df3p.format(curr.volatility);
+                        break;
+                    case CR_LAST_EVENT_ANNO_DATE:
+                        text+=curr.last_event_date != null && !curr.last_event_date.isEmpty() ? curr.last_event_date : "Unknown date";
+                        break;
+                    default:
+                        text+=df6.format(curr.current_price);
+                        break;
                 }
+                
                 if (curr.value_enter > 0) {
                     text += " [H]";
                 }
@@ -438,6 +545,7 @@ public class CoinRatingController extends Thread {
         
         need_stop = false;
         paused = false;
+        have_all_coins_info = false;
 
         doWait(1000);
 
@@ -452,7 +560,7 @@ public class CoinRatingController extends Thread {
 
         while (!need_stop) {
             if (paused) {
-                doWait(12000);
+                doWait(delayTime * 1000);
                 continue;
             }
 
@@ -542,17 +650,17 @@ public class CoinRatingController extends Thread {
                     heroesMap.remove(symbol);
                 }
             });
-            updateList();
             
             if (analyzer) {
                 checkFromTop();
             }
+            updateList();
 
-            if (autoOrder) {
+            if (autoOrder && have_all_coins_info) {
                 checkFastEnter();
             }
 
-            doWait(delayTime * 1000);
+            doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
         }
     }
 
@@ -651,5 +759,26 @@ public class CoinRatingController extends Thread {
     public void setSortAsc(boolean sortAsc) {
         this.sortAsc = sortAsc;
         updateList();
+    }
+
+    /**
+     * @return the updateTime
+     */
+    public long getUpdateTime() {
+        return updateTime;
+    }
+
+    /**
+     * @param updateTime the updateTime to set
+     */
+    public void setUpdateTime(long updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    /**
+     * @param progressBar the progressBar to set
+     */
+    public void setProgressBar(JProgressBar progressBar) {
+        this.progressBar = progressBar;
     }
 }

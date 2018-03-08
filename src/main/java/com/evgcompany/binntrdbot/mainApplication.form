@@ -57,12 +57,13 @@
                   <Group type="102" attributes="0">
                       <Group type="103" groupAlignment="0" max="-2" attributes="0">
                           <Component id="jLabel8" min="-2" max="-2" attributes="0"/>
-                          <Component id="jScrollPane5" min="-2" pref="209" max="-2" attributes="0"/>
+                          <Component id="jScrollPane5" pref="209" max="32767" attributes="0"/>
                           <Group type="102" alignment="0" attributes="0">
                               <Component id="comboBoxRatingSortby" min="-2" pref="129" max="-2" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="comboBoxRatingSort" max="32767" attributes="0"/>
                           </Group>
+                          <Component id="progressBarRatingAnalPercent" max="32767" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
@@ -177,6 +178,8 @@
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="jScrollPane5" max="32767" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="progressBarRatingAnalPercent" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <Group type="102" attributes="0">
                               <Component id="textFieldApiSecret" min="-2" max="-2" attributes="0"/>
@@ -870,12 +873,18 @@
                           <Component id="checkBoxAutoAnalyzer" min="-2" max="-2" attributes="0"/>
                           <Component id="checkboxAutoFastorder" alignment="0" min="-2" max="-2" attributes="0"/>
                           <Group type="102" alignment="0" attributes="0">
-                              <Component id="jLabel15" min="-2" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="1" attributes="0">
+                                  <Component id="jLabel16" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel15" min="-2" max="-2" attributes="0"/>
+                              </Group>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Component id="spinnerScanRatingDelayTime" min="-2" pref="82" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="spinnerScanRatingDelayTime" pref="82" max="32767" attributes="0"/>
+                                  <Component id="spinnerScanRatingUpdateTime" max="32767" attributes="0"/>
+                              </Group>
                           </Group>
                       </Group>
-                      <EmptySpace pref="340" max="32767" attributes="0"/>
+                      <EmptySpace pref="263" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -891,7 +900,12 @@
                           <Component id="spinnerScanRatingDelayTime" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel15" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <EmptySpace pref="105" max="32767" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel16" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="spinnerScanRatingUpdateTime" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace pref="79" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -914,7 +928,7 @@
             <Component class="javax.swing.JSpinner" name="spinnerScanRatingDelayTime">
               <Properties>
                 <Property name="value" type="java.lang.Object" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
-                  <Connection code="5" type="code"/>
+                  <Connection code="2" type="code"/>
                 </Property>
               </Properties>
               <Events>
@@ -923,7 +937,19 @@
             </Component>
             <Component class="javax.swing.JLabel" name="jLabel15">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Delay time:"/>
+                <Property name="text" type="java.lang.String" value="Next coin check delay time:"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel16">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Update time:"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="spinnerScanRatingUpdateTime">
+              <Properties>
+                <Property name="value" type="java.lang.Object" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
+                  <Connection code="10" type="code"/>
+                </Property>
               </Properties>
             </Component>
           </SubComponents>
@@ -1004,11 +1030,11 @@
           <StringArray count="9">
             <StringItem index="0" value="Rank"/>
             <StringItem index="1" value="Market cap"/>
-            <StringItem index="2" value="% last hour"/>
-            <StringItem index="3" value="% from prog start"/>
+            <StringItem index="2" value="% from prog start"/>
+            <StringItem index="3" value="% last hour"/>
             <StringItem index="4" value="% 24hr"/>
             <StringItem index="5" value="Events count"/>
-            <StringItem index="6" value="Last event date"/>
+            <StringItem index="6" value="Last event anno date"/>
             <StringItem index="7" value="Volatility"/>
             <StringItem index="8" value="Calculated rating"/>
           </StringArray>
@@ -1059,6 +1085,8 @@
         <Property name="text" type="java.lang.String" value="Check"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
+    </Component>
+    <Component class="javax.swing.JProgressBar" name="progressBarRatingAnalPercent">
     </Component>
   </SubComponents>
 </Form>

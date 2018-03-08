@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.SyncedTime;
+import com.evgcompany.binntrdbot.analysis.*;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
