@@ -5,13 +5,11 @@
  */
 package com.evgcompany.binntrdbot;
 
-import com.binance.api.client.BinanceApiWebSocketClient;
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
-import com.binance.api.client.domain.event.CandlestickEvent;
 import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.SymbolFilter;
 import com.binance.api.client.domain.general.SymbolInfo;
@@ -22,9 +20,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -43,7 +38,6 @@ import org.ta4j.core.TimeSeries;
 public class tradePairProcess extends Thread {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
-    BinanceApiWebSocketClient client_s = null;
     TradingAPIAbstractInterface client;
     private String symbol;
     private String baseAssetSymbol;
@@ -68,7 +62,6 @@ public class tradePairProcess extends Thread {
     private long limitOrderId = 0;
     
     private BigDecimal tradingBalancePercent = new BigDecimal("50");
-    private BigDecimal tradeMinProfitPercent = new BigDecimal("0.03");
     
     private TimeSeries series = null;
     
@@ -109,6 +102,7 @@ public class tradePairProcess extends Thread {
     private boolean useBuyStopLimited = false;
     private int stopBuyLimitTimeout = 120;
     private boolean useSellStopLimited = false;
+    private boolean isInitialized = false;
     private int stopSellLimitTimeout = 1200;
     
     private long lastOrderMillis = 0;
@@ -120,9 +114,18 @@ public class tradePairProcess extends Thread {
         app = application;
         symbol = pair;
         client = rclient;
+        isInitialized = false;
         profitsChecker = rprofitsChecker;
         strategiesController = new StrategiesController(symbol, app, profitsChecker);
         setBarInterval("1m");
+    }
+
+    @Override
+    public void finalize() throws Throwable {
+        if (socket != null) {
+            socket.close();
+        }
+        super.finalize();
     }
     
     private void doEnter(BigDecimal curPrice) {
@@ -133,6 +136,9 @@ public class tradePairProcess extends Thread {
         sold_price = normalizePrice(curPrice);
         sold_amount = normalizeQuantity(summ_to_buy.divide(curPrice, RoundingMode.HALF_DOWN), true);
         sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
+        if (!profitsChecker.canBuy(symbol, sold_amount, curPrice) && filterQtyStep != null && sold_amount.compareTo(filterQtyStep) > 0) {
+            sold_amount = sold_amount.subtract(filterQtyStep);
+        }
         summ_to_buy = sold_price.multiply(sold_amount);
         base_strategy_sell_ignored = false;
         if (profitsChecker.canBuy(symbol, sold_amount, curPrice)) {
@@ -160,7 +166,7 @@ public class tradePairProcess extends Thread {
         BigDecimal new_sold_price = sold_amount.multiply(curPrice);
         BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
         BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
-        if (skip_check || !profitsChecker.isLowHold() || incomeWithoutComissionPercent.compareTo(tradeMinProfitPercent) > 0) {
+        if (skip_check || !profitsChecker.isLowHold() || incomeWithoutComissionPercent.compareTo(profitsChecker.getTradeMinProfitPercent()) > 0) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
                 base_strategy_sell_ignored = false;
                 app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(new_sold_price) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
@@ -263,10 +269,6 @@ public class tradePairProcess extends Thread {
         paused = _paused;
     }
     
-    private void tradeResponse(CandlestickEvent response) {
-        app.log(symbol + " = " + response.getClose(), false, true);
-    }
-    
     private void doWait(long ms) {
         try { Thread.sleep(ms);} catch(InterruptedException e) {}
     }
@@ -281,30 +283,7 @@ public class tradePairProcess extends Thread {
         } catch (InterruptedException ex) {
             Logger.getLogger(tradePairProcess.class.getName()).log(Level.SEVERE, null, ex);
         }
-        if (nbars.size() > 0) {
-            ZonedDateTime lastEndTime = null;
-            if (series.getBarCount() > 0) {
-                long last_end_time = series.getLastBar().getEndTime().toInstant().toEpochMilli();
-                lastEndTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(last_end_time), ZoneId.systemDefault());
-            }
-            for(int i=0; i<nbars.size(); i++) {
-                Bar stick = nbars.get(i);
-                ZonedDateTime endTime = stick.getEndTime();
-                boolean updated = false;
-                if (lastEndTime != null) {
-                    if (lastEndTime.equals(endTime)) {
-                        List<Bar> clist = series.getBarData();
-                        clist.set(clist.size()-1, stick);
-                        updated = true;
-                    } else if (lastEndTime.isAfter(endTime)) {
-                        updated = true;
-                    }
-                }
-                if (!updated) {
-                    series.addBar(stick);
-                }
-            }
-        }
+        client.addUpdateSeriesBars(series, nbars);
         SEMAPHORE_ADD.release();
     }
     
@@ -344,7 +323,7 @@ public class tradePairProcess extends Thread {
     public BigDecimal normalizeNotionalQuantity(BigDecimal quantity, BigDecimal price) {
         if (filterNotional && price.compareTo(BigDecimal.ZERO) > 0) {
             if (quantity.multiply(price).compareTo(filterMinNotional) < 0) {
-                quantity = filterMinNotional.divide(price);
+                quantity = filterMinNotional.divide(price, filterMinNotional.scale(), RoundingMode.HALF_UP);
                 quantity = normalizeQuantity(quantity, false);
             }
         }
@@ -471,6 +450,7 @@ public class tradePairProcess extends Thread {
     @Override
     public void run(){  
         int exceptions_cnt = 0;
+        isInitialized = false;
 
         if (!buyOnStart) {
             doWait(ThreadLocalRandom.current().nextLong(100, 500));
@@ -535,23 +515,8 @@ public class tradePairProcess extends Thread {
             doWait(startDelayTime);
         }
         
-        // https://github.com/ta4j/ta4j/blob/master/ta4j-examples/src/main/java/ta4jexamples/loaders/CsvTradesLoader.java
-        // https://github.com/ta4j/ta4j/blob/master/ta4j-examples/src/main/java/ta4jexamples/bots/TradingBotOnMovingTimeSeries.java
-        
-        // autoselect strategy
-        // https://github.com/mdeverdelhan/ta4j-origins/blob/master/ta4j-examples/src/main/java/ta4jexamples/walkforward/WalkForward.java
-        
-        
         resetSeries();
 
-        /*
-        System.out.println(bars.get(bars.size()-1));
-        */
-        
-        
-        /*if (bars.size() > 0) {
-            app.log(symbol + ": price=" + bars.get(bars.size() - 1).getClose() + "; volume=" + bars.get(bars.size() - 1).getVolume() + "; bars=" + series.getBarCount(), false, true);
-        }*/
         strategiesController.resetStrategies();
         
         if (isTryingToSellUp) {
@@ -566,6 +531,8 @@ public class tradePairProcess extends Thread {
         if (buyOnStart) {
             doBuy();
         }
+        
+        isInitialized = true;
         
         while (!need_stop) {
             if (paused) {
@@ -735,7 +702,7 @@ public class tradePairProcess extends Thread {
     /**
      * @param _barInterval the barInterval to set
      */
-    public void setBarInterval(String _barInterval) {
+    public final void setBarInterval(String _barInterval) {
         int newSeconds = barSeconds;
         if (
                 "1m".equals(_barInterval) || 
@@ -851,5 +818,12 @@ public class tradePairProcess extends Thread {
      */
     public void setBarQueryCount(int barQueryCount) {
         this.barQueryCount = barQueryCount;        
+    }
+
+    /**
+     * @return the isInitialized
+     */
+    public boolean isInitialized() {
+        return isInitialized;
     }
 }

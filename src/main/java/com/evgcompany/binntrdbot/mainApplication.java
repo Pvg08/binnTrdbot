@@ -22,7 +22,6 @@ import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
-import javax.swing.DefaultListModel;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -40,9 +39,9 @@ public class mainApplication extends javax.swing.JFrame {
     
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
-    private List<tradePairProcess> pairs = new ArrayList<>(0);
-    private tradeProfitsController profitsChecker = new tradeProfitsController(this);
-    private CoinRatingController coinRatingController = new CoinRatingController(this);
+    private final List<tradePairProcess> pairs = new ArrayList<>(0);
+    private final tradeProfitsController profitsChecker = new tradeProfitsController(this);
+    private final CoinRatingController coinRatingController = new CoinRatingController(this);
     
     private boolean is_paused = false;
     Preferences prefs = null;
@@ -79,7 +78,7 @@ public class mainApplication extends javax.swing.JFrame {
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         listProfit.setModel(profitsChecker.getListProfitModel());
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
-        listHeroes.setModel(coinRatingController.getListHeroesModel());
+        listRating.setModel(coinRatingController.getListHeroesModel());
         
         StrategiesController scontroller = new StrategiesController();
         List<String> s_items = new ArrayList<>(scontroller.getStrategiesInitializerMap().keySet());
@@ -284,7 +283,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonCancelLimit = new javax.swing.JButton();
         buttonShowPlot = new javax.swing.JButton();
         jScrollPane5 = new javax.swing.JScrollPane();
-        listHeroes = new javax.swing.JList<>();
+        listRating = new javax.swing.JList<>();
         jLabel6 = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
         jLabel8 = new javax.swing.JLabel();
@@ -452,13 +451,13 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        listHeroes.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        listHeroes.addMouseListener(new java.awt.event.MouseAdapter() {
+        listRating.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        listRating.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
-                listHeroesMouseClicked(evt);
+                listRatingMouseClicked(evt);
             }
         });
-        jScrollPane5.setViewportView(listHeroes);
+        jScrollPane5.setViewportView(listRating);
 
         jLabel6.setText("Log");
 
@@ -821,7 +820,7 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "% from prog start", "% last hour", "% 24hr", "Events count", "Last event anno date", "Volatility", "Calculated rating" }));
+        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "% from prog start", "% last hour", "% 24hr", "Events count", "Last event anno date", "Volatility", "Strategies to enter value", "Strategies to exit value", "Strategies value", "Calculated rating" }));
         comboBoxRatingSortby.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxRatingSortbyActionPerformed(evt);
@@ -1068,7 +1067,6 @@ public class mainApplication extends javax.swing.JFrame {
             });
             pairs.clear();
         }
-        listHeroes.setModel(new DefaultListModel<>());
         buttonRun.setEnabled(true);
         checkboxTestMode.setEnabled(true);
         buttonBuy.setEnabled(false);
@@ -1181,9 +1179,9 @@ public class mainApplication extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_checkBoxLimitedOrdersStateChanged
 
-    private void listHeroesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_listHeroesMouseClicked
+    private void listRatingMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_listRatingMouseClicked
         if (evt.getClickCount() == 2) {
-            String content = listHeroes.getSelectedValue();
+            String content = listRating.getSelectedValue();
             if (content != null && !content.isEmpty()) {
                 String[] parts = content.split(":");
                 if (parts.length > 0) {
@@ -1195,7 +1193,7 @@ public class mainApplication extends javax.swing.JFrame {
                 }
             }
         }
-    }//GEN-LAST:event_listHeroesMouseClicked
+    }//GEN-LAST:event_listRatingMouseClicked
 
     private void listCurrenciesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_listCurrenciesMouseClicked
         if (evt.getClickCount() == 2) {
@@ -1447,8 +1445,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JTabbedPane jTabbedPane2;
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JList<String> listCurrencies;
-    private javax.swing.JList<String> listHeroes;
     private javax.swing.JList<String> listProfit;
+    private javax.swing.JList<String> listRating;
     private javax.swing.JTextArea logTextarea;
     private javax.swing.JTextArea mainTextarea;
     private javax.swing.JProgressBar progressBarRatingAnalPercent;

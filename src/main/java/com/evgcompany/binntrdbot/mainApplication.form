@@ -391,7 +391,7 @@
 
       <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
       <SubComponents>
-        <Component class="javax.swing.JList" name="listHeroes">
+        <Component class="javax.swing.JList" name="listRating">
           <Properties>
             <Property name="model" type="javax.swing.ListModel" editor="org.netbeans.modules.form.editors2.ListModelEditor">
               <StringArray count="0"/>
@@ -399,7 +399,7 @@
             <Property name="selectionMode" type="int" value="0"/>
           </Properties>
           <Events>
-            <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="listHeroesMouseClicked"/>
+            <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="listRatingMouseClicked"/>
           </Events>
           <AuxValues>
             <AuxValue name="JavaCodeGenerator_TypeParameters" type="java.lang.String" value="&lt;String&gt;"/>
@@ -1027,7 +1027,7 @@
     <Component class="javax.swing.JComboBox" name="comboBoxRatingSortby">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="9">
+          <StringArray count="12">
             <StringItem index="0" value="Rank"/>
             <StringItem index="1" value="Market cap"/>
             <StringItem index="2" value="% from prog start"/>
@@ -1036,7 +1036,10 @@
             <StringItem index="5" value="Events count"/>
             <StringItem index="6" value="Last event anno date"/>
             <StringItem index="7" value="Volatility"/>
-            <StringItem index="8" value="Calculated rating"/>
+            <StringItem index="8" value="Strategies to enter value"/>
+            <StringItem index="9" value="Strategies to exit value"/>
+            <StringItem index="10" value="Strategies value"/>
+            <StringItem index="11" value="Calculated rating"/>
           </StringArray>
         </Property>
       </Properties>

@@ -43,6 +43,7 @@ public class tradeProfitsController {
     private LimitedOrderMode limitedOrderMode = LimitedOrderMode.LOMODE_SELLANDBUY;
 
     private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
+    private BigDecimal tradeMinProfitPercent;
     private final String tradeComissionCurrency = "BNB";
     
     private BigDecimal stopLossPercent = null;
@@ -56,6 +57,7 @@ public class tradeProfitsController {
 
     public tradeProfitsController(mainApplication _app) {
         app = _app;
+        tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(2));
     }
     
     public currencyItem getProfitData(String symbolAsset) {
@@ -481,6 +483,7 @@ public class tradeProfitsController {
      */
     public void setTradeComissionPercent(BigDecimal tradeComissionPercent) {
         this.tradeComissionPercent = tradeComissionPercent;
+        tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(2));
     }
 
     void removeCurrencyPair(String symbolPair) {
@@ -562,5 +565,12 @@ public class tradeProfitsController {
      */
     public void setLimitedOrderMode(LimitedOrderMode limitedOrderMode) {
         this.limitedOrderMode = limitedOrderMode;
+    }
+
+    /**
+     * @return the tradeMinProfitPercent
+     */
+    public BigDecimal getTradeMinProfitPercent() {
+        return tradeMinProfitPercent;
     }
 }

@@ -30,6 +30,10 @@ import javax.swing.DefaultListModel;
 import javax.swing.JProgressBar;
 import org.json.*;
 import org.ta4j.core.Bar;
+import org.ta4j.core.BaseTimeSeries;
+import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 
 /**
  *
@@ -64,7 +68,6 @@ public class CoinRatingController extends Thread {
         Float volatility = 0f;
         int up_counter = 0;
         
-        
         boolean do_remove_flag = false;
         boolean fastbuy_skip = false;
         
@@ -73,7 +76,10 @@ public class CoinRatingController extends Thread {
         
         String last_event_date;
         long last_event_anno_millis = 0;
-        int rating = 0;
+        long last_rating_update_millis = 0;
+        int strategies_shouldenter_cnt = 0;
+        int strategies_shouldexit_cnt = 0;
+        float rating = 0;
     }
     
     enum CoinRatingSort {
@@ -85,11 +91,15 @@ public class CoinRatingController extends Thread {
         CR_EVENTS_COUNT,
         CR_LAST_EVENT_ANNO_DATE,
         CR_VOLATILITY,
+        CR_STRATEGIES_SHOULD_ENTER,
+        CR_STRATEGIES_SHOULD_EXIT,
+        CR_STRATEGIES_DIRECTION,
         CR_CALCULATED_RATING
     }
     
     private final mainApplication app;
     TradingAPIAbstractInterface client = null;
+    private StrategiesController strategiesController = null;
     private boolean lowHold = true;
     private boolean autoOrder = true;
     private boolean analyzer = false;
@@ -116,6 +126,8 @@ public class CoinRatingController extends Thread {
 
     public CoinRatingController(mainApplication application) {
         app = application;
+        strategiesController = new StrategiesController();
+        strategiesController.setMainStrategy("No strategy");
     }
 
     private void checkFromTop() {
@@ -150,76 +162,88 @@ public class CoinRatingController extends Thread {
     
     private void updatePair(coinRatingLog curr) {
         curr.update_counter++;
-        List<Bar> bars_h = client.getBars(curr.symbol, "5m", 13, System.currentTimeMillis() - 60*60*1000, System.currentTimeMillis() + 10000);
+        List<Bar> bars_h = client.getBars(curr.symbol, "5m");
         List<Bar> bars_d = client.getBars(curr.symbol, "2h", 13, System.currentTimeMillis() - 24*60*60*1000, System.currentTimeMillis() + 100000);
+        float volatility_hour = 0, volatility_day = 0;
         if (bars_h.size() > 1) {
-            curr.hour_ago_price = bars_h.get(0).getClosePrice().floatValue();
-            curr.volatility = 0f;
+            int hour_ago_index = Math.max(0, bars_h.size()-12);
+            int last_index = bars_h.size()-1;
+            curr.current_price = bars_h.get(last_index).getClosePrice().floatValue();
+            curr.hour_ago_price = bars_h.get(hour_ago_index).getClosePrice().floatValue();
+            if (curr.hour_ago_price > 0) {
+                curr.percent_hour = (curr.current_price - curr.hour_ago_price) / curr.hour_ago_price;
+            }
             curr.hour_volume = 0f;
-            for(int i=0; i<bars_h.size(); i++) {
-                float min_price = bars_h.get(i).getMinPrice().floatValue();
-                float max_price = bars_h.get(i).getMaxPrice().floatValue();
-                float open_price = bars_h.get(i).getOpenPrice().floatValue();
-                float close_price = bars_h.get(i).getClosePrice().floatValue();
-                curr.volatility += Math.abs((open_price - min_price)/open_price);
-                curr.volatility += Math.abs((close_price - min_price)/close_price);
-                curr.volatility += Math.abs((max_price - open_price)/open_price);
-                curr.volatility += Math.abs((max_price - close_price)/close_price);
+            for(int i=hour_ago_index; i<=last_index; i++) {
                 curr.hour_volume += bars_h.get(i).getVolume().floatValue();
             }
-            curr.volatility /= bars_h.size()*4;
-            
-            /*BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
-            series.addBar(bar);
+            BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
+            client.addSeriesBars(series, bars_h);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-            StandardDeviationIndicator vol_indicator = new StandardDeviationIndicator(closePrice, bars_h.size());*/
-            
+            SMAIndicator sma = new SMAIndicator(closePrice, 12);
+            StandardDeviationIndicator vol_indicator = new StandardDeviationIndicator(closePrice, 12);
+            volatility_hour = vol_indicator.getValue(series.getEndIndex()).floatValue() / sma.getValue(series.getEndIndex()).floatValue();
         }
         if (bars_d.size() > 1) {
             curr.day_ago_price = bars_d.get(0).getClosePrice().floatValue();
+            if (curr.day_ago_price > 0) {
+                curr.percent_day = (curr.current_price - curr.day_ago_price) / curr.day_ago_price;
+            }
             curr.day_volume = 0f;
             for(int i=0; i<bars_d.size(); i++) {
                 curr.day_volume += bars_d.get(i).getVolume().floatValue();
             }
+            BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
+            client.addSeriesBars(series, bars_d);
+            ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+            SMAIndicator sma = new SMAIndicator(closePrice, bars_d.size());
+            StandardDeviationIndicator vol_indicator = new StandardDeviationIndicator(closePrice, bars_d.size());
+            volatility_day = vol_indicator.getValue(series.getEndIndex()).floatValue() / sma.getValue(series.getEndIndex()).floatValue();
         }
+        curr.volatility = volatility_hour * 0.7f + volatility_day * 0.3f;
+        strategiesController.setGroupName(curr.symbol);
+        strategiesController.setBarSeconds(300);
+        strategiesController.resetSeries();
+        client.addSeriesBars(strategiesController.getSeries(), bars_h);
+        strategiesController.resetStrategies();
+        curr.strategies_shouldenter_cnt = strategiesController.getStrategiesEnterActive(6);
+        curr.strategies_shouldexit_cnt = strategiesController.getStrategiesExitActive(6);
+        calculateRating(curr);
+        curr.last_rating_update_millis = System.currentTimeMillis();
     }
     
     private void calculateRating(coinRatingLog curr) {
         curr.rating = 0;
+        curr.rating += curr.events_count / 20;
+        curr.rating += curr.volatility * 150;
         if (curr.last_event_anno_millis < 1*60*60*1000) {
             curr.rating++;
         }
         if (curr.last_event_anno_millis < 24*60*60*1000) {
             curr.rating++;
         }
-        if (curr.events_count > 10) {
-            curr.rating++;
-        }
-        if (curr.events_count > 50) {
-            curr.rating++;
-        }
         if (curr.market_cap > 20000000) {
-            curr.rating++;
-        }
-        if (curr.market_cap > 100000000) {
-            curr.rating++;
-        }
-        if (curr.market_cap > 500000000) {
-            curr.rating++;
-        }
-        if (curr.volatility > 0.01) {
-            curr.rating++;
-        }
-        if (curr.volatility > 0.1) {
-            curr.rating++;
-        }
-        if (curr.volatility > 0.3) {
-            curr.rating++;
+            curr.rating += 0.2 * Math.sqrt(curr.market_cap / 20000000);
         }
         if (curr.hour_ago_price > 0 && curr.hour_ago_price < curr.current_price) {
-            curr.rating++;
+            curr.rating += curr.current_price / curr.hour_ago_price;
         }
         if (curr.day_ago_price > 0 && curr.day_ago_price < curr.current_price) {
+            curr.rating += curr.current_price / curr.day_ago_price;
+        }
+        if (curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt) {
+            curr.rating++;
+        }
+        if (curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt + 4) {
+            curr.rating++;
+        }
+        if (curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt + 10) {
+            curr.rating++;
+        }
+        if (curr.hour_volume > 0.1 * curr.day_volume) {
+            curr.rating++;
+        }
+        if (curr.hour_volume > 0.25 * curr.day_volume) {
             curr.rating++;
         }
     }
@@ -329,6 +353,12 @@ public class CoinRatingController extends Thread {
         
         calculateRating(curr);
         
+        app.log("Volatility = " + df3p.format(curr.volatility));
+        app.log("Hour volume = " + df3.format(curr.hour_volume));
+        app.log("Day volume = " + df3.format(curr.day_volume));
+        app.log("Hour change percent = " + df3p.format(curr.percent_hour));
+        app.log("Day change percent = " + df3p.format(curr.percent_day));
+        
         app.log("-----------------------------------");
     }
     
@@ -416,6 +446,15 @@ public class CoinRatingController extends Thread {
                 case CR_VOLATILITY:
                     entry.getValue().sort = (float) entry.getValue().volatility;
                     break;
+                case CR_STRATEGIES_SHOULD_ENTER:
+                    entry.getValue().sort = (float) entry.getValue().strategies_shouldenter_cnt;
+                    break;
+                case CR_STRATEGIES_SHOULD_EXIT:
+                    entry.getValue().sort = (float) entry.getValue().strategies_shouldexit_cnt;
+                    break;
+                case CR_STRATEGIES_DIRECTION:
+                    entry.getValue().sort = (float) entry.getValue().strategies_shouldenter_cnt - entry.getValue().strategies_shouldexit_cnt;
+                    break;
                 case CR_LAST_EVENT_ANNO_DATE:
                     entry.getValue().sort = (float) entry.getValue().last_event_anno_millis;
                     break;
@@ -453,10 +492,19 @@ public class CoinRatingController extends Thread {
                         text += curr.events_count;
                         break;
                     case CR_CALCULATED_RATING:
-                        text += curr.rating;
+                        text += df3.format(curr.rating);
                         break;
                     case CR_VOLATILITY:
                         text += df3p.format(curr.volatility);
+                        break;
+                    case CR_STRATEGIES_SHOULD_ENTER:
+                        text += curr.strategies_shouldenter_cnt;
+                        break;
+                    case CR_STRATEGIES_SHOULD_EXIT:
+                        text += curr.strategies_shouldexit_cnt;
+                        break;
+                    case CR_STRATEGIES_DIRECTION:
+                        text += curr.strategies_shouldenter_cnt - curr.strategies_shouldexit_cnt;
                         break;
                     case CR_LAST_EVENT_ANNO_DATE:
                         text+=curr.last_event_date != null && !curr.last_event_date.isEmpty() ? curr.last_event_date : "Unknown date";
@@ -483,15 +531,27 @@ public class CoinRatingController extends Thread {
     }
 
     private void checkFastEnter() {
-        if (entered == null && !heroesMap.isEmpty()) {
+        if (entered == null && !heroesMap.isEmpty() && !app.getPairs().isEmpty()) {
             String pairMax = "";
             float maxK = 0;
             for (Entry<String, coinRatingLog> entry : heroesMap.entrySet()) {
                 coinRatingLog curr = entry.getValue();
-                if (curr != null && !curr.fastbuy_skip && curr.up_counter >= 5 && curr.percent_from_begin > 0.03 && curr.percent_last > 0.002) {
-                    float k = curr.percent_from_begin * curr.up_counter;
+                if (
+                        curr != null && 
+                        !curr.fastbuy_skip && 
+                        curr.last_rating_update_millis > 0 &&
+                        curr.last_rating_update_millis > System.currentTimeMillis() - 600000 &&
+                        curr.volatility > 0.01 &&
+                        curr.percent_hour > 0.005 &&
+                        curr.market_cap > 200000 &&
+                        curr.hour_volume > 0 &&
+                        curr.rank > 0 && curr.rank < 200 &&
+                        curr.strategies_shouldenter_cnt > 1
+                ) {
+                    float k = curr.rating;
                     if (k > maxK) {
                         pairMax = entry.getKey();
+                        maxK = k;
                     }
                 }
             }
@@ -505,19 +565,24 @@ public class CoinRatingController extends Thread {
                     nproc.setTryingToBuyDip(false);
                     nproc.set_do_remove_flag(false);
                     nproc.setTradingBalancePercent(100);
-                    nproc.setMainStrategy("No");
+                    nproc.setMainStrategy("Auto");
                     nproc.setBarInterval("1m");
                     nproc.setDelayTime(5);
                     nproc.setBuyOnStart(true);
+                    nproc.setStopBuyLimitTimeout(120);
+                    nproc.setStopSellLimitTimeout(240);
+                    nproc.setUseBuyStopLimited(true);
+                    nproc.setUseSellStopLimited(true);
                     app.getPairs().add(nproc);
                     nproc.start();
                     entered.pair = nproc;
                     entered.value_enter = entered.current_price;
                     entered.percent_enter = 0f;
+                    doWait(1000);
                 }
             }
         } else if (entered != null) {
-            if (!entered.pair.isHodling() || (entered.percent_last < 0 && entered.up_counter == 0 && (!lowHold || entered.percent_enter > 0))) {
+            if (entered.pair.isInitialized() && !entered.pair.isHodling()) {
                 if (entered.pair.isHodling()) {
                     entered.pair.doSell();
                     doWait(1000);
@@ -535,6 +600,94 @@ public class CoinRatingController extends Thread {
         }
     }
 
+    private void updateCurrentPrices(String coinsPattern) {
+        heroesMap.forEach((symbol, curr) -> {
+            curr.do_remove_flag = true;
+        });
+        List<TickerPrice> allPrices = client.getAllPrices();
+        if (heroesMap.isEmpty()) {
+            app.log("Found " + allPrices.size() + " prices...");
+            app.log("Checking them using pattern: " + coinsPattern);
+        }
+        allPrices.forEach((price) -> {
+            if (price != null && !price.getSymbol().isEmpty() && !price.getSymbol().contains("1") && !price.getPrice().isEmpty()) {
+                String symbol = price.getSymbol();                    
+                if (symbol.matches(".*(" + coinsPattern + ")$")) {
+                    float rprice = Float.parseFloat(price.getPrice());
+                    if (heroesMap.containsKey(symbol)) {
+                        coinRatingLog clog = heroesMap.get(symbol);
+                        clog.value_last = clog.current_price;
+                        clog.current_price = rprice;
+                        clog.do_remove_flag = false;
+                        if (clog.value_last > 0) {
+                            clog.percent_last = (clog.current_price - clog.value_last) / clog.value_last;
+                        }
+                        if (clog.value_begin > 0) {
+                            clog.percent_from_begin = (clog.current_price - clog.value_begin) / clog.value_begin;
+                        }
+                        if (clog.hour_ago_price > 0) {
+                            clog.percent_hour = (clog.current_price - clog.hour_ago_price) / clog.hour_ago_price;
+                        }
+                        if (clog.day_ago_price > 0) {
+                            clog.percent_day = (clog.current_price - clog.day_ago_price) / clog.day_ago_price;
+                        }
+                        if (clog.percent_last > 0.0005) {
+                            clog.up_counter++;
+                        } else if (clog.percent_last < -1) {
+                            clog.up_counter = 0;
+                        } else if (clog.percent_last < -0.001) {
+                            clog.up_counter = clog.up_counter / 2 - 1;
+                            if (clog.up_counter < 0) {
+                                clog.up_counter = 0;
+                            }
+                        } else if (clog.percent_last < -0.0005) {
+                            clog.up_counter = clog.up_counter - 1;
+                            if (clog.up_counter < 0) {
+                                clog.up_counter = 0;
+                            }
+                        }
+                        if (clog.value_enter > 0) {
+                            clog.percent_enter = (clog.current_price - clog.value_enter) / clog.value_enter;
+                        }
+                    } else {
+                        coinRatingLog newlog = new coinRatingLog();
+                        newlog.symbol = symbol;
+                        newlog.do_remove_flag = false;
+                        newlog.current_price = rprice;
+                        newlog.value_last = rprice;
+                        newlog.value_begin = rprice;
+                        newlog.percent_last = 0f;
+                        newlog.percent_from_begin = 0f;
+                        newlog.percent_enter = 0f;
+                        newlog.up_counter = 0;
+                        newlog.update_counter = 0;
+                        newlog.value_enter = 0f;
+                        newlog.pair = null;
+                        newlog.fastbuy_skip = false;
+
+                        String psymbol = symbol.substring(0, symbol.length() - 3).toUpperCase();
+                        if (coinRanks.containsKey(psymbol)) {
+                            newlog.rank = Integer.parseInt(coinRanks.get(psymbol).optString("rank", "9999"));
+                            newlog.market_cap = Float.parseFloat(coinRanks.get(psymbol).optString("market_cap_usd", "0"));
+                            newlog.fullname = coinRanks.get(psymbol).optString("name", symbol);
+                        } else {
+                            newlog.rank = 9999;
+                            newlog.market_cap = 0;
+                            newlog.fullname = symbol;
+                        }
+
+                        heroesMap.put(symbol, newlog);
+                    }
+                }
+            }
+        });
+        heroesMap.forEach((symbol, curr) -> {
+            if (curr.do_remove_flag) {
+                heroesMap.remove(symbol);
+            }
+        });
+    }
+    
     @Override
     public void run() {
 
@@ -564,99 +717,14 @@ public class CoinRatingController extends Thread {
                 continue;
             }
 
-            heroesMap.forEach((symbol, curr) -> {
-                curr.do_remove_flag = true;
-            });
-            List<TickerPrice> allPrices = client.getAllPrices();
-            if (heroesMap.isEmpty()) {
-                app.log("Found " + allPrices.size() + " prices...");
-                app.log("Checking them using pattern: " + coinsPattern);
-            }
-
-            allPrices.forEach((price) -> {
-                if (price != null && !price.getSymbol().isEmpty() && !price.getSymbol().contains("1") && !price.getPrice().isEmpty()) {
-                    String symbol = price.getSymbol();                    
-                    if (symbol.matches(".*(" + coinsPattern + ")$")) {
-                        float rprice = Float.parseFloat(price.getPrice());
-                        if (heroesMap.containsKey(symbol)) {
-                            coinRatingLog clog = heroesMap.get(symbol);
-                            clog.value_last = clog.current_price;
-                            clog.current_price = rprice;
-                            clog.do_remove_flag = false;
-                            if (clog.value_last > 0) {
-                                clog.percent_last = (clog.current_price - clog.value_last) / clog.value_last;
-                            }
-                            if (clog.value_begin > 0) {
-                                clog.percent_from_begin = (clog.current_price - clog.value_begin) / clog.value_begin;
-                            }
-                            if (clog.hour_ago_price > 0) {
-                                clog.percent_hour = (clog.current_price - clog.hour_ago_price) / clog.hour_ago_price;
-                            }
-                            if (clog.day_ago_price > 0) {
-                                clog.percent_day = (clog.current_price - clog.day_ago_price) / clog.day_ago_price;
-                            }
-                            if (clog.percent_last > 0.0005) {
-                                clog.up_counter++;
-                            } else if (clog.percent_last < -1) {
-                                clog.up_counter = 0;
-                            } else if (clog.percent_last < -0.001) {
-                                clog.up_counter = clog.up_counter / 2 - 1;
-                                if (clog.up_counter < 0) {
-                                    clog.up_counter = 0;
-                                }
-                            } else if (clog.percent_last < -0.0005) {
-                                clog.up_counter = clog.up_counter - 1;
-                                if (clog.up_counter < 0) {
-                                    clog.up_counter = 0;
-                                }
-                            }
-                            if (clog.value_enter > 0) {
-                                clog.percent_enter = (clog.current_price - clog.value_enter) / clog.value_enter;
-                            }
-                        } else {
-                            coinRatingLog newlog = new coinRatingLog();
-                            newlog.symbol = symbol;
-                            newlog.do_remove_flag = false;
-                            newlog.current_price = rprice;
-                            newlog.value_last = rprice;
-                            newlog.value_begin = rprice;
-                            newlog.percent_last = 0f;
-                            newlog.percent_from_begin = 0f;
-                            newlog.percent_enter = 0f;
-                            newlog.up_counter = 0;
-                            newlog.update_counter = 0;
-                            newlog.value_enter = 0f;
-                            newlog.pair = null;
-                            newlog.fastbuy_skip = false;
-                            
-                            String psymbol = symbol.substring(0, symbol.length() - 3).toUpperCase();
-                            if (coinRanks.containsKey(psymbol)) {
-                                newlog.rank = Integer.parseInt(coinRanks.get(psymbol).optString("rank", "9999"));
-                                newlog.market_cap = Float.parseFloat(coinRanks.get(psymbol).optString("market_cap_usd", "0"));
-                                newlog.fullname = coinRanks.get(psymbol).optString("name", symbol);
-                            } else {
-                                newlog.rank = 9999;
-                                newlog.market_cap = 0;
-                                newlog.fullname = symbol;
-                            }
-                            
-                            heroesMap.put(symbol, newlog);
-                        }
-                    }
-                }
-            });
-            heroesMap.forEach((symbol, curr) -> {
-                if (curr.do_remove_flag) {
-                    heroesMap.remove(symbol);
-                }
-            });
+            updateCurrentPrices(coinsPattern);
             
             if (analyzer) {
                 checkFromTop();
             }
             updateList();
 
-            if (autoOrder && have_all_coins_info) {
+            if (analyzer && autoOrder && have_all_coins_info) {
                 checkFastEnter();
             }
 

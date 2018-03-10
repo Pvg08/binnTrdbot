@@ -12,10 +12,17 @@ import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.RateLimit;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
+import com.evgcompany.binntrdbot.tradePairProcess;
 import java.io.Closeable;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.ta4j.core.Bar;
+import org.ta4j.core.TimeSeries;
 
 /**
  *
@@ -83,6 +90,41 @@ public abstract class TradingAPIAbstractInterface {
                 break;
         }
         return newSeconds;
+    }
+    
+    public void addSeriesBars(TimeSeries series, List<Bar> bars) {
+        if (bars != null && !bars.isEmpty()) {
+            for(int i=0; i<bars.size(); i++) {
+                series.addBar(bars.get(i));
+            }
+        }
+    }
+    
+    public void addUpdateSeriesBars(TimeSeries series, List<Bar> nbars) {
+        if (nbars.size() > 0) {
+            ZonedDateTime lastEndTime = null;
+            if (series.getBarCount() > 0) {
+                long last_end_time = series.getLastBar().getEndTime().toInstant().toEpochMilli();
+                lastEndTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(last_end_time), ZoneId.systemDefault());
+            }
+            for(int i=0; i<nbars.size(); i++) {
+                Bar stick = nbars.get(i);
+                ZonedDateTime endTime = stick.getEndTime();
+                boolean updated = false;
+                if (lastEndTime != null) {
+                    if (lastEndTime.equals(endTime)) {
+                        List<Bar> clist = series.getBarData();
+                        clist.set(clist.size()-1, stick);
+                        updated = true;
+                    } else if (lastEndTime.isAfter(endTime)) {
+                        updated = true;
+                    }
+                }
+                if (!updated) {
+                    series.addBar(stick);
+                }
+            }
+        }
     }
     
     abstract public List<RateLimit> getRateLimits();

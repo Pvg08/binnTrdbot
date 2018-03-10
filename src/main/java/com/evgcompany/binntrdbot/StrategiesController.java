@@ -6,7 +6,6 @@
 package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.analysis.*;
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -52,7 +51,7 @@ public class StrategiesController {
     private String mainStrategy = "Auto";
     private int barSeconds;
     private String groupName;
-    private List<StrategyMarker> markers = new ArrayList<>();
+    private final List<StrategyMarker> markers = new ArrayList<>();
     private TradingRecord tradingRecord = null;
     
     public StrategiesController(String groupName, mainApplication app, tradeProfitsController profitsChecker) {
@@ -99,15 +98,17 @@ public class StrategiesController {
     }
     
     public void addStrategyMarker(boolean is_enter, String strategy_name) {
-        StrategyMarker newm = new StrategyMarker();
-        newm.label = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
-        newm.timeStamp = profitsChecker.getClient().getAlignedCurrentTimeMillis();
-        if (strategy_name.equals(mainStrategy)) {
-            newm.typeIndex = is_enter ? 0 : 1;
-        } else {
-            newm.typeIndex = is_enter ? 2 : 3;
+        if (profitsChecker != null) {
+            StrategyMarker newm = new StrategyMarker();
+            newm.label = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
+            newm.timeStamp = profitsChecker.getClient().getAlignedCurrentTimeMillis();
+            if (strategy_name.equals(mainStrategy)) {
+                newm.typeIndex = is_enter ? 0 : 1;
+            } else {
+                newm.typeIndex = is_enter ? 2 : 3;
+            }
+            markers.add(newm);
         }
-        markers.add(newm);
     }
     
     private void addStrategyPastMarker(boolean is_enter, long timestamp, String strategy_name) {
@@ -132,8 +133,8 @@ public class StrategiesController {
             throw new IllegalArgumentException("Series cannot be null");
         }
         return new BaseStrategy(
-                new BooleanRule(false),
-                addStopLossGain(new BooleanRule(false), series)
+            new BooleanRule(false),
+            addStopLossGain(new BooleanRule(false), series)
         );
     }
     
@@ -462,28 +463,15 @@ public class StrategiesController {
             throw new IllegalArgumentException("Series cannot be null");
         }
 
-        // http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:ichimoku_cloud
-        /*IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
-        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
-        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
-        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
-        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);*/
-        
         // http://www.tradingsystemlab.com/files/The%20Fisher%20Transform.pdf
         // FisherIndicator fisher = new FisherIndicator(series);
 
         // https://alanhull.com/hull-moving-average
         // HMAIndicator hma = new HMAIndicator(new ClosePriceIndicator(series), 9);
         
-        // http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:kaufman_s_adaptive_moving_average
-        // KAMAIndicator kama = new KAMAIndicator(new ClosePriceIndicator(series), 10, 2, 30);
-        
         // http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:aroon
         // AroonUpIndicator arronUp = new AroonUpIndicator(series, 5);
-        
-        // https://blokt.com/technical-analysis/cryptocurrency-indicators
-        // https://hackernoon.com/my-top-3-favourite-indicators-for-technical-analysis-of-cryptocurrencies-b552f584776d
-        
+
         //OpenPriceIndicator openPriceIndicator = new OpenPriceIndicator(series);
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         
@@ -523,7 +511,7 @@ public class StrategiesController {
      * @param series a time series
      * @return a moving momentum strategy
      */
-    public Strategy buildMovingMomentumStrategy(TimeSeries series) {
+    private Strategy buildMovingMomentumStrategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
@@ -557,7 +545,7 @@ public class StrategiesController {
      * @param series a time series
      * @return a CCI correction strategy
      */
-    public Strategy buildCCICorrectionStrategy(TimeSeries series) {
+    private Strategy buildCCICorrectionStrategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
@@ -582,7 +570,7 @@ public class StrategiesController {
      * @param series a time series
      * @return a global extrema strategy
      */
-    public Strategy buildGlobalExtremaStrategy(TimeSeries series) {
+    private Strategy buildGlobalExtremaStrategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
@@ -613,7 +601,7 @@ public class StrategiesController {
      * @param series a time series
      * @return a 2-period RSI strategy
      */
-    public Strategy buildRSI2Strategy(TimeSeries series) {
+    private Strategy buildRSI2Strategy(TimeSeries series) {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
@@ -645,9 +633,9 @@ public class StrategiesController {
     
     private Rule addStopLossGain(Rule rule, TimeSeries series) {
         if (profitsChecker != null) {
-            if (profitsChecker.isLowHold()) {
-                rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeComissionPercent().multiply(BigDecimal.valueOf(2)))));
-            }
+            /*if (profitsChecker.isLowHold()) {
+                rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeMinProfitPercent())));
+            }*/
             if (profitsChecker.getStopLossPercent() != null) {
                 rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
             }
@@ -659,6 +647,9 @@ public class StrategiesController {
     }
     
     public void logStatistics(boolean init_marks) {
+        
+        if (app == null) return;
+        
         TimeSeriesManager seriesManager = new TimeSeriesManager(series);
         TradingRecord tradingRecordC = seriesManager.run(strategies.get(mainStrategy));
         if (init_marks) {
@@ -684,7 +675,8 @@ public class StrategiesController {
         app.log("Current "+groupName+" strategy ("+mainStrategy+") criterias:");
         TotalProfitCriterion totalProfit = new TotalProfitCriterion();
         app.log("Total profit: " + totalProfit.calculate(series, tradingRecordC));
-        app.log("Total transaction cost: " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
+        if (profitsChecker != null)
+            app.log("Total transaction cost: " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
         app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecordC));
         app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecordC));
         app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecordC));
@@ -692,7 +684,8 @@ public class StrategiesController {
         app.log("");
         app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecordC));
         app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecordC));
-        app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
+        if (profitsChecker != null)
+            app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
         app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecordC));
         app.log("");app.log("");
     }
@@ -701,29 +694,66 @@ public class StrategiesController {
         markers.clear();
         strategies.clear();
         HashMap<String, StrategyInitializer> strategies_init = getStrategiesInitializerMap();
-        for (Map.Entry<String, StrategyInitializer> entry : strategies_init.entrySet()) {
+        strategies_init.entrySet().forEach((entry) -> {
             strategies.put(entry.getKey(), entry.getValue().onInit(series));
-        }
+        });
         strategies_init.clear();
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
-            app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
+            if (app != null) app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
         }
         if (!strategies.containsKey(mainStrategy)) {
             List<String> keysAsArray = new ArrayList<>(strategies.keySet());
             Random r = new Random();
             mainStrategy = keysAsArray.get(r.nextInt(keysAsArray.size()));
-            app.log("Strategy for " + groupName + " is not found. Using random = " + mainStrategy, true, false);
+            if (app != null) app.log("Strategy for " + groupName + " is not found. Using random = " + mainStrategy, true, false);
         }
 
         logStatistics(true);
+    }
+    
+    public int getStrategiesEnterActive(int timeframe) {
+        int result = 0;
+        int start_index = series.getEndIndex() - timeframe;
+        if (start_index < 0) start_index = 0;
+        int end_index = series.getEndIndex();
+        for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
+            for(int i=start_index;i<=end_index;i++) {
+                if (entry.getValue().shouldEnter(i)) {
+                    result++;
+                    i = end_index+1;
+                }
+            }
+        }
+        return result;
+    }
+    public int getStrategiesExitActive(int timeframe) {
+        TradingRecord tradingRecordT = new BaseTradingRecord();
+        tradingRecordT.enter(0);
+        int result = 0;
+        int start_index = series.getEndIndex() - timeframe;
+        if (start_index < 0) start_index = 0;
+        int end_index = series.getEndIndex();
+        for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
+            for(int i=start_index;i<=end_index;i++) {
+                if (entry.getValue().shouldExit(i, tradingRecordT)) {
+                    result++;
+                    i = end_index+1;
+                }
+            }
+        }
+        return result;
     }
     
     private String findOptimalStrategy() {
         String result = "Unknown";
         List<Strategy> slist = new ArrayList<>(strategies.values());
         List<TimeSeries> subseries = splitSeries(series, Duration.ofSeconds(barSeconds * 30), Duration.ofSeconds(barSeconds * 1440));
-        AnalysisCriterion profitwotranscostCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
+        AnalysisCriterion profitCriterion = null;
+        if (profitsChecker != null)
+            profitCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
+        else 
+            profitCriterion = new TotalProfitCriterion();
         Map<String, Integer> successMap = new HashMap<>();
         
         String log = "";
@@ -735,10 +765,10 @@ public class StrategiesController {
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
                 Strategy strategy = entry.getValue();
                 TradingRecord tradingRecordC = sliceManager.run(strategy);
-                double profit = profitwotranscostCriterion.calculate(slice, tradingRecordC);
+                double profit = profitCriterion.calculate(slice, tradingRecordC);
                 log += "\tProfit wo comission for " + entry.getKey() + ": " + profit + "\n";
             }
-            Strategy bestStrategy = profitwotranscostCriterion.chooseBest(sliceManager, slist);
+            Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, slist);
             
             String bestKey = result;
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
@@ -761,7 +791,7 @@ public class StrategiesController {
             }
         }
         
-        app.log(log);
+        if (app != null) app.log(log);
         
         return result;
     }
@@ -772,7 +802,7 @@ public class StrategiesController {
      * @param splitDuration the duration between 2 splits
      * @return a list of begin indexes after split
      */
-    public static List<Integer> getSplitBeginIndexes(TimeSeries series, Duration splitDuration) {
+    private static List<Integer> getSplitBeginIndexes(TimeSeries series, Duration splitDuration) {
         ArrayList<Integer> beginIndexes = new ArrayList<>();
 
         int beginIndex = series.getBeginIndex();
@@ -814,7 +844,7 @@ public class StrategiesController {
      * @param duration the duration of the time series
      * @return a constrained {@link TimeSeries time series} which is a sub-set of the current series
      */
-    public static TimeSeries subseries(TimeSeries series, int beginIndex, Duration duration) {
+    private static TimeSeries subseries(TimeSeries series, int beginIndex, Duration duration) {
 
         // Calculating the sub-series interval
         ZonedDateTime beginInterval = series.getBar(beginIndex).getEndTime();
@@ -847,7 +877,7 @@ public class StrategiesController {
      * @param sliceDuration the duration of each sub-series
      * @return a list of sub-series
      */
-    public static List<TimeSeries> splitSeries(TimeSeries series, Duration splitDuration, Duration sliceDuration) {
+    private static List<TimeSeries> splitSeries(TimeSeries series, Duration splitDuration, Duration sliceDuration) {
         ArrayList<TimeSeries> subseries = new ArrayList<>();
         if (splitDuration != null && !splitDuration.isZero() && 
             sliceDuration != null && !sliceDuration.isZero()) {
@@ -870,7 +900,7 @@ public class StrategiesController {
                     return StrategiesAction.DO_LEAVE;
                 } else if (strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord)) {
                     addStrategyMarker(true, mainStrategy);
-                    app.log(groupName + " should enter here but already hodling...", false, true);
+                    if (app != null) app.log(groupName + " should enter here but already hodling...", false, true);
                 }
             }
         } else {
@@ -879,7 +909,7 @@ public class StrategiesController {
                 return StrategiesAction.DO_ENTER;
             } else if (strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord)) {
                 addStrategyMarker(false, mainStrategy);
-                app.log(groupName + " should exit here but everything is sold...", false, true);
+                if (app != null) app.log(groupName + " should exit here but everything is sold...", false, true);
             }
         }
 
@@ -889,21 +919,21 @@ public class StrategiesController {
                     if (is_hodling) {
                         if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
                             addStrategyMarker(false, entry.getKey());
-                            app.log(groupName + " should exit here ("+entry.getKey()+")...", false, true);
+                            if (app != null) app.log(groupName + " should exit here ("+entry.getKey()+")...", false, true);
                             if (mode != StrategiesMode.SELL_UP) {
                                 return StrategiesAction.DO_LEAVE;
                             }
                         } else if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
                             addStrategyMarker(true, entry.getKey());
-                            app.log(groupName + " should enter here ("+entry.getKey()+") but already hodling...", false, true);
+                            if (app != null) app.log(groupName + " should enter here ("+entry.getKey()+") but already hodling...", false, true);
                         }
                     } else {
                         if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
                             addStrategyMarker(true, entry.getKey());
-                            app.log(groupName + " should enter here ("+entry.getKey()+")...", false, true);
+                            if (app != null) app.log(groupName + " should enter here ("+entry.getKey()+")...", false, true);
                         } else if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
                             addStrategyMarker(false, entry.getKey());
-                            app.log(groupName + " should exit here ("+entry.getKey()+") but everything is sold...", false, true);
+                            if (app != null) app.log(groupName + " should exit here ("+entry.getKey()+") but everything is sold...", false, true);
                         }
                     }
                 }
