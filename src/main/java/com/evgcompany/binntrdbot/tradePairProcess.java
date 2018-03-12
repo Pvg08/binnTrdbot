@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
+import com.binance.api.client.domain.OrderType;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
@@ -23,6 +24,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -39,13 +41,13 @@ public class tradePairProcess extends Thread {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     TradingAPIAbstractInterface client;
-    private String symbol;
+    private final String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
     private tradeProfitsController profitsChecker = null;
     private StrategiesController strategiesController = null;
     
-    private mainApplication app;
+    private final mainApplication app;
     private boolean need_stop = false;
     private boolean paused = false;
     
@@ -143,7 +145,7 @@ public class tradePairProcess extends Thread {
         base_strategy_sell_ignored = false;
         if (profitsChecker.canBuy(symbol, sold_amount, curPrice)) {
             app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
-            long result = profitsChecker.Buy(symbol, sold_amount, curPrice, false);
+            long result = profitsChecker.Buy(symbol, sold_amount, curPrice);
             if (result >= 0) {
                 limitOrderId = result;
                 app.log("Successful!", true, true);
@@ -195,6 +197,10 @@ public class tradePairProcess extends Thread {
     }
     
     private void checkOrder() {
+        if (profitsChecker.isTestMode()) {
+            profitsChecker.finishOrder(symbol, true, currentPrice);
+            return;
+        }
         Order order = client.getOrderStatus(symbol, limitOrderId);
         if(order != null) {
             if (
@@ -284,6 +290,9 @@ public class tradePairProcess extends Thread {
             Logger.getLogger(tradePairProcess.class.getName()).log(Level.SEVERE, null, ex);
         }
         client.addUpdateSeriesBars(series, nbars);
+        if (plot != null) {
+            plot.updateSeries();
+        }
         SEMAPHORE_ADD.release();
     }
     
@@ -331,36 +340,43 @@ public class tradePairProcess extends Thread {
     }
     
     private void tryStartSellUpSeq() {
-        int i;
-        
         Trade last = client.getLastTrade(symbol);
         if (last != null) {
             BigDecimal lastBuyPrice = new BigDecimal(last.getPrice());
             BigDecimal lastBuyQty = new BigDecimal(last.getQty());
+            
+            BigDecimal currentLimitSellPrice = BigDecimal.ZERO;
+            BigDecimal currentLimitSellQty = BigDecimal.ZERO;
             
             AssetBalance qbalance = profitsChecker.getClient().getAssetBalance(baseAssetSymbol);
             BigDecimal free_cnt = new BigDecimal(qbalance.getFree());
             BigDecimal order_cnt = BigDecimal.ZERO;
             
             orderToCancelOnSellUp.clear();
-            
+
+            List<Order> openOrders = client.getOpenOrders(symbol);
             if (free_cnt.compareTo(BigDecimal.ZERO)==0 || sellUpAll) {
-                List<Order> openOrders = client.getOpenOrders(symbol);
-                for (i=0; i < openOrders.size(); i++) {
+                for (int i=0; i < openOrders.size(); i++) {
                     if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL) {
                         orderToCancelOnSellUp.add(openOrders.get(i).getOrderId());
                         order_cnt = order_cnt.add(new BigDecimal(openOrders.get(i).getOrigQty()));
                     }
                 }
             }
-            
+            for (int i=0; i < openOrders.size(); i++) {
+                if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL && openOrders.get(i).getType() == OrderType.LIMIT) {
+                    currentLimitSellPrice = new BigDecimal(openOrders.get(i).getPrice());
+                    currentLimitSellQty = new BigDecimal(openOrders.get(i).getOrigQty());
+                }
+            }
+
             if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !orderToCancelOnSellUp.isEmpty())) {
                 BigDecimal res_cnt = free_cnt.add(order_cnt);
                 base_strategy_sell_ignored = true;
                 sold_price = lastBuyPrice;
                 sold_amount = res_cnt;
                 app.log("START WAITING to sell " + df8.format(sold_amount) + " " + baseAssetSymbol + " for price more than " + df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
-                long result = profitsChecker.Buy(symbol, sold_amount, lastBuyPrice, true);
+                long result = profitsChecker.PreBuySell(symbol, sold_amount, lastBuyPrice, currentLimitSellQty, currentLimitSellPrice);
                 if (result >= 0) {
                     limitOrderId = result;
                     app.log("Successful waiting start!", true, true);
@@ -451,6 +467,7 @@ public class tradePairProcess extends Thread {
     public void run(){  
         int exceptions_cnt = 0;
         isInitialized = false;
+        limitOrderId = 0;
 
         if (!buyOnStart) {
             doWait(ThreadLocalRandom.current().nextLong(100, 500));
@@ -533,6 +550,7 @@ public class tradePairProcess extends Thread {
         }
         
         isInitialized = true;
+        app.log(symbol + " initialized. Current price = " + df8.format(currentPrice));
         
         while (!need_stop) {
             if (paused) {
@@ -595,10 +613,17 @@ public class tradePairProcess extends Thread {
     }
 
     public void doLimitCancel() {
+        
+        System.out.println(limitOrderId);
+        
         if (limitOrderId > 0) {
-            client.cancelOrder(symbol, limitOrderId);
-            doWait(1000);
-            checkOrder();
+            profitsChecker.cancelOrder(symbol, limitOrderId);
+            if (profitsChecker.isTestMode()) {
+                limitOrderId = 0;
+            } else {
+                doWait(1000);
+                checkOrder();
+            }
         }
     }
     
@@ -825,5 +850,9 @@ public class tradePairProcess extends Thread {
      */
     public boolean isInitialized() {
         return isInitialized;
+    }
+    
+    public boolean isInLimitOrder() {
+        return limitOrderId>0;
     }
 }

@@ -223,7 +223,7 @@ public class CoinRatingController extends Thread {
             curr.rating++;
         }
         if (curr.market_cap > 20000000) {
-            curr.rating += 0.2 * Math.sqrt(curr.market_cap / 20000000);
+            curr.rating += 0.2 * Math.pow(curr.market_cap / 20000000, 0.333);
         }
         if (curr.hour_ago_price > 0 && curr.hour_ago_price < curr.current_price) {
             curr.rating += curr.current_price / curr.hour_ago_price;
@@ -232,7 +232,7 @@ public class CoinRatingController extends Thread {
             curr.rating += curr.current_price / curr.day_ago_price;
         }
         if (curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt) {
-            curr.rating++;
+            curr.rating+=2;
         }
         if (curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt + 4) {
             curr.rating++;
@@ -531,7 +531,7 @@ public class CoinRatingController extends Thread {
     }
 
     private void checkFastEnter() {
-        if (entered == null && !heroesMap.isEmpty() && !app.getPairs().isEmpty()) {
+        if (entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
             String pairMax = "";
             float maxK = 0;
             for (Entry<String, coinRatingLog> entry : heroesMap.entrySet()) {
@@ -541,11 +541,11 @@ public class CoinRatingController extends Thread {
                         !curr.fastbuy_skip && 
                         curr.last_rating_update_millis > 0 &&
                         curr.last_rating_update_millis > System.currentTimeMillis() - 600000 &&
-                        curr.volatility > 0.01 &&
-                        curr.percent_hour > 0.005 &&
+                        curr.volatility > 0.008 &&
+                        curr.percent_hour > 0.002 &&
                         curr.market_cap > 200000 &&
-                        curr.hour_volume > 0 &&
-                        curr.rank > 0 && curr.rank < 200 &&
+                        curr.hour_volume > curr.day_volume / 24 &&
+                        (curr.rank == 9999 || curr.rank < 400) &&
                         curr.strategies_shouldenter_cnt > 1
                 ) {
                     float k = curr.rating;
@@ -573,7 +573,7 @@ public class CoinRatingController extends Thread {
                     nproc.setStopSellLimitTimeout(240);
                     nproc.setUseBuyStopLimited(true);
                     nproc.setUseSellStopLimited(true);
-                    app.getPairs().add(nproc);
+                    app.getPairController().getPairs().add(nproc);
                     nproc.start();
                     entered.pair = nproc;
                     entered.value_enter = entered.current_price;
@@ -582,14 +582,14 @@ public class CoinRatingController extends Thread {
                 }
             }
         } else if (entered != null) {
-            if (entered.pair.isInitialized() && !entered.pair.isHodling()) {
+            if (entered.pair.isInitialized() && !entered.pair.isHodling() && !entered.pair.isInLimitOrder()) {
                 if (entered.pair.isHodling()) {
                     entered.pair.doSell();
                     doWait(1000);
                 } else {
                     entered.fastbuy_skip = true;
                 }
-                app.getPairs().remove(entered.pair);
+                app.getPairController().getPairs().remove(entered.pair);
                 app.getProfitsChecker().removeCurrencyPair(entered.pair.getSymbol());
                 entered.pair.doStop();
                 entered.pair = null;
@@ -705,7 +705,7 @@ public class CoinRatingController extends Thread {
 
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
-            if (Float.parseFloat(balance.getFree()) > 0 /*&& !balance.getAsset().equals("BNB") && !balance.getAsset().equals("BTC")*/) {
+            if (Float.parseFloat(balance.getFree()) > 0.0001 && !balance.getAsset().equals("BNB")) {
                 accountCoins.add(balance.getAsset());
             }
         });

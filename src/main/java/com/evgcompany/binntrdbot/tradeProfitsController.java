@@ -8,7 +8,6 @@ package com.evgcompany.binntrdbot;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.AssetBalance;
-import com.binance.api.client.domain.account.NewOrderResponse;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.text.DecimalFormat;
 import java.util.List;
@@ -23,7 +22,7 @@ import java.util.Map;
  * @author EVG_Adminer
  */
 public class tradeProfitsController {
-    
+
     public enum LimitedOrderMode {
         LOMODE_SELL, LOMODE_BUY, LOMODE_SELLANDBUY
     }
@@ -120,7 +119,22 @@ public class tradeProfitsController {
         }
     }
     
-    public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price, boolean is_preordered) {
+    public long PreBuySell(String symbolPair, BigDecimal baseAmount, BigDecimal buyPrice, BigDecimal sellAmount, BigDecimal sellPrice) {
+        long result = 0;
+        currencyPairItem pair = pair_map.get(symbolPair);
+        pair.setPrice(buyPrice);
+        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice));
+        if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
+            pair.startSellTransaction(sellAmount, sellAmount.multiply(sellPrice));
+            if (isTestMode) {
+                result = 1;
+            }
+        }
+        updatePairText(symbolPair, !isTestMode);
+        return result;
+    }
+    
+    public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
@@ -130,58 +144,53 @@ public class tradeProfitsController {
                 SEMAPHORE.release();
                 return -1;
             }
-            if (!is_preordered) {
-                if (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) < 0) {
-                    app.log("Not enough " + pair.getSymbolQuote() + " to buy " + df6.format(baseAmount) + " " + pair.getSymbolBase() + ". Need " + df6.format(baseAmount.multiply(price)) + " but have " + df6.format(pair.getQuoteItem().getFreeValue()), true, true);
+            if (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) < 0) {
+                app.log("Not enough " + pair.getSymbolQuote() + " to buy " + df6.format(baseAmount) + " " + pair.getSymbolBase() + ". Need " + df6.format(baseAmount.multiply(price)) + " but have " + df6.format(pair.getQuoteItem().getFreeValue()), true, true);
+                SEMAPHORE.release();
+                return -1;
+            }
+            if (!isTestMode) {
+                if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_BUY)) {
+                    //price = price / (1 + 0.01f * tradeComissionPercent);
+                    result = client.order(true, false, symbolPair, baseAmount, price);
+                } else {
+                    result = client.order(true, true, symbolPair, baseAmount, price);
+                }
+                if (result > 0) {
+                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
+                    app.log("Order id = " + result, false, true);
+                    Thread.sleep(550);
+                    Order mord = client.getOrderStatus(symbolPair, result);
+                    if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
+                        pair.rollbackTransaction();
+                        app.log("Order cancelled!", true, true);
+                        SEMAPHORE.release();
+                        return -1;
+                    } else if (mord.getStatus() == OrderStatus.FILLED) {
+                        pair.confirmTransaction();
+                        BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, true);
+                        if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
+                            app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
+                            price = lastTradePrice;
+                            pair.setPrice(price);
+                            pair.setLastOrderPrice(lastTradePrice);
+                        } else {
+                            pair.setPrice(price);
+                            pair.setLastOrderPrice(price);
+                        }
+                        result = 0;
+                    }
+                } else {
+                    app.log("Order error!", true, true);
                     SEMAPHORE.release();
                     return -1;
                 }
-                if (!isTestMode) {
-                    if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_BUY)) {
-                        //price = price / (1 + 0.01f * tradeComissionPercent);
-                        result = client.order(true, false, symbolPair, baseAmount, price);
-                    } else {
-                        result = client.order(true, true, symbolPair, baseAmount, price);
-                    }
-                    if (result > 0) {
-                        pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
-                        app.log("Order id = " + result, false, true);
-                        Thread.sleep(550);
-                        Order mord = client.getOrderStatus(symbolPair, result);
-                        if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
-                            pair.rollbackTransaction();
-                            app.log("Order cancelled!", true, true);
-                            SEMAPHORE.release();
-                            return -1;
-                        } else if (mord.getStatus() == OrderStatus.FILLED) {
-                            pair.confirmTransaction();
-                            BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, true);
-                            if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
-                                app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
-                                price = lastTradePrice;
-                                pair.setPrice(price);
-                                pair.setLastOrderPrice(lastTradePrice);
-                            } else {
-                                pair.setPrice(price);
-                                pair.setLastOrderPrice(price);
-                            }
-                            result = 0;
-                        }
-                    } else {
-                        app.log("Order error!", true, true);
-                        SEMAPHORE.release();
-                        return -1;
-                    }
-                } else {
-                    pair.setPrice(price);
-                    pair.setLastOrderPrice(price);
-                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
-                    pair.confirmTransaction();
-                    testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
-                }
             } else {
                 pair.setPrice(price);
-                pair.preBuyTransaction(baseAmount, baseAmount.multiply(price));
+                pair.setLastOrderPrice(price);
+                pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
+                pair.confirmTransaction();
+                testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
             }
             updatePairText(symbolPair, !isTestMode);
             SEMAPHORE.release();
@@ -216,7 +225,6 @@ public class tradeProfitsController {
                     });
                     Thread.sleep(750);
                 }
-                NewOrderResponse newOrderResponse;
                 if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_SELL)) {
                     result = client.order(false, false, symbolPair, baseAmount, price);
                 } else {
@@ -268,6 +276,16 @@ public class tradeProfitsController {
         return result;
     }
 
+    public void cancelOrder(String symbolPair, long limitOrderId) {
+        if (!isTestMode) {
+            client.cancelOrder(symbolPair, limitOrderId);
+        } else {
+            currencyPairItem pair = pair_map.get(symbolPair);
+            pair.rollbackTransaction();
+            updatePairText(symbolPair, false);
+        }
+    }
+    
     public void setPairPrice(String symbolPair, BigDecimal price) {
         currencyPairItem pair = pair_map.get(symbolPair);
         if (pair != null) {
@@ -375,11 +393,11 @@ public class tradeProfitsController {
     public void placeOrUpdatePair(String symbolBase, String symbolQuote, String symbolPair, boolean updateBalance) {
         try {
             SEMAPHORE_ADDCOIN.acquire();
-            symbolBase = symbolBase.toUpperCase();
-            symbolQuote = symbolQuote.toUpperCase();
             symbolPair = symbolPair.toUpperCase();
             currencyPairItem cpair = pair_map.get(symbolPair);
             if (cpair == null) {
+                symbolBase = symbolBase.toUpperCase();
+                symbolQuote = symbolQuote.toUpperCase();
                 if (!symbolBase.isEmpty() && !symbolQuote.isEmpty()) {
                     currencyItem cbase = curr_map.get(symbolBase);
                     currencyItem cquote = curr_map.get(symbolQuote);

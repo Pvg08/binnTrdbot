@@ -55,33 +55,43 @@ public class CurrencyPlot extends JFrame implements ChangeListener {
     private final int delta = 1000 * 60 * 10;
     
     private TimeSeries tseries = null;
+    private String stockSymbol;
+    private long bar_seconds;
     
-    public CurrencyPlot(String stockSymbol, TimeSeries _tseries, long bar_seconds) {
-        super(stockSymbol + " candlestick");
+    XYDataset   dataset, maSataset, maSataset2, maSataset3;
+    
+    public CurrencyPlot(String _stockSymbol, TimeSeries _tseries, long _bar_seconds) {
+        super(_stockSymbol + " candlestick");
         setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 
         tseries = _tseries;
+        stockSymbol = _stockSymbol;
+        bar_seconds = _bar_seconds;
         
         domainAxis       = new DateAxis("Date");
         NumberAxis  rangeAxis        = new NumberAxis("Price");
         NumberAxis  rangeAxis2       = new NumberAxis("Volume");
         CandlestickRenderer renderer = new CandlestickRenderer();
-        XYDataset   dataset          = getDataSet(stockSymbol);
+        dataset          = getDataSet(stockSymbol);
         
         mainPlot = new XYPlot(dataset, domainAxis, rangeAxis, renderer);
+        
+        renderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
+        renderer.setAutoWidthGap(1);
+        renderer.setAutoWidthFactor(0.75);
         
         rangeAxis2.setUpperMargin(maxVolume);
         
         XYLineAndShapeRenderer maRenderer = new XYLineAndShapeRenderer(true, false);
-        XYDataset              maSataset  = MovingAverage.createMovingAverage(dataset, "MA1", 7 * bar_seconds * 1000, 0);
+                               maSataset  = MovingAverage.createMovingAverage(dataset, "MA1", 7 * bar_seconds * 1000, 0);
         mainPlot.setRenderer(1, maRenderer);
         mainPlot.setDataset (1, maSataset);
         XYLineAndShapeRenderer maRenderer2 = new XYLineAndShapeRenderer(true, false);
-        XYDataset              maSataset2  = MovingAverage.createMovingAverage(dataset, "MA2", 25 * bar_seconds * 1000, 0);
+                               maSataset2  = MovingAverage.createMovingAverage(dataset, "MA2", 25 * bar_seconds * 1000, 0);
         mainPlot.setRenderer(2, maRenderer2);
         mainPlot.setDataset (2, maSataset2);
         XYLineAndShapeRenderer maRenderer3 = new XYLineAndShapeRenderer(true, false);
-        XYDataset              maSataset3  = MovingAverage.createMovingAverage(dataset, "MA3", 99 * bar_seconds * 1000, 0);
+                               maSataset3  = MovingAverage.createMovingAverage(dataset, "MA3", 99 * bar_seconds * 1000, 0);
         mainPlot.setRenderer(3, maRenderer3);
         mainPlot.setDataset (3, maSataset3);
         
@@ -131,6 +141,19 @@ public class CurrencyPlot extends JFrame implements ChangeListener {
         pack();
     }
     
+    public void updateSeries() {
+        if (tseries != null) {
+            dataset = getDataSet(stockSymbol);
+            mainPlot.setDataset(dataset);
+            maSataset  = MovingAverage.createMovingAverage(dataset, "MA1", 7 * bar_seconds * 1000, 0);
+            mainPlot.setDataset (1, maSataset);
+            maSataset2  = MovingAverage.createMovingAverage(dataset, "MA2", 25 * bar_seconds * 1000, 0);
+            mainPlot.setDataset (2, maSataset2);
+            maSataset3  = MovingAverage.createMovingAverage(dataset, "MA3", 99 * bar_seconds * 1000, 0);
+            mainPlot.setDataset (3, maSataset3);
+        }
+    }
+    
     public void addMarker(String label, double value, int typeIndex) {
         ValueMarker marker = new ValueMarker(value);
         marker.setLabel(label);
@@ -161,7 +184,7 @@ public class CurrencyPlot extends JFrame implements ChangeListener {
             lastValue = value;
         }
     
-    protected AbstractXYDataset getDataSet(String stockSymbol) {
+    private AbstractXYDataset getDataSet(String stockSymbol) {
         return new DefaultOHLCDataset(stockSymbol, getData());
     }
     //This method uses yahoo finance to get the OHLC data

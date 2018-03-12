@@ -7,20 +7,13 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
-import java.awt.Desktop;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.Semaphore;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -39,9 +32,9 @@ public class mainApplication extends javax.swing.JFrame {
     
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
-    private final List<tradePairProcess> pairs = new ArrayList<>(0);
     private final tradeProfitsController profitsChecker = new tradeProfitsController(this);
     private final CoinRatingController coinRatingController = new CoinRatingController(this);
+    private final tradePairProcessController pairController = new tradePairProcessController(this, profitsChecker);
     
     private boolean is_paused = false;
     Preferences prefs = null;
@@ -118,23 +111,6 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefLoad(spinnerSellStopLimited, "sell_stop_limited_timeout");
         componentPrefLoad(comboBoxLimitedMode, "limited_mode");
     }
-
-    private int searchCurrencyFirstPair(String currencyPair, boolean is_hodling) {
-        for(int i=0; i<pairs.size(); i++) {
-            if (pairs.get(i).getSymbol().equals(currencyPair) && pairs.get(i).isHodling() == is_hodling) {
-                return i;
-            }
-        }
-        return -1;
-    }
-    private int searchCurrencyFirstPair(String currencyPair) {
-        for(int i=0; i<pairs.size(); i++) {
-            if (pairs.get(i).getSymbol().equals(currencyPair)) {
-                return i;
-            }
-        }
-        return -1;
-    }
     
     public void log(String txt) {
         try {
@@ -164,11 +140,12 @@ public class mainApplication extends javax.swing.JFrame {
         log(txt, is_main, false);
     }
     
-    public List<tradePairProcess> getPairs() {
-        return pairs;
-    }
     public tradeProfitsController getProfitsChecker() {
         return profitsChecker;
+    }
+    
+    public tradePairProcessController getPairController() {
+        return pairController;
     }
     
     private void initAPI() {
@@ -180,77 +157,23 @@ public class mainApplication extends javax.swing.JFrame {
         }
     }
     
-    private void initPairs() {
-        pairs.forEach((pair)->{
-            pair.set_do_remove_flag(true);
-        });
-        List<String> items = Arrays.asList(textFieldTradePairs.getText().toUpperCase().split("\\s*,\\s*"));
-        if (items.size() > 0) {
-            items.forEach((symbol)->{
-                if (!symbol.isEmpty()) {
-                    boolean has_plus = symbol.contains("+");
-                    boolean has_2plus = symbol.contains("++");
-                    boolean has_minus = !has_plus && symbol.contains("-");
-                    symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "");
-                    int str_index = ComboBoxMainStrategy.getSelectedIndex();
-                    if (str_index < 0) {
-                        str_index = 0;
-                    }
-                    int bq_index = comboBoxBarsCount.getSelectedIndex();
-                    if (bq_index < 0) {
-                        bq_index = 0;
-                    }
-                    int interval_index = comboBoxBarsInterval.getSelectedIndex();
-                    if (interval_index < 0) {
-                        interval_index = 0;
-                    }
-                    int pair_index = searchCurrencyFirstPair(symbol);
-                    if (pair_index < 0) {
-                        tradePairProcess nproc = new tradePairProcess(this, client, profitsChecker, symbol);
-                        nproc.setTryingToSellUp(has_plus);
-                        nproc.setSellUpAll(has_2plus);
-                        nproc.setTryingToBuyDip(has_minus);
-                        nproc.set_do_remove_flag(false);
-                        nproc.setTradingBalancePercent((Integer) spinnerBuyPercent.getValue());
-                        nproc.setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
-                        nproc.setBarInterval(comboBoxBarsInterval.getItemAt(interval_index));
-                        nproc.setDelayTime((Integer) spinnerUpdateDelay.getValue());
-                        nproc.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
-                        nproc.setStartDelay(pairs.size() * 1000 + 500);
-                        nproc.setUseBuyStopLimited(checkBoxBuyStopLimited.isSelected());
-                        nproc.setStopBuyLimitTimeout((Integer) spinnerBuyStopLimited.getValue());
-                        nproc.setUseSellStopLimited(checkBoxSellStopLimited.isSelected());
-                        nproc.setStopSellLimitTimeout((Integer) spinnerSellStopLimited.getValue());
-                        nproc.setBarQueryCount(Integer.parseInt(comboBoxBarsCount.getItemAt(bq_index)) / 500);
-                        nproc.start();
-                        pairs.add(nproc);
-                    } else {
-                        pairs.get(pair_index).setTryingToBuyDip(has_minus);
-                        pairs.get(pair_index).set_do_remove_flag(false);
-                        pairs.get(pair_index).setTradingBalancePercent((Integer) spinnerBuyPercent.getValue());
-                        pairs.get(pair_index).setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
-                        pairs.get(pair_index).setBarInterval(comboBoxBarsInterval.getItemAt(interval_index));
-                        pairs.get(pair_index).setDelayTime((Integer) spinnerUpdateDelay.getValue());
-                        pairs.get(pair_index).setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
-                        pairs.get(pair_index).setUseSellStopLimited(checkBoxBuyStopLimited.isSelected());
-                        pairs.get(pair_index).setStopBuyLimitTimeout((Integer) spinnerBuyStopLimited.getValue());
-                        pairs.get(pair_index).setUseSellStopLimited(checkBoxSellStopLimited.isSelected());
-                        pairs.get(pair_index).setStopSellLimitTimeout((Integer) spinnerSellStopLimited.getValue());
-                        pairs.get(pair_index).setBarQueryCount(Integer.parseInt(comboBoxBarsCount.getItemAt(bq_index)) / 500);
-                    }
-                }
-            });
-        }
-        int i = 0;
-        while (i<pairs.size()) {
-            if (pairs.get(i).is_do_remove_flag()) {
-                pairs.get(i).doStop();
-                profitsChecker.removeCurrencyPair(pairs.get(i).getSymbol());
-                pairs.remove(i);
-            } else {
-                i++;
-            }
-        }
+    private void setPairParams() {
+        int str_index = ComboBoxMainStrategy.getSelectedIndex();
+        if (str_index < 0) str_index = 0;
+        pairController.setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
+        int bq_index = comboBoxBarsCount.getSelectedIndex();
+        if (bq_index < 0) bq_index = 0;
+        pairController.setBarAdditionalCount(Integer.parseInt(comboBoxBarsCount.getItemAt(bq_index)) / 500);
+        int interval_index = comboBoxBarsInterval.getSelectedIndex();
+        if (interval_index < 0) interval_index = 0;
+        pairController.setBarsInterval(comboBoxBarsInterval.getItemAt(interval_index));
+        pairController.setTradingBalancePercent((Integer) spinnerBuyPercent.getValue());
+        pairController.setBuyStop(checkBoxBuyStopLimited.isSelected());
+        pairController.setSellStop(checkBoxSellStopLimited.isSelected());
+        pairController.setBuyStopLimitedTimeout((Integer) spinnerBuyStopLimited.getValue());
+        pairController.setSellStopLimitedTimeout((Integer) spinnerSellStopLimited.getValue());
+        pairController.setUpdateDelay((Integer) spinnerUpdateDelay.getValue());
+        pairController.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
     }
     
     /**
@@ -1037,9 +960,10 @@ public class mainApplication extends javax.swing.JFrame {
                 log(limit.getRateLimitType().name() + " " + limit.getInterval().name() + " " + limit.getLimit(), true);
             });*/
 
+            
             log("", true);
-            initPairs();
-
+            setPairParams();
+            pairController.initPairs(textFieldTradePairs.getText());
             checkboxTestMode.setEnabled(false);
             buttonStop.setEnabled(true);
             buttonPause.setEnabled(true);
@@ -1061,12 +985,7 @@ public class mainApplication extends javax.swing.JFrame {
         is_paused = false;
         buttonStop.setEnabled(false);
         buttonPause.setEnabled(false);
-        if (pairs.size() > 0) {
-            pairs.forEach((pair)->{
-                pair.doStop();
-            });
-            pairs.clear();
-        }
+        pairController.stopPairs();
         buttonRun.setEnabled(true);
         checkboxTestMode.setEnabled(true);
         buttonBuy.setEnabled(false);
@@ -1097,40 +1016,18 @@ public class mainApplication extends javax.swing.JFrame {
         buttonCancelLimit.setEnabled(checkBoxLimitedOrders.isSelected());
         buttonShowPlot.setEnabled(true);
         log(is_paused ? "Paused..." : "Unpaused");
-        if (pairs.size() > 0) {
-            pairs.forEach((pair)->{
-                pair.doSetPaused(is_paused);
-            });
-        }
+        pairController.pausePairs(is_paused);
         coinRatingController.doSetPaused(is_paused);
         ButtonStatistics.setEnabled(true);
         buttonWebBrowserOpen.setEnabled(true);
     }//GEN-LAST:event_buttonPauseActionPerformed
 
     private void buttonBuyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonBuyActionPerformed
-        if (pairs.size() > 0) {
-            int curr_index = listCurrencies.getSelectedIndex();
-            if (curr_index >= 0) {
-                String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
-                int pair_index = searchCurrencyFirstPair(currencyPair, false);
-                if (pair_index >= 0 && pair_index < pairs.size()) {
-                    pairs.get(pair_index).doBuy();
-                }
-            }
-        }
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "BUY");
     }//GEN-LAST:event_buttonBuyActionPerformed
 
     private void buttonSellActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSellActionPerformed
-        if (pairs.size() > 0) {
-            int curr_index = listCurrencies.getSelectedIndex();
-            if (curr_index >= 0) {
-                String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
-                int pair_index = searchCurrencyFirstPair(currencyPair, true);
-                if (pair_index >= 0 && pair_index < pairs.size()) {
-                    pairs.get(pair_index).doSell();
-                }
-            }
-        }
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "SELL");
     }//GEN-LAST:event_buttonSellActionPerformed
 
     private void buttonSetPairsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetPairsActionPerformed
@@ -1138,39 +1035,22 @@ public class mainApplication extends javax.swing.JFrame {
         profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
         profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
         profitsChecker.setLowHold(checkBoxLowHold.isSelected());
-        initPairs();
+        setPairParams();
+        pairController.initPairs(textFieldTradePairs.getText());
     }//GEN-LAST:event_buttonSetPairsActionPerformed
 
     private void buttonUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonUpdateActionPerformed
-        if (pairs.size() > 0) {
+        if (pairController.getPairs().size() > 0) {
             profitsChecker.updateAllBalances();
         }
     }//GEN-LAST:event_buttonUpdateActionPerformed
 
     private void buttonCancelLimitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonCancelLimitActionPerformed
-        if (pairs.size() > 0) {
-            int curr_index = listCurrencies.getSelectedIndex();
-            if (curr_index >= 0) {
-                String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
-                int pair_index = searchCurrencyFirstPair(currencyPair);
-                if (pair_index >= 0 && pair_index < pairs.size()) {
-                    pairs.get(pair_index).doLimitCancel();
-                }
-            }
-        }
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "CANCEL");
     }//GEN-LAST:event_buttonCancelLimitActionPerformed
 
     private void buttonShowPlotActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonShowPlotActionPerformed
-        if (pairs.size() > 0) {
-            int curr_index = listCurrencies.getSelectedIndex();
-            if (curr_index >= 0) {
-                String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
-                int pair_index = searchCurrencyFirstPair(currencyPair);
-                if (pair_index >= 0 && pair_index < pairs.size()) {
-                    pairs.get(pair_index).doShowPlot();
-                }
-            }
-        }
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "PLOT");
     }//GEN-LAST:event_buttonShowPlotActionPerformed
 
     private void checkBoxLimitedOrdersStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxLimitedOrdersStateChanged
@@ -1185,11 +1065,21 @@ public class mainApplication extends javax.swing.JFrame {
             if (content != null && !content.isEmpty()) {
                 String[] parts = content.split(":");
                 if (parts.length > 0) {
-                    String newtext = parts[0].toLowerCase();
-                    if (!textFieldTradePairs.getText().isEmpty()) {
-                        newtext = textFieldTradePairs.getText() + "," + newtext;
+                    String newtext = "";
+                    if (parts[0].indexOf(')') > 0) {
+                        parts = parts[0].split(" ");
+                        if (parts.length > 1) {
+                            newtext = parts[1].toLowerCase();
+                        }
+                    } else {
+                        newtext = parts[0].toLowerCase();
                     }
-                    textFieldTradePairs.setText(newtext);
+                    if (!newtext.isEmpty()) {
+                        if (!textFieldTradePairs.getText().isEmpty()) {
+                            newtext = textFieldTradePairs.getText() + "," + newtext;
+                        }
+                        textFieldTradePairs.setText(newtext);
+                    }
                 }
             }
         }
@@ -1265,36 +1155,11 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkBoxSellStopLimitedStateChanged
 
     private void ButtonStatisticsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ButtonStatisticsActionPerformed
-        if (pairs.size() > 0) {
-            int curr_index = listCurrencies.getSelectedIndex();
-            if (curr_index >= 0) {
-                String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
-                int pair_index = searchCurrencyFirstPair(currencyPair);
-                if (pair_index >= 0 && pair_index < pairs.size()) {
-                    pairs.get(pair_index).doShowStatistics();
-                }
-            }
-        }
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "STATISTICS");
     }//GEN-LAST:event_ButtonStatisticsActionPerformed
 
     private void buttonWebBrowserOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonWebBrowserOpenActionPerformed
-        if (Desktop.isDesktopSupported()) {
-            try {
-                if (pairs.size() > 0) {
-                    int curr_index = listCurrencies.getSelectedIndex();
-                    if (curr_index >= 0) {
-                        String currencyPair = profitsChecker.getNthCurrencyPair(curr_index);
-                        int pair_index = searchCurrencyFirstPair(currencyPair);
-                        if (pair_index >= 0 && pair_index < pairs.size()) {
-                            String url = "https://www.binance.com/tradeDetail.html?symbol="+pairs.get(pair_index).getBaseSymbol()+"_"+pairs.get(pair_index).getQuoteSymbol();
-                            Desktop.getDesktop().browse(new URI(url));
-                        }
-                    }
-                }
-            } catch (URISyntaxException | IOException ex) {
-                Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "BROWSER");
     }//GEN-LAST:event_buttonWebBrowserOpenActionPerformed
 
     private void checkBoxLimitedOrdersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxLimitedOrdersActionPerformed
