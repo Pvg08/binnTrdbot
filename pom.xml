@@ -5,6 +5,12 @@
     <artifactId>binnTrdbot</artifactId>
     <version>1.0</version>
     <packaging>jar</packaging>
+    <repositories>
+        <repository>
+            <id>neuroph.sourceforge.net</id>
+            <url>http://neuroph.sourceforge.net/maven2/</url>
+        </repository>
+    </repositories>
     <dependencies>
         <dependency>
             <groupId>com.squareup.retrofit2</groupId>
@@ -46,6 +52,11 @@
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20180130</version>
+        </dependency>
+        <dependency>
+            <groupId>org.neuroph</groupId>
+            <artifactId>neuroph-core</artifactId>
+            <version>2.94</version>
         </dependency>
     </dependencies>
     <properties>

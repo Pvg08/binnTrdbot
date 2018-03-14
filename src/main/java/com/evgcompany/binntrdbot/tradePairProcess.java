@@ -15,6 +15,7 @@ import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.SymbolFilter;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.exception.BinanceApiException;
+import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.io.Closeable;
 import java.io.IOException;
@@ -24,7 +25,6 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -41,6 +41,9 @@ public class tradePairProcess extends Thread {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     TradingAPIAbstractInterface client;
+    
+    NeuralNetworkStockPredictor predictor = null;
+    
     private final String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
@@ -416,6 +419,7 @@ public class tradePairProcess extends Thread {
     
     private void resetSeries() {
         series = strategiesController.resetSeries();
+        predictor = new NeuralNetworkStockPredictor(symbol, 250, 1);
         need_bar_reset = false;
         
         stopSockets();
@@ -432,6 +436,14 @@ public class tradePairProcess extends Thread {
             lastStrategyPriceMillis = System.currentTimeMillis();
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
+        }
+        
+        if (!predictor.canLoad()) {
+            app.log("Neural network start learn...");
+            predictor.trainNetwork(series);
+            app.log("Neural network learning complete!");
+        } else {
+            predictor.initMinMax(series);
         }
         
         socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, nbar -> {
@@ -559,6 +571,12 @@ public class tradePairProcess extends Thread {
             }
             try { 
                 nextBars();
+                
+                if (predictor != null) {
+                    double np = predictor.predictNextPrice(series);
+                    app.log(symbol + " NEUR prediction = " + df8.format(np));
+                }
+                
                 if (limitOrderId > 0) {
                     checkOrder();
                 } else {
