@@ -39,6 +39,12 @@ public class mainApplication extends javax.swing.JFrame {
     private boolean is_paused = false;
     Preferences prefs = null;
     
+    private static volatile mainApplication instance = null;
+    
+    public static mainApplication getInstance() {
+        return instance;
+    }
+    
     private void componentPrefLoad(JComponent cb, String name) {
         if (cb instanceof JCheckBox) {
             ((JCheckBox)cb).setSelected("true".equals(prefs.get(name, ((JCheckBox)cb).isSelected() ? "true" : "false")));
@@ -66,6 +72,7 @@ public class mainApplication extends javax.swing.JFrame {
      * Creates new form mainApplication
      */
     public mainApplication() {
+        instance = this;
         initComponents();
         DefaultCaret caret = (DefaultCaret)logTextarea.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);

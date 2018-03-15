@@ -416,10 +416,11 @@ public class tradePairProcess extends Thread {
             socket = null;
         }
     }
-    
+
     private void resetSeries() {
         series = strategiesController.resetSeries();
-        predictor = new NeuralNetworkStockPredictor(symbol, 250, 1);
+        predictor = new NeuralNetworkStockPredictor(symbol, 200);
+        predictor.setLearningRate(0.9);
         need_bar_reset = false;
         
         stopSockets();
@@ -437,16 +438,16 @@ public class tradePairProcess extends Thread {
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
         }
-        
-        if (!predictor.canLoad()) {
-            app.log("Neural network start learn...");
-            predictor.trainNetwork(series);
-            app.log("Neural network learning complete!");
+
+        if (!predictor.isHaveNetworkInFile()) {
+            predictor.setSaveTrainData(true);
+            if (!predictor.isHaveDatasetInFile()) predictor.initTrainNetwork(series);
+            predictor.start();
         } else {
             predictor.initMinMax(series);
         }
         
-        socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, nbar -> {
+        socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, (nbar, is_fin) -> {
             addBar(nbar);
             if (last_time < nbar.getBeginTime().toInstant().toEpochMilli()) {
                 last_time = nbar.getBeginTime().toInstant().toEpochMilli();
@@ -455,8 +456,12 @@ public class tradePairProcess extends Thread {
             if (profitsChecker != null) {
                 profitsChecker.setPairPrice(symbol, currentPrice);
             }
+            if (is_fin) {
+                app.log(symbol + " current price = " + df8.format(currentPrice));
+            }
         });
     }
+
     private void nextBars() {
         List<Bar> bars = null;
         if (need_bar_reset) {
@@ -572,7 +577,7 @@ public class tradePairProcess extends Thread {
             try { 
                 nextBars();
                 
-                if (predictor != null) {
+                if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
                     double np = predictor.predictNextPrice(series);
                     app.log(symbol + " NEUR prediction = " + df8.format(np));
                 }

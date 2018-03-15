@@ -13,5 +13,5 @@ import org.ta4j.core.Bar;
  */
 @FunctionalInterface
 public interface BarEvent {
-    void onUpdate(Bar last_bar);
+    void onUpdate(Bar last_bar, boolean is_closed);
 }

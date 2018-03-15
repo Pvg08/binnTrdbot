@@ -247,7 +247,7 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
                     Decimal.valueOf(response.getVolume()), 
                     Decimal.valueOf(response.getQuoteAssetVolume())
             );
-            evt.onUpdate(nbar);
+            evt.onUpdate(nbar, response.getBarFinal());
         });
         
         /*
