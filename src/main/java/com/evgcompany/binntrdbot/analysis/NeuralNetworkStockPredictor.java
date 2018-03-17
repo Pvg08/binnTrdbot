@@ -29,6 +29,7 @@ public class NeuralNetworkStockPredictor extends Thread {
     private final String neuralNetworkModelFileExt = "nnet";
     private final String neuralNetworkDataFileExt = "dset";
     private String neuralNetworkModelFilePath = "";
+    private String neuralNetworkModelBaseFilePath = "";
     private String neuralNetworkDataFilePath = "";
     
     private double maxPrice = 0;
@@ -43,19 +44,35 @@ public class NeuralNetworkStockPredictor extends Thread {
     private String stock_name = "";
     
     private boolean have_network_in_file = false;
+    private boolean have_network_in_base_file = false;
     private boolean have_dataset_in_file = false;
     
     private boolean skipLastBar = true;
     
     public NeuralNetworkStockPredictor(String name, int slidingWindowSize) {
-        this.stock_name = name;
         this.slidingWindowSize = slidingWindowSize;
-        neuralNetworkModelFilePath = neuralNetworkFileName+"_"+name+"_"+slidingWindowSize+"."+neuralNetworkModelFileExt;
-        neuralNetworkDataFilePath = neuralNetworkFileName+"_"+name+"_"+slidingWindowSize+"."+neuralNetworkDataFileExt;
-        have_network_in_file = canLoadNetwork();
-        have_dataset_in_file = canLoadDataset();
+        init(name);
     }
 
+    private void init(String name) {
+        neuralNetworkModelFilePath = neuralNetworkFileName+"_"+name+"_"+slidingWindowSize+"."+neuralNetworkModelFileExt;
+        neuralNetworkModelBaseFilePath = neuralNetworkFileName+"__"+slidingWindowSize+"."+neuralNetworkModelFileExt;
+        neuralNetworkDataFilePath = neuralNetworkFileName+"_"+name+"_"+slidingWindowSize+"."+neuralNetworkDataFileExt;
+        have_network_in_file = canLoadNetwork(neuralNetworkModelFilePath);
+        if (name.isEmpty()) {
+            have_network_in_base_file = have_network_in_file;
+            this.stock_name = "BASE";
+        } else {
+            have_network_in_base_file = canLoadNetwork(neuralNetworkModelBaseFilePath);
+            this.stock_name = name;
+        }
+        have_dataset_in_file = canLoadDataset();
+    }
+    
+    public void toBase() {
+        init("");
+    }
+    
     private void doWait(long ms) {
         try {
             Thread.sleep(ms);
@@ -93,10 +110,10 @@ public class NeuralNetworkStockPredictor extends Thread {
         return minVolume + (input - 0.1) * (maxVolume - minVolume) / 0.8;
     }
     
-    private boolean canLoadNetwork() {
+    private boolean canLoadNetwork(String _neuralNetworkModelFilePath) {
         NeuralNetwork neuralNetwork = null;
         try {
-            neuralNetwork = NeuralNetwork.createFromFile(neuralNetworkModelFilePath);
+            neuralNetwork = NeuralNetwork.createFromFile(_neuralNetworkModelFilePath);
         } catch (Exception e) {
             neuralNetwork = null;
         }
@@ -265,6 +282,13 @@ public class NeuralNetworkStockPredictor extends Thread {
         return have_network_in_file;
     }
 
+    /**
+     * @return the have_network_in_base_file
+     */
+    public boolean isHaveNetworkInBaseFile() {
+        return have_network_in_base_file;
+    }
+    
     /**
      * @return the have_dataset_in_file
      */

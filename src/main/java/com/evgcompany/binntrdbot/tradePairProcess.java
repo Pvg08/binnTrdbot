@@ -56,6 +56,7 @@ public class tradePairProcess extends Thread {
     
     private boolean isTryingToSellUp = false;
     private boolean isTryingToBuyDip = false;
+    private boolean stopAfterSell = false;
     private boolean sellUpAll = false;
     private boolean checkOtherStrategies = true;
     
@@ -171,7 +172,15 @@ public class tradePairProcess extends Thread {
         BigDecimal new_sold_price = sold_amount.multiply(curPrice);
         BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
         BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
-        if (skip_check || !profitsChecker.isLowHold() || incomeWithoutComissionPercent.compareTo(profitsChecker.getTradeMinProfitPercent()) > 0) {
+        if (
+                skip_check || 
+                !profitsChecker.isLowHold() || 
+                incomeWithoutComissionPercent.compareTo(profitsChecker.getTradeMinProfitPercent()) > 0 ||
+                (
+                    profitsChecker.getStopLossPercent() != null &&
+                    incomeWithoutComissionPercent.compareTo(profitsChecker.getStopLossPercent().multiply(BigDecimal.valueOf(-1))) < 0
+                )
+            ) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
                 base_strategy_sell_ignored = false;
                 app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(new_sold_price) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
@@ -186,6 +195,9 @@ public class tradePairProcess extends Thread {
                     lastOrderMillis = System.currentTimeMillis();
                     if (limitOrderId == 0) {
                         strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
+                        if (stopAfterSell) {
+                            doStop();
+                        }
                     }
                 } else {
                     app.log("Error!", true, true);
@@ -208,6 +220,7 @@ public class tradePairProcess extends Thread {
         if(order != null) {
             if (
                 order.getStatus() == OrderStatus.FILLED || 
+                order.getStatus() == OrderStatus.PARTIALLY_FILLED || 
                 order.getStatus() == OrderStatus.CANCELED ||
                 order.getStatus() == OrderStatus.EXPIRED ||
                 order.getStatus() == OrderStatus.REJECTED
@@ -222,6 +235,13 @@ public class tradePairProcess extends Thread {
                     } else {
                         is_hodling = true;
                     }
+                    if (order.getStatus() == OrderStatus.PARTIALLY_FILLED) {
+                        profitsChecker.finishOrderPart(symbol, new BigDecimal(order.getPrice()), new BigDecimal(order.getExecutedQty()));
+                        sold_amount = sold_amount.subtract(new BigDecimal(order.getExecutedQty()));
+                        app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is partially finished! Price = "+order.getPrice() + "; Quantity = " + order.getExecutedQty(), true, true);
+                        profitsChecker.updateAllBalances(true);
+                        return;
+                    }
                 } else {
                     if(order.getSide() == OrderSide.BUY) {
                         strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
@@ -232,6 +252,9 @@ public class tradePairProcess extends Thread {
                 profitsChecker.finishOrder(symbol, order.getStatus() == OrderStatus.FILLED, new BigDecimal(order.getPrice()));
                 profitsChecker.updateAllBalances(true);
                 app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is finished! Status="+order.getStatus().name()+"; Price = "+order.getPrice(), true, true);
+                if (stopAfterSell && order.getSide() == OrderSide.SELL && order.getStatus() == OrderStatus.FILLED) {
+                    doStop();
+                }
             } else {
                 if(order.getSide() == OrderSide.BUY) {
                     if (useBuyStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopBuyLimitTimeout) {
@@ -378,6 +401,7 @@ public class tradePairProcess extends Thread {
                 base_strategy_sell_ignored = true;
                 sold_price = lastBuyPrice;
                 sold_amount = res_cnt;
+                stopAfterSell = true;
                 app.log("START WAITING to sell " + df8.format(sold_amount) + " " + baseAssetSymbol + " for price more than " + df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
                 long result = profitsChecker.PreBuySell(symbol, sold_amount, lastBuyPrice, currentLimitSellQty, currentLimitSellPrice);
                 if (result >= 0) {
@@ -419,8 +443,15 @@ public class tradePairProcess extends Thread {
 
     private void resetSeries() {
         series = strategiesController.resetSeries();
-        predictor = new NeuralNetworkStockPredictor(symbol, 200);
-        predictor.setLearningRate(0.9);
+        
+        if (strategiesController.getMainStrategy().equals("Neural Network")) {
+            predictor = new NeuralNetworkStockPredictor(symbol, 200);
+            if (!predictor.isHaveNetworkInFile() && predictor.isHaveNetworkInBaseFile()) {
+                predictor.toBase();
+            }
+            predictor.setLearningRate(0.9);
+        }
+        
         need_bar_reset = false;
         
         stopSockets();
@@ -439,12 +470,14 @@ public class tradePairProcess extends Thread {
             currentPrice = lastStrategyCheckPrice;
         }
 
-        if (!predictor.isHaveNetworkInFile()) {
-            predictor.setSaveTrainData(true);
-            if (!predictor.isHaveDatasetInFile()) predictor.initTrainNetwork(series);
-            predictor.start();
-        } else {
-            predictor.initMinMax(series);
+        if (predictor != null) {
+            if (!predictor.isHaveNetworkInFile()) {
+                predictor.setSaveTrainData(true);
+                if (!predictor.isHaveDatasetInFile()) predictor.initTrainNetwork(series);
+                predictor.start();
+            } else {
+                predictor.initMinMax(series);
+            }
         }
         
         socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, (nbar, is_fin) -> {
@@ -477,6 +510,19 @@ public class tradePairProcess extends Thread {
             lastStrategyPriceMillis = System.currentTimeMillis();
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
+        }
+    }
+    
+    public void doNetworkAction(String train, String base) {
+        if (strategiesController.getMainStrategy().equals("Neural Network")) {
+            predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "", 200);
+            predictor.setLearningRate(0.9);
+            if (train.equals("TRAIN")) {
+                predictor.start();
+            } else if (train.equals("ADDSET")) {
+                predictor.setSaveTrainData(true);
+                predictor.loadTrainingData(series);
+            }
         }
     }
     
@@ -577,11 +623,13 @@ public class tradePairProcess extends Thread {
             try { 
                 nextBars();
                 
-                if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
-                    double np = predictor.predictNextPrice(series);
-                    app.log(symbol + " NEUR prediction = " + df8.format(np));
+                if(strategiesController.getMainStrategy().equals("Neural Network")) {
+                    if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
+                        double np = predictor.predictNextPrice(series);
+                        app.log(symbol + " NEUR prediction = " + df8.format(np));
+                    }
                 }
-                
+
                 if (limitOrderId > 0) {
                     checkOrder();
                 } else {
@@ -745,6 +793,12 @@ public class tradePairProcess extends Thread {
     public void setMainStrategy(String mainStrategy) {
         strategiesController.setMainStrategy(mainStrategy);
         need_bar_reset = true;
+        if (predictor != null) {
+            if (predictor.getLearningRule() != null) {
+                predictor.getLearningRule().stopLearning();
+            }
+            predictor = null;
+        }
     }
     
     /**

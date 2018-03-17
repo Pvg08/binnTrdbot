@@ -168,6 +168,18 @@ public class tradePairProcessController {
                             }
                         }
                         break;
+                    case "NNBTRAIN":
+                        pairs.get(pair_index).doNetworkAction("TRAIN", "BASE");
+                        break;
+                    case "NNCTRAIN":
+                        pairs.get(pair_index).doNetworkAction("TRAIN", "COIN");
+                        break;
+                    case "NNBADD":
+                        pairs.get(pair_index).doNetworkAction("ADDSET", "BASE");
+                        break;
+                    case "NNCADD":
+                        pairs.get(pair_index).doNetworkAction("ADDSET", "COIN");
+                        break;
                     default:
                         break;
                 }

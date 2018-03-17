@@ -268,6 +268,10 @@ public class mainApplication extends javax.swing.JFrame {
         buttonRatingStop = new javax.swing.JButton();
         buttonRatingCheck = new javax.swing.JButton();
         progressBarRatingAnalPercent = new javax.swing.JProgressBar();
+        buttonNNBTrain = new javax.swing.JButton();
+        buttonNNBAdd = new javax.swing.JButton();
+        buttonNNCTrain = new javax.swing.JButton();
+        buttonNNCAdd = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -333,7 +337,9 @@ public class mainApplication extends javax.swing.JFrame {
         listProfit.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         jScrollPane4.setViewportView(listProfit);
 
+        buttonBuy.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonBuy.setText("Buy");
+        buttonBuy.setToolTipText("Buy selected coin");
         buttonBuy.setEnabled(false);
         buttonBuy.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -341,7 +347,9 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        buttonSell.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonSell.setText("Sell");
+        buttonSell.setToolTipText("Sell selected coin");
         buttonSell.setEnabled(false);
         buttonSell.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -357,7 +365,9 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        buttonUpdate.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonUpdate.setText("Update");
+        buttonUpdate.setToolTipText("Update balances");
         buttonUpdate.setEnabled(false);
         buttonUpdate.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -365,7 +375,9 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        buttonCancelLimit.setText("Cancel limit order");
+        buttonCancelLimit.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
+        buttonCancelLimit.setText("Cancel LO");
+        buttonCancelLimit.setToolTipText("Cancel limit order");
         buttonCancelLimit.setEnabled(false);
         buttonCancelLimit.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -373,7 +385,9 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        buttonShowPlot.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonShowPlot.setText("Show plot");
+        buttonShowPlot.setToolTipText("Show plot");
         buttonShowPlot.setEnabled(false);
         buttonShowPlot.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -734,7 +748,9 @@ public class mainApplication extends javax.swing.JFrame {
 
         jTabbedPane2.addTab("Tips", jPanel3);
 
+        ButtonStatistics.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         ButtonStatistics.setText("Statistics");
+        ButtonStatistics.setToolTipText("Show coin strategy statistics");
         ButtonStatistics.setEnabled(false);
         ButtonStatistics.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -742,7 +758,9 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        buttonWebBrowserOpen.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonWebBrowserOpen.setText("Binance");
+        buttonWebBrowserOpen.setToolTipText("Open coin page");
         buttonWebBrowserOpen.setEnabled(false);
         buttonWebBrowserOpen.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -781,6 +799,48 @@ public class mainApplication extends javax.swing.JFrame {
 
         buttonRatingCheck.setText("Check");
         buttonRatingCheck.setEnabled(false);
+
+        buttonNNBTrain.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
+        buttonNNBTrain.setText("NN B Train");
+        buttonNNBTrain.setToolTipText("Neural network Base Train");
+        buttonNNBTrain.setActionCommand("NN B Train");
+        buttonNNBTrain.setEnabled(false);
+        buttonNNBTrain.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonNNBTrainActionPerformed(evt);
+            }
+        });
+
+        buttonNNBAdd.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
+        buttonNNBAdd.setText("NN B Add");
+        buttonNNBAdd.setToolTipText("Neural network Base Add to dataset");
+        buttonNNBAdd.setEnabled(false);
+        buttonNNBAdd.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonNNBAddActionPerformed(evt);
+            }
+        });
+
+        buttonNNCTrain.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
+        buttonNNCTrain.setText("NN C Train");
+        buttonNNCTrain.setToolTipText("Neural network Coin Train");
+        buttonNNCTrain.setActionCommand("NN C Train");
+        buttonNNCTrain.setEnabled(false);
+        buttonNNCTrain.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonNNCTrainActionPerformed(evt);
+            }
+        });
+
+        buttonNNCAdd.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
+        buttonNNCAdd.setText("NN C Add");
+        buttonNNCAdd.setToolTipText("Neural network Coin add to dataset");
+        buttonNNCAdd.setEnabled(false);
+        buttonNNCAdd.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonNNCAddActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -826,31 +886,34 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(jScrollPane3)
                             .addComponent(jScrollPane4)
                             .addGroup(layout.createSequentialGroup()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addGroup(layout.createSequentialGroup()
-                                        .addComponent(buttonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                        .addComponent(buttonStop, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                        .addComponent(buttonPause, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                    .addComponent(jLabel1)
-                                    .addComponent(jLabel10)
-                                    .addComponent(jLabel11))
-                                .addGap(0, 0, Short.MAX_VALUE))
-                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                                .addComponent(buttonWebBrowserOpen)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(ButtonStatistics))
+                                .addComponent(buttonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonStop, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonPause, javax.swing.GroupLayout.PREFERRED_SIZE, 85, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(jLabel1)
+                            .addComponent(jLabel10)
+                            .addComponent(jLabel11)
                             .addGroup(layout.createSequentialGroup()
-                                .addComponent(buttonBuy)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addComponent(buttonBuy, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                    .addComponent(buttonWebBrowserOpen, javax.swing.GroupLayout.DEFAULT_SIZE, 80, Short.MAX_VALUE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonSell)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addComponent(buttonNNBTrain, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                    .addComponent(buttonSell, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                    .addComponent(buttonNNCTrain, javax.swing.GroupLayout.DEFAULT_SIZE, 80, Short.MAX_VALUE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonCancelLimit)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addComponent(buttonNNBAdd, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                    .addComponent(buttonCancelLimit, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(buttonNNCAdd, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonUpdate)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(buttonShowPlot))))
+                                .addComponent(buttonUpdate, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(78, 78, 78)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addComponent(buttonShowPlot, javax.swing.GroupLayout.DEFAULT_SIZE, 79, Short.MAX_VALUE)
+                                    .addComponent(ButtonStatistics, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))))
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(buttonRatingStart)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -865,39 +928,6 @@ public class mainApplication extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createSequentialGroup()
-                        .addComponent(jLabel1)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(textFieldTradePairs, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(buttonSetPairs))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jTabbedPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 227, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(buttonRun)
-                            .addComponent(buttonStop)
-                            .addComponent(buttonPause))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(jLabel11)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 58, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jLabel10)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 127, Short.MAX_VALUE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(buttonBuy)
-                            .addComponent(buttonSell)
-                            .addComponent(buttonUpdate)
-                            .addComponent(buttonCancelLimit)
-                            .addComponent(buttonShowPlot))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(ButtonStatistics)
-                            .addComponent(buttonWebBrowserOpen))
-                        .addGap(4, 4, 4))
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(jLabel9)
@@ -923,13 +953,52 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addGap(9, 9, 9)
                                 .addComponent(jLabel7)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 269, Short.MAX_VALUE)))))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(buttonClear)
-                    .addComponent(buttonRatingStart)
-                    .addComponent(buttonRatingStop)
-                    .addComponent(buttonRatingCheck)))
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 269, Short.MAX_VALUE)))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(buttonClear)
+                            .addComponent(buttonRatingStart)
+                            .addComponent(buttonRatingStop)
+                            .addComponent(buttonRatingCheck)))
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(jLabel1)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(textFieldTradePairs, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(buttonSetPairs))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jTabbedPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 227, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(buttonRun)
+                            .addComponent(buttonStop)
+                            .addComponent(buttonPause))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(jLabel11)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 58, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabel10)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 128, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(buttonBuy)
+                            .addComponent(buttonSell)
+                            .addComponent(buttonUpdate)
+                            .addComponent(buttonCancelLimit)
+                            .addComponent(buttonShowPlot))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(buttonWebBrowserOpen)
+                            .addComponent(ButtonStatistics)
+                            .addComponent(buttonNNBTrain)
+                            .addComponent(buttonNNBAdd))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(buttonNNCTrain)
+                            .addComponent(buttonNNCAdd))
+                        .addGap(15, 15, 15))))
         );
 
         pack();
@@ -982,6 +1051,10 @@ public class mainApplication extends javax.swing.JFrame {
             buttonShowPlot.setEnabled(true);
             ButtonStatistics.setEnabled(true);
             buttonWebBrowserOpen.setEnabled(true);
+            buttonNNBAdd.setEnabled(true);
+            buttonNNCAdd.setEnabled(true);
+            buttonNNBTrain.setEnabled(true);
+            buttonNNCTrain.setEnabled(true);
         } catch (Exception e) {
             log("Error: " + e.getMessage(), true, true);
             buttonRun.setEnabled(true);
@@ -1003,6 +1076,10 @@ public class mainApplication extends javax.swing.JFrame {
         buttonShowPlot.setEnabled(false);
         ButtonStatistics.setEnabled(false);
         buttonWebBrowserOpen.setEnabled(false);
+        buttonNNBAdd.setEnabled(false);
+        buttonNNCAdd.setEnabled(false);
+        buttonNNBTrain.setEnabled(false);
+        buttonNNCTrain.setEnabled(false);
     }//GEN-LAST:event_buttonStopActionPerformed
 
     private void buttonClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonClearActionPerformed
@@ -1027,6 +1104,10 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.doSetPaused(is_paused);
         ButtonStatistics.setEnabled(true);
         buttonWebBrowserOpen.setEnabled(true);
+        buttonNNBAdd.setEnabled(true);
+        buttonNNCAdd.setEnabled(true);
+        buttonNNBTrain.setEnabled(true);
+        buttonNNCTrain.setEnabled(true);
     }//GEN-LAST:event_buttonPauseActionPerformed
 
     private void buttonBuyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonBuyActionPerformed
@@ -1223,6 +1304,22 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
     }//GEN-LAST:event_spinnerScanRatingDelayTimeStateChanged
 
+    private void buttonNNBTrainActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNBTrainActionPerformed
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNBTRAIN");
+    }//GEN-LAST:event_buttonNNBTrainActionPerformed
+
+    private void buttonNNCTrainActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNCTrainActionPerformed
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNCTRAIN");
+    }//GEN-LAST:event_buttonNNCTrainActionPerformed
+
+    private void buttonNNBAddActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNBAddActionPerformed
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNBADD");
+    }//GEN-LAST:event_buttonNNBAddActionPerformed
+
+    private void buttonNNCAddActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNCAddActionPerformed
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNCADD");
+    }//GEN-LAST:event_buttonNNCAddActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1262,6 +1359,10 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonBuy;
     private javax.swing.JButton buttonCancelLimit;
     private javax.swing.JButton buttonClear;
+    private javax.swing.JButton buttonNNBAdd;
+    private javax.swing.JButton buttonNNBTrain;
+    private javax.swing.JButton buttonNNCAdd;
+    private javax.swing.JButton buttonNNCTrain;
     private javax.swing.JButton buttonPause;
     private javax.swing.JButton buttonRatingCheck;
     private javax.swing.JButton buttonRatingStart;

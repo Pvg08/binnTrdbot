@@ -152,7 +152,19 @@ public class currencyPairItem {
         base_item.decActiveOrders();
         quote_item.decActiveOrders();
     }
-    
+
+    public void confirmTransactionPart(BigDecimal summPartBase, BigDecimal summPartQuote) {
+        if (in_sell_order) {
+            base_item.addLimitValue(summPartBase.multiply(new BigDecimal("-1")));
+            quote_item.addFreeValue(summPartQuote);
+        } else {
+            quote_item.addLimitValue(summPartQuote.multiply(new BigDecimal("-1")));
+            base_item.addFreeValue(summPartBase);
+        }
+        summOrderBase = summOrderBase.subtract(summPartBase);
+        summOrderQuote = summOrderQuote.subtract(summPartQuote);
+    }
+
     public void rollbackTransaction() {
         if (in_sell_order) {
             base_item.addLimitValue(summOrderBase.multiply(new BigDecimal("-1")));

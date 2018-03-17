@@ -75,36 +75,40 @@
                           <Component id="jTabbedPane2" max="32767" attributes="0"/>
                           <Component id="jScrollPane3" max="32767" attributes="0"/>
                           <Component id="jScrollPane4" max="32767" attributes="0"/>
-                          <Group type="102" attributes="0">
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="buttonRun" min="-2" pref="85" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="buttonStop" min="-2" pref="85" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="buttonPause" min="-2" pref="85" max="-2" attributes="0"/>
-                                  </Group>
-                                  <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel10" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
-                          </Group>
-                          <Group type="102" alignment="1" attributes="0">
-                              <Component id="buttonWebBrowserOpen" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace max="32767" attributes="0"/>
-                              <Component id="ButtonStatistics" min="-2" max="-2" attributes="0"/>
-                          </Group>
                           <Group type="102" alignment="0" attributes="0">
-                              <Component id="buttonBuy" min="-2" max="-2" attributes="0"/>
+                              <Component id="buttonRun" min="-2" pref="85" max="-2" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonSell" min="-2" max="-2" attributes="0"/>
+                              <Component id="buttonStop" min="-2" pref="85" max="-2" attributes="0"/>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonCancelLimit" min="-2" max="-2" attributes="0"/>
+                              <Component id="buttonPause" min="-2" pref="85" max="-2" attributes="0"/>
+                          </Group>
+                          <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel10" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Group type="102" alignment="0" attributes="0">
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="buttonBuy" max="32767" attributes="0"/>
+                                  <Component id="buttonWebBrowserOpen" pref="80" max="32767" attributes="0"/>
+                              </Group>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonUpdate" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace max="32767" attributes="0"/>
-                              <Component id="buttonShowPlot" min="-2" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="buttonNNBTrain" max="32767" attributes="0"/>
+                                  <Component id="buttonSell" max="32767" attributes="0"/>
+                                  <Component id="buttonNNCTrain" alignment="0" pref="80" max="32767" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="buttonNNBAdd" max="32767" attributes="0"/>
+                                  <Component id="buttonCancelLimit" min="-2" pref="80" max="-2" attributes="0"/>
+                                  <Component id="buttonNNCAdd" alignment="0" max="32767" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="buttonUpdate" min="-2" pref="80" max="-2" attributes="0"/>
+                              <EmptySpace min="-2" pref="78" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                  <Component id="buttonShowPlot" pref="79" max="32767" attributes="0"/>
+                                  <Component id="ButtonStatistics" max="32767" attributes="0"/>
+                              </Group>
                           </Group>
                       </Group>
                   </Group>
@@ -126,45 +130,7 @@
           <Group type="102" alignment="0" attributes="0">
               <EmptySpace max="-2" attributes="0"/>
               <Group type="103" groupAlignment="0" attributes="0">
-                  <Group type="102" alignment="0" attributes="0">
-                      <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="textFieldTradePairs" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonSetPairs" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jTabbedPane2" min="-2" pref="227" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="buttonRun" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonStop" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonPause" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                      <Component id="jLabel11" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jScrollPane4" min="-2" pref="58" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jLabel10" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jScrollPane3" pref="127" max="32767" attributes="0"/>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="buttonBuy" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonSell" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonUpdate" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonCancelLimit" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonShowPlot" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="ButtonStatistics" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="buttonWebBrowserOpen" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <EmptySpace min="-2" pref="4" max="-2" attributes="0"/>
-                  </Group>
-                  <Group type="102" alignment="0" attributes="0">
+                  <Group type="102" attributes="0">
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="jLabel9" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel8" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -195,14 +161,59 @@
                               <Component id="jScrollPane2" pref="269" max="32767" attributes="0"/>
                           </Group>
                       </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="buttonClear" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonRatingStart" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonRatingStop" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonRatingCheck" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
                   </Group>
-              </Group>
-              <EmptySpace max="-2" attributes="0"/>
-              <Group type="103" groupAlignment="3" attributes="0">
-                  <Component id="buttonClear" alignment="3" min="-2" max="-2" attributes="0"/>
-                  <Component id="buttonRatingStart" alignment="3" min="-2" max="-2" attributes="0"/>
-                  <Component id="buttonRatingStop" alignment="3" min="-2" max="-2" attributes="0"/>
-                  <Component id="buttonRatingCheck" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Group type="102" attributes="0">
+                      <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="textFieldTradePairs" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonSetPairs" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="jTabbedPane2" min="-2" pref="227" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="buttonRun" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonStop" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonPause" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                      <Component id="jLabel11" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="jScrollPane4" min="-2" pref="58" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="jLabel10" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="jScrollPane3" pref="128" max="32767" attributes="0"/>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="buttonBuy" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonSell" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonUpdate" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonCancelLimit" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonShowPlot" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="buttonWebBrowserOpen" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="ButtonStatistics" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonNNBTrain" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonNNBAdd" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="buttonNNCTrain" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="buttonNNCAdd" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace min="-2" pref="15" max="-2" attributes="0"/>
+                  </Group>
               </Group>
           </Group>
       </Group>
@@ -332,7 +343,11 @@
     </Container>
     <Component class="javax.swing.JButton" name="buttonBuy">
       <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Buy"/>
+        <Property name="toolTipText" type="java.lang.String" value="Buy selected coin"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -341,7 +356,11 @@
     </Component>
     <Component class="javax.swing.JButton" name="buttonSell">
       <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Sell"/>
+        <Property name="toolTipText" type="java.lang.String" value="Sell selected coin"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -359,7 +378,11 @@
     </Component>
     <Component class="javax.swing.JButton" name="buttonUpdate">
       <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Update"/>
+        <Property name="toolTipText" type="java.lang.String" value="Update balances"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -368,7 +391,11 @@
     </Component>
     <Component class="javax.swing.JButton" name="buttonCancelLimit">
       <Properties>
-        <Property name="text" type="java.lang.String" value="Cancel limit order"/>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
+        <Property name="text" type="java.lang.String" value="Cancel LO"/>
+        <Property name="toolTipText" type="java.lang.String" value="Cancel limit order"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -377,7 +404,11 @@
     </Component>
     <Component class="javax.swing.JButton" name="buttonShowPlot">
       <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Show plot"/>
+        <Property name="toolTipText" type="java.lang.String" value="Show plot"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -1008,7 +1039,11 @@
     </Container>
     <Component class="javax.swing.JButton" name="ButtonStatistics">
       <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Statistics"/>
+        <Property name="toolTipText" type="java.lang.String" value="Show coin strategy statistics"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -1017,7 +1052,11 @@
     </Component>
     <Component class="javax.swing.JButton" name="buttonWebBrowserOpen">
       <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
         <Property name="text" type="java.lang.String" value="Binance"/>
+        <Property name="toolTipText" type="java.lang.String" value="Open coin page"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -1090,6 +1129,60 @@
       </Properties>
     </Component>
     <Component class="javax.swing.JProgressBar" name="progressBarRatingAnalPercent">
+    </Component>
+    <Component class="javax.swing.JButton" name="buttonNNBTrain">
+      <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
+        <Property name="text" type="java.lang.String" value="NN B Train"/>
+        <Property name="toolTipText" type="java.lang.String" value="Neural network Base Train"/>
+        <Property name="actionCommand" type="java.lang.String" value="NN B Train"/>
+        <Property name="enabled" type="boolean" value="false"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="buttonNNBTrainActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="buttonNNBAdd">
+      <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
+        <Property name="text" type="java.lang.String" value="NN B Add"/>
+        <Property name="toolTipText" type="java.lang.String" value="Neural network Base Add to dataset"/>
+        <Property name="enabled" type="boolean" value="false"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="buttonNNBAddActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="buttonNNCTrain">
+      <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
+        <Property name="text" type="java.lang.String" value="NN C Train"/>
+        <Property name="toolTipText" type="java.lang.String" value="Neural network Coin Train"/>
+        <Property name="actionCommand" type="java.lang.String" value="NN C Train"/>
+        <Property name="enabled" type="boolean" value="false"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="buttonNNCTrainActionPerformed"/>
+      </Events>
+    </Component>
+    <Component class="javax.swing.JButton" name="buttonNNCAdd">
+      <Properties>
+        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+          <Font name="Tahoma" size="8" style="0"/>
+        </Property>
+        <Property name="text" type="java.lang.String" value="NN C Add"/>
+        <Property name="toolTipText" type="java.lang.String" value="Neural network Coin add to dataset"/>
+        <Property name="enabled" type="boolean" value="false"/>
+      </Properties>
+      <Events>
+        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="buttonNNCAddActionPerformed"/>
+      </Events>
     </Component>
   </SubComponents>
 </Form>

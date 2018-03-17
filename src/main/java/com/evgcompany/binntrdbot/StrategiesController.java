@@ -945,6 +945,7 @@ public class StrategiesController {
     public HashMap<String, StrategyInitializer> getStrategiesInitializerMap() {
         HashMap<String, StrategyInitializer> strategiesI = new HashMap<>();
         strategiesI.put("No strategy", s -> buildNoStrategy(s));
+        strategiesI.put("Neural Network", s -> buildNoStrategy(s)); // @todo
         strategiesI.put("Three Soldiers", s -> buildThreeSoldiersStrategy(s));
         strategiesI.put("MovingMomentum", s -> buildMovingMomentumStrategy(s));
         strategiesI.put("CCICorrection", s -> buildCCICorrectionStrategy(s));

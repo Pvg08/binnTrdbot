@@ -56,7 +56,7 @@ public class tradeProfitsController {
 
     public tradeProfitsController(mainApplication _app) {
         app = _app;
-        tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(2));
+        tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(3));
     }
     
     public currencyItem getProfitData(String symbolAsset) {
@@ -303,6 +303,14 @@ public class tradeProfitsController {
             } else {
                 pair.rollbackTransaction();
             }
+        }
+    }
+    
+    public void finishOrderPart(String symbolPair, BigDecimal sold_price, BigDecimal sold_qty) {
+        currencyPairItem pair = pair_map.get(symbolPair);
+        if (pair != null) {
+            pair.setLastOrderPrice(sold_price);
+            pair.confirmTransactionPart(sold_qty, sold_qty.multiply(sold_price));
         }
     }
     
