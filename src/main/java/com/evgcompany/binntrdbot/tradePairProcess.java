@@ -43,6 +43,7 @@ public class tradePairProcess extends Thread {
     TradingAPIAbstractInterface client;
     
     NeuralNetworkStockPredictor predictor = null;
+    private List<StrategiesController.StrategyMarker> predictor_values = new ArrayList<>();
     
     private final String symbol;
     private String baseAssetSymbol;
@@ -445,11 +446,10 @@ public class tradePairProcess extends Thread {
         series = strategiesController.resetSeries();
         
         if (strategiesController.getMainStrategy().equals("Neural Network")) {
-            predictor = new NeuralNetworkStockPredictor(symbol, 200);
+            predictor = new NeuralNetworkStockPredictor(symbol, 12);
             if (!predictor.isHaveNetworkInFile() && predictor.isHaveNetworkInBaseFile()) {
                 predictor.toBase();
             }
-            predictor.setLearningRate(0.9);
         }
         
         need_bar_reset = false;
@@ -472,9 +472,9 @@ public class tradePairProcess extends Thread {
 
         if (predictor != null) {
             if (!predictor.isHaveNetworkInFile()) {
-                predictor.setSaveTrainData(true);
+                /*predictor.setSaveTrainData(true);
                 if (!predictor.isHaveDatasetInFile()) predictor.initTrainNetwork(series);
-                predictor.start();
+                predictor.start();*/
             } else {
                 predictor.initMinMax(series);
             }
@@ -515,13 +515,12 @@ public class tradePairProcess extends Thread {
     
     public void doNetworkAction(String train, String base) {
         if (strategiesController.getMainStrategy().equals("Neural Network")) {
-            predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "", 200);
-            predictor.setLearningRate(0.9);
+            predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "", 12);
             if (train.equals("TRAIN")) {
                 predictor.start();
             } else if (train.equals("ADDSET")) {
                 predictor.setSaveTrainData(true);
-                predictor.loadTrainingData(series);
+                predictor.appendTrainingData(series);
             }
         }
     }
@@ -626,6 +625,7 @@ public class tradePairProcess extends Thread {
                 if(strategiesController.getMainStrategy().equals("Neural Network")) {
                     if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
                         double np = predictor.predictNextPrice(series);
+                        strategiesController.addNNetValue(series.getLastBar().getEndTime().toInstant().toEpochMilli(), np);
                         app.log(symbol + " NEUR prediction = " + df8.format(np));
                     }
                 }
@@ -702,6 +702,9 @@ public class tradePairProcess extends Thread {
         plot = new CurrencyPlot(symbol, series, barSeconds);
         for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
             plot.addMarker(strategiesController.getStrategyMarkers().get(i).label, strategiesController.getStrategyMarkers().get(i).timeStamp, strategiesController.getStrategyMarkers().get(i).typeIndex);
+        }
+        for(int i=0; i<strategiesController.getNNetValues().size(); i++) {
+            plot.addPoint(strategiesController.getNNetValues().get(i).timeStamp, strategiesController.getNNetValues().get(i).value);
         }
         plot.showPlot();
     }

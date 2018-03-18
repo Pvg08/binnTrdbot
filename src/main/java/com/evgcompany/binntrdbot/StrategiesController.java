@@ -34,6 +34,7 @@ public class StrategiesController {
     public class StrategyMarker {
         String label = "";
         double timeStamp = 0;
+        double value = 0;
         int typeIndex = 0;
     }
 
@@ -52,6 +53,7 @@ public class StrategiesController {
     private int barSeconds;
     private String groupName;
     private final List<StrategyMarker> markers = new ArrayList<>();
+    private final List<StrategyMarker> nnet_values = new ArrayList<>();
     private TradingRecord tradingRecord = null;
     
     public StrategiesController(String groupName, mainApplication app, tradeProfitsController profitsChecker) {
@@ -81,6 +83,9 @@ public class StrategiesController {
     
     public List<StrategyMarker> getStrategyMarkers() {
         return markers;
+    }
+    public List<StrategyMarker> getNNetValues() {
+        return nnet_values;
     }
     
     /**
@@ -117,6 +122,14 @@ public class StrategiesController {
         newm.timeStamp = timestamp;
         newm.typeIndex = is_enter ? 0 : 1;
         markers.add(newm);
+    }
+    
+    public void addNNetValue(long timestamp, double value) {
+        StrategyMarker newm = new StrategyMarker();
+        newm.timeStamp = timestamp;
+        newm.value = value;
+        newm.typeIndex = 0;
+        nnet_values.add(newm);
     }
     
     public TimeSeries resetSeries() {
@@ -692,6 +705,7 @@ public class StrategiesController {
     
     public void resetStrategies() {
         markers.clear();
+        nnet_values.clear();
         strategies.clear();
         HashMap<String, StrategyInitializer> strategies_init = getStrategiesInitializerMap();
         strategies_init.entrySet().forEach((entry) -> {

@@ -10,10 +10,10 @@ import org.neuroph.core.NeuralNetwork;
 import org.neuroph.core.data.DataSet;
 import org.neuroph.core.data.DataSetRow;
 import org.neuroph.core.events.LearningEvent;
-import org.neuroph.core.events.LearningEventListener;
 import org.neuroph.core.learning.SupervisedLearning;
-import org.neuroph.nnet.ElmanNetwork;
-import org.neuroph.nnet.learning.BackPropagation;
+import org.neuroph.nnet.MultiLayerPerceptron;
+import org.neuroph.nnet.learning.LMS;
+import org.neuroph.util.TransferFunctionType;
 import org.ta4j.core.TimeSeries;
 
 /**
@@ -22,7 +22,7 @@ import org.ta4j.core.TimeSeries;
  */
 public class NeuralNetworkStockPredictor extends Thread {
    
-    private double learningRate = 1;
+    private double learningRate = 0.7;
     private final int slidingWindowSize;
 
     private final String neuralNetworkFileName = "neuralStockPredictor";
@@ -89,25 +89,20 @@ public class NeuralNetworkStockPredictor extends Thread {
         mainApplication.getInstance().log("Neural network "+stock_name+" begin learning...");
         learning = true;
         trainNetwork(run_series);
+        if (run_series != null) {
+            initMinMax(run_series);
+        }
         run_series = null;
         learning = false;
         mainApplication.getInstance().log("Neural network "+stock_name+" learning complete! Error = " + learningRule.getTotalNetworkError());
     }
     
-    private double normalizePriceValue(double input) {
-        return (input - minPrice) / (maxPrice - minPrice) * 0.8 + 0.1;
+    private double normalizeValue(double input, double min, double max) {
+        return (input - min) / (max - min) * 0.8 + 0.1;
     }
 
-    private double deNormalizePriceValue(double input) {
-        return minPrice + (input - 0.1) * (maxPrice - minPrice) / 0.8;
-    }
-    
-    private double normalizeVolumeValue(double input) {
-        return (input - minVolume) / (maxVolume - minVolume) * 0.8 + 0.1;
-    }
-
-    private double deNormalizeVolumeValue(double input) {
-        return minVolume + (input - 0.1) * (maxVolume - minVolume) / 0.8;
+    private double deNormalizeValue(double input, double min, double max) {
+        return min + (input - 0.1) * (max - min) / 0.8;
     }
     
     private boolean canLoadNetwork(String _neuralNetworkModelFilePath) {
@@ -130,56 +125,93 @@ public class NeuralNetworkStockPredictor extends Thread {
     }
     
     public void trainNetwork(TimeSeries series) {
-        NeuralNetwork<BackPropagation> neuralNetwork = new ElmanNetwork(slidingWindowSize * 2, slidingWindowSize * 6, slidingWindowSize * 6 + 1, 1);
+        NeuralNetwork neuralNetwork = new MultiLayerPerceptron(TransferFunctionType.GAUSSIAN, slidingWindowSize * 2, slidingWindowSize * 54, slidingWindowSize * 32 + 1, 1);
 
-        int maxIterations = 8;
-        double maxError = 0.0001;
+        int maxIterations = 50;
+        double maxError = 0.000001;
 
-        learningRule = neuralNetwork.getLearningRule();
-        getLearningRule().setMaxError(maxError);
-        getLearningRule().setLearningRate(getLearningRate());
-        getLearningRule().setMaxIterations(maxIterations);
-        getLearningRule().addListener(new LearningEventListener() {
-            @Override
-            public void handleLearningEvent(LearningEvent learningEvent) {
-                SupervisedLearning rule = (SupervisedLearning) learningEvent.getSource();
-                mainApplication.getInstance().log("Network "+stock_name+" iteration " + rule.getCurrentIteration() + ": error = " + rule.getTotalNetworkError());
-            }
+        learningRule = (LMS) neuralNetwork.getLearningRule();
+        learningRule.setMaxError(maxError);
+        learningRule.setLearningRate(getLearningRate());
+        learningRule.setMaxIterations(maxIterations);
+        learningRule.setLearningRate(learningRate);
+        learningRule.addListener((LearningEvent learningEvent) -> {
+            SupervisedLearning rule = (SupervisedLearning) learningEvent.getSource();
+            mainApplication.getInstance().log("Network "+stock_name+" iteration " + rule.getCurrentIteration() + ": error = " + rule.getTotalNetworkError());
         });
 
         DataSet trainingSet;
         if (series == null && have_dataset_in_file) {
             trainingSet = DataSet.createFromFile(neuralNetworkDataFilePath, slidingWindowSize*2, 1, "\t", true);
         } else {
-            trainingSet = loadTrainingData(series);
-            if (saveTrainData) {
-                trainingSet.saveAsTxt(neuralNetworkDataFilePath, "\t");
-                have_dataset_in_file = true;
-            }
+            trainingSet = appendTrainingData(series);
         }
+        
+        mainApplication.getInstance().log("Dataset size: "+trainingSet.getRows().size());
+        mainApplication.getInstance().log("Network input size: "+trainingSet.getInputSize());
+        mainApplication.getInstance().log("Network output size: "+trainingSet.getOutputSize());
+        
         neuralNetwork.learn(trainingSet);
         neuralNetwork.save(neuralNetworkModelFilePath);
         have_network_in_file = true;
     }
     
-    public DataSet loadTrainingData(TimeSeries series) {
-        initMinMax(series);
-        DataSet trainingSet = null;
-        try {
-            trainingSet = DataSet.createFromFile(neuralNetworkDataFilePath, slidingWindowSize*2, 1, "\t", true);
-        } catch(Exception e) {
-            trainingSet = new DataSet(slidingWindowSize*2, 1);
+    public DataSet appendTrainingData(TimeSeries series) {
+        DataSet trainingSet = loadTrainingData(series);
+        if (saveTrainData) {
+            trainingSet.saveAsTxt(neuralNetworkDataFilePath, "\t");
+            have_dataset_in_file = true;
         }
+        return trainingSet;
+    }
+    
+    public DataSet loadTrainingData(TimeSeries series) {
+        return loadTrainingData(series, series.getBeginIndex(), lastBarIndex(series), null);
+    }
+
+    private DataSet loadTrainingData(TimeSeries series, int index_from, int index_to, DataSet trainingSet) {
+        if ((index_to - index_from) < 2) {
+            return trainingSet;
+        }
+        if (trainingSet == null) {
+            initMinMax(series);
+            try {
+                trainingSet = DataSet.createFromFile(neuralNetworkDataFilePath, slidingWindowSize*2, 1, "\t", true);
+            } catch(Exception e) {
+                trainingSet = new DataSet(slidingWindowSize*2, 1);
+            }
+        }
+        
+        double maxPriceLocal = 0;
+        double minPriceLocal = Double.MAX_VALUE;    
+        double maxVolumeLocal = 0;
+        double minVolumeLocal = Double.MAX_VALUE;
+        
+        for(int i=index_from; i < index_to; i++) {
+            if (minPriceLocal > series.getBar(i).getClosePrice().doubleValue()) {
+                minPriceLocal = series.getBar(i).getClosePrice().doubleValue();
+            }
+            if (maxPriceLocal < series.getBar(i).getClosePrice().doubleValue()) {
+                maxPriceLocal = series.getBar(i).getClosePrice().doubleValue();
+            }
+            if (minVolumeLocal > series.getBar(i).getVolume().doubleValue()) {
+                minVolumeLocal = series.getBar(i).getVolume().doubleValue();
+            }
+            if (maxVolumeLocal < series.getBar(i).getVolume().doubleValue()) {
+                maxVolumeLocal = series.getBar(i).getVolume().doubleValue();
+            }
+        }
+        
         double trainValues[] = new double[slidingWindowSize*2];
         double expectedValue[] = new double[1];
-        int endIndex = lastBarIndex(series);
-        for(int i=series.getBeginIndex() + slidingWindowSize; i < endIndex; i++) {
+        for(int i=index_from + slidingWindowSize; i < index_to; i++) {
             for(int j = 0; j < slidingWindowSize; j++) {
-                trainValues[j*2] = normalizePriceValue(series.getBar(i-slidingWindowSize+j).getClosePrice().doubleValue());
-                trainValues[j*2+1] = normalizeVolumeValue(series.getBar(i-slidingWindowSize+j).getVolume().doubleValue());
+                trainValues[j*2] = normalizeValue(series.getBar(i-slidingWindowSize+j).getClosePrice().doubleValue(), minPriceLocal, maxPriceLocal);
+                trainValues[j*2+1] = normalizeValue(series.getBar(i-slidingWindowSize+j).getVolume().doubleValue(), minVolumeLocal, maxVolumeLocal);
             }
-            expectedValue[0] = normalizePriceValue(series.getBar(i).getClosePrice().doubleValue());
+            expectedValue[0] = normalizeValue(series.getBar(i).getClosePrice().doubleValue(), minPriceLocal, maxPriceLocal);
             trainingSet.addRow(new DataSetRow(trainValues.clone(), expectedValue.clone()));
+            loadTrainingData(series, i-slidingWindowSize, i, trainingSet);
         }
         return trainingSet;
     }
@@ -190,14 +222,14 @@ public class NeuralNetworkStockPredictor extends Thread {
         int k = 0;
         int endIndex = series.getEndIndex();
         for(int i=Math.max(endIndex - slidingWindowSize, 0); i < endIndex; i++) {
-            inputs[k*2] = normalizePriceValue(series.getBar(i).getClosePrice().doubleValue());
-            inputs[k*2+1] = normalizeVolumeValue(series.getBar(i).getVolume().doubleValue());
+            inputs[k*2] = normalizeValue(series.getBar(i).getClosePrice().doubleValue(), minPrice, maxPrice);
+            inputs[k*2+1] = normalizeValue(series.getBar(i).getVolume().doubleValue(), minVolume, maxVolume);
             k++;
         }
         neuralNetwork.setInput(inputs);
         neuralNetwork.calculate();
         double[] networkOutput = neuralNetwork.getOutput();
-        return deNormalizePriceValue(networkOutput[0]);
+        return deNormalizeValue(networkOutput[0], minPrice, maxPrice);
     }
     
     public void initMinMax(TimeSeries series) {
