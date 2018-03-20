@@ -170,6 +170,9 @@ public class tradePairProcess extends Thread {
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
+        curPrice = normalizePrice(curPrice);
+        sold_amount = normalizeQuantity(sold_amount, true);
+        sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
         BigDecimal new_sold_price = sold_amount.multiply(curPrice);
         BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
         BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
@@ -446,7 +449,7 @@ public class tradePairProcess extends Thread {
         series = strategiesController.resetSeries();
         
         if (strategiesController.getMainStrategy().equals("Neural Network")) {
-            predictor = new NeuralNetworkStockPredictor(symbol, 12);
+            predictor = new NeuralNetworkStockPredictor(symbol);
             if (!predictor.isHaveNetworkInFile() && predictor.isHaveNetworkInBaseFile()) {
                 predictor.toBase();
             }
@@ -470,14 +473,8 @@ public class tradePairProcess extends Thread {
             currentPrice = lastStrategyCheckPrice;
         }
 
-        if (predictor != null) {
-            if (!predictor.isHaveNetworkInFile()) {
-                /*predictor.setSaveTrainData(true);
-                if (!predictor.isHaveDatasetInFile()) predictor.initTrainNetwork(series);
-                predictor.start();*/
-            } else {
-                predictor.initMinMax(series);
-            }
+        if (predictor != null && predictor.isHaveNetworkInFile()) {
+            predictor.initMinMax(series);
         }
         
         socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, (nbar, is_fin) -> {
@@ -489,7 +486,7 @@ public class tradePairProcess extends Thread {
             if (profitsChecker != null) {
                 profitsChecker.setPairPrice(symbol, currentPrice);
             }
-            if (is_fin) {
+            if (is_fin && (predictor == null || !predictor.isLearning())) {
                 app.log(symbol + " current price = " + df8.format(currentPrice));
             }
         });
@@ -515,12 +512,16 @@ public class tradePairProcess extends Thread {
     
     public void doNetworkAction(String train, String base) {
         if (strategiesController.getMainStrategy().equals("Neural Network")) {
-            predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "", 12);
+            predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "");
             if (train.equals("TRAIN")) {
                 predictor.start();
             } else if (train.equals("ADDSET")) {
                 predictor.setSaveTrainData(true);
                 predictor.appendTrainingData(series);
+            } else if (train.equals("STOP")) {
+                if (predictor.getLearningRule() != null) {
+                    predictor.getLearningRule().stopLearning();
+                }
             }
         }
     }
@@ -624,9 +625,8 @@ public class tradePairProcess extends Thread {
                 
                 if(strategiesController.getMainStrategy().equals("Neural Network")) {
                     if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
-                        double np = predictor.predictNextPrice(series);
-                        strategiesController.addNNetValue(series.getLastBar().getEndTime().toInstant().toEpochMilli(), np);
-                        app.log(symbol + " NEUR prediction = " + df8.format(np));
+                        Bar nbar = predictor.predictNextBar(series);
+                        app.log(symbol + " NEUR prediction = " + df8.format(nbar.getClosePrice()));
                     }
                 }
 
@@ -703,8 +703,13 @@ public class tradePairProcess extends Thread {
         for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
             plot.addMarker(strategiesController.getStrategyMarkers().get(i).label, strategiesController.getStrategyMarkers().get(i).timeStamp, strategiesController.getStrategyMarkers().get(i).typeIndex);
         }
-        for(int i=0; i<strategiesController.getNNetValues().size(); i++) {
-            plot.addPoint(strategiesController.getNNetValues().get(i).timeStamp, strategiesController.getNNetValues().get(i).value);
+        
+        if (predictor != null && predictor.isHaveNetworkInFile()) {
+            List<Bar> pbars = predictor.predictPreviousBars(series);
+            pbars.forEach((pbar)->{
+                plot.addPoint(pbar.getEndTime().toInstant().toEpochMilli(), pbar.getClosePrice().doubleValue());
+            });
+            //Bar nbar = predictor.predictNextBar(series);
         }
         plot.showPlot();
     }

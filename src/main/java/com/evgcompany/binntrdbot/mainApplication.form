@@ -1137,7 +1137,6 @@
         </Property>
         <Property name="text" type="java.lang.String" value="NN B Train"/>
         <Property name="toolTipText" type="java.lang.String" value="Neural network Base Train"/>
-        <Property name="actionCommand" type="java.lang.String" value="NN B Train"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>
@@ -1164,7 +1163,6 @@
         </Property>
         <Property name="text" type="java.lang.String" value="NN C Train"/>
         <Property name="toolTipText" type="java.lang.String" value="Neural network Coin Train"/>
-        <Property name="actionCommand" type="java.lang.String" value="NN C Train"/>
         <Property name="enabled" type="boolean" value="false"/>
       </Properties>
       <Events>

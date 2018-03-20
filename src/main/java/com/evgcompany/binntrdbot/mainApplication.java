@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
+import java.awt.Toolkit;
 import java.math.BigDecimal;
 import java.text.Format;
 import java.text.SimpleDateFormat;
@@ -66,6 +67,12 @@ public class mainApplication extends javax.swing.JFrame {
         } else if (cb instanceof JComboBox) {
             prefs.put(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString());
         }
+    }
+    
+    public void systemSound() {
+        final Runnable runnable =
+            (Runnable) Toolkit.getDefaultToolkit().getDesktopProperty("win.sound.exclamation");
+       if (runnable != null) runnable.run();
     }
     
     /**
