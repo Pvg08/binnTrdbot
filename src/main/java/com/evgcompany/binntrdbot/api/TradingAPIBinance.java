@@ -19,6 +19,7 @@ import com.binance.api.client.domain.account.Trade;
 import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
+import com.binance.api.client.domain.event.UserDataUpdateEvent.UserDataUpdateEventType;
 import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.RateLimit;
 import com.binance.api.client.domain.general.SymbolInfo;
@@ -257,6 +258,27 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         }
         */
         
+        return socket;
+    }
+    
+    @Override
+    public Closeable OnOrderEvent(String symbol, OrderEvent evt) {
+        BinanceApiWebSocketClient client_s = factory.newWebSocketClient();
+        String listenKey = client.startUserDataStream();
+        Closeable socket = client_s.onUserDataUpdateEvent(listenKey, response -> {
+            if (
+                    response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE &&
+                    response.getOrderTradeUpdateEvent().getEventType().equals("executionReport") && 
+                    response.getOrderTradeUpdateEvent().getOrderId() > 0 &&
+                    Double.parseDouble(response.getOrderTradeUpdateEvent().getAccumulatedQuantity()) > 0 &&
+                    (
+                        symbol == null ||
+                        response.getOrderTradeUpdateEvent().getSymbol().toUpperCase().equals(symbol)
+                    )
+            ) {
+                evt.onUpdate(response.getOrderTradeUpdateEvent());
+            }
+        });
         return socket;
     }
 }

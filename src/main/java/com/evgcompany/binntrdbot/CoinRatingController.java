@@ -9,6 +9,7 @@ import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import java.io.Closeable;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.ParseException;
@@ -99,6 +100,8 @@ public class CoinRatingController extends Thread {
     
     private final mainApplication app;
     TradingAPIAbstractInterface client = null;
+    private Closeable orderEvent = null;
+    
     private StrategiesController strategiesController = null;
     private boolean lowHold = true;
     private boolean autoOrder = true;
@@ -711,6 +714,11 @@ public class CoinRatingController extends Thread {
         });
         String coinsPattern = String.join("|", accountCoins);
 
+        orderEvent = client.OnOrderEvent(null, event -> {
+            app.log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
+            app.systemSound();
+        });
+        
         while (!need_stop) {
             if (paused) {
                 doWait(delayTime * 1000);
@@ -729,6 +737,14 @@ public class CoinRatingController extends Thread {
             }
 
             doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
+        }
+        
+        if (orderEvent != null) {
+            try {
+                orderEvent.close();
+            } catch (IOException ex) {
+                Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
     }
 

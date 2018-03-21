@@ -38,8 +38,9 @@ import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
  */
 public class NeuralNetworkStockPredictor extends Thread {
     private double learningRate = 0.7;
-    private int slidingWindowSize = 5;
-    private int inputVectorPartSize = 10;
+    private int slidingWindowSize = 3;
+    private final int inputVectorPartSize = 10;
+    private final int outputVectorSize = 1;
     private int inputVectorSize = slidingWindowSize * inputVectorPartSize;
 
     private final String neuralNetworkFileName = "neuralStockPredictor";
@@ -52,8 +53,6 @@ public class NeuralNetworkStockPredictor extends Thread {
     private double[] maxVector = null;
     private double[] minVector = null;
     
-    private double maxPrice = 0;
-    private double minPrice = Double.MAX_VALUE;
     private boolean saveTrainData = false;
     
     private TimeSeries run_series = null;
@@ -188,7 +187,7 @@ public class NeuralNetworkStockPredictor extends Thread {
         if (normalize) {
             for(int j=0; j<slidingWindowSize; j++) {
                 for(int n=0; n<inputVectorPartSize; n++) {
-                    trainValues[j*inputVectorPartSize + n] = this.normalizeValue(trainValues[j*inputVectorPartSize + n], minVector[n], maxVector[n]);
+                    trainValues[j*inputVectorPartSize + n] = normalizeValue(trainValues[j*inputVectorPartSize + n], minVector[n], maxVector[n]);
                 }
             }
         }
@@ -196,8 +195,17 @@ public class NeuralNetworkStockPredictor extends Thread {
         return trainValues;
     }
     
+    private double[] getOutputForSeries(TimeSeries series, int begin_index, boolean normalize) {
+        double outputValues[] = new double[1];
+        outputValues[0] = series.getBar(begin_index + slidingWindowSize).getClosePrice().doubleValue();
+        if (normalize) {
+            outputValues[0] = normalizeValue(outputValues[0], minVector[inputVectorPartSize], maxVector[inputVectorPartSize]);
+        }
+        return outputValues;
+    }
+    
     public void trainNetwork(TimeSeries series) {
-        NeuralNetwork neuralNetwork = new MultiLayerPerceptron(TransferFunctionType.SIGMOID, inputVectorSize, inputVectorSize * 32, inputVectorSize * 16, inputVectorSize * 4, 1);
+        NeuralNetwork neuralNetwork = new MultiLayerPerceptron(TransferFunctionType.SIGMOID, inputVectorSize, inputVectorSize * 32, inputVectorSize * 20, inputVectorSize * 2, 1);
 
         int maxIterations = 15;
         double maxError = 0.0000001;
@@ -255,23 +263,9 @@ public class NeuralNetworkStockPredictor extends Thread {
                 trainingSet = new DataSet(inputVectorSize, 1);
             }
         }
-        
-        double maxPriceLocal = Double.MIN_VALUE;
-        double minPriceLocal = Double.MAX_VALUE;
-        
-        for(int i=index_from; i < index_to; i++) {
-            if (minPriceLocal > series.getBar(i).getClosePrice().doubleValue()) {
-                minPriceLocal = series.getBar(i).getClosePrice().doubleValue();
-            }
-            if (maxPriceLocal < series.getBar(i).getClosePrice().doubleValue()) {
-                maxPriceLocal = series.getBar(i).getClosePrice().doubleValue();
-            }
-        }
-        
         for(int i=index_from + slidingWindowSize; i < index_to; i++) {
             double trainValues[] = getInputForSeries(series, i-slidingWindowSize, true);
-            double expectedValue[] = new double[1];
-            expectedValue[0] = normalizeValue(series.getBar(i).getClosePrice().doubleValue(), minPriceLocal, maxPriceLocal);
+            double expectedValue[] = getOutputForSeries(series, i-slidingWindowSize, true);
             trainingSet.addRow(new DataSetRow(trainValues, expectedValue));
             loadTrainingData(series, i-slidingWindowSize, i, trainingSet);
         }
@@ -279,7 +273,7 @@ public class NeuralNetworkStockPredictor extends Thread {
     }
 
     private Bar getPredictedBar(Bar lastbar, double predicted_close_price) {
-        double ncprice = deNormalizeValue(predicted_close_price, minPrice, maxPrice);
+        double ncprice = deNormalizeValue(predicted_close_price, minVector[inputVectorPartSize], maxVector[inputVectorPartSize]);
         double oprice = lastbar.getClosePrice().doubleValue();
         Bar bar = new BaseBar(
             lastbar.getTimePeriod(), 
@@ -319,13 +313,16 @@ public class NeuralNetworkStockPredictor extends Thread {
     
     public void initMinMax(TimeSeries series) {
         if (maxVector == null) {
-            maxVector = new double[inputVectorPartSize];
+            maxVector = new double[inputVectorPartSize + outputVectorSize];
             for(int i=0; i<maxVector.length; i++) maxVector[i] = Double.MIN_VALUE;
         }
         if (minVector == null) {
-            minVector = new double[inputVectorPartSize];
+            minVector = new double[inputVectorPartSize + outputVectorSize];
             for(int i=0; i<minVector.length; i++) minVector[i] = Double.MAX_VALUE;
         }
+        
+        double maxPrice = 0;
+        double minPrice = Double.MAX_VALUE;
         int endIndex = lastBarIndex(series);
         for(int i = series.getBeginIndex(); i < endIndex; i++) {
             if (minPrice > series.getBar(i).getClosePrice().doubleValue()) {
@@ -337,6 +334,7 @@ public class NeuralNetworkStockPredictor extends Thread {
         }
         for(int i = series.getBeginIndex(); i < endIndex - slidingWindowSize; i++) {
             double[] inputs = getInputForSeries(series, i, false);
+            //double[] outputs = getOutputForSeries(series, i, false);
             
             if (i == series.getBeginIndex())
             System.out.println("INPUT: " + Arrays.toString(inputs));
@@ -351,9 +349,17 @@ public class NeuralNetworkStockPredictor extends Thread {
                     }
                 }
             }
-            
-            
+            /*for(int k=0; k<outputVectorSize; k++) {
+                if (minVector[inputVectorPartSize + k] > outputs[k]) {
+                    minVector[inputVectorPartSize + k] = outputs[k];
+                }
+                if (maxVector[inputVectorPartSize + k] < outputs[k]) {
+                    maxVector[inputVectorPartSize + k] = outputs[k];
+                }
+            }*/
         }
+        minVector[inputVectorPartSize] = minPrice;
+        maxVector[inputVectorPartSize] = maxPrice;
         
         System.out.println("MIN: " + Arrays.toString(minVector));
         System.out.println("MAX: " + Arrays.toString(maxVector));
