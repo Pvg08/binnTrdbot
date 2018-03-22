@@ -11,9 +11,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -65,7 +63,48 @@ public class tradePairProcessController {
         return pairs;
     }
     
-    public void initPairs(String pairstxt) {
+    public boolean hasPair(String currencyPair) {
+        return searchCurrencyFirstPair(currencyPair) >= 0;
+    }
+    
+    private tradePairProcess initializePair(String symbol, boolean run) {
+        boolean has_plus = symbol.contains("+");
+        boolean has_2plus = symbol.contains("++");
+        boolean has_minus = !has_plus && symbol.contains("-");
+        symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "");
+        int pair_index = searchCurrencyFirstPair(symbol);
+        tradePairProcess nproc = null;
+        if (pair_index < 0) {
+            nproc = new tradePairProcess(app, profitsChecker.getClient(), profitsChecker, symbol);
+            nproc.setStartDelay(pairs.size() * 1000 + 500);
+            nproc.setTryingToSellUp(has_plus);
+            nproc.setSellUpAll(has_2plus);
+        } else {
+            nproc = pairs.get(pair_index);
+        }
+
+        nproc.setTryingToBuyDip(has_minus);
+        nproc.set_do_remove_flag(false);
+        nproc.setTradingBalancePercent(tradingBalancePercent);
+        nproc.setMainStrategy(mainStrategy);
+        nproc.setBarInterval(barsInterval);
+        nproc.setDelayTime(updateDelay);
+        nproc.setCheckOtherStrategies(checkOtherStrategies);
+        nproc.setUseBuyStopLimited(buyStop);
+        nproc.setUseSellStopLimited(sellStop);
+        nproc.setStopBuyLimitTimeout(buyStopLimitedTimeout);
+        nproc.setStopSellLimitTimeout(sellStopLimitedTimeout);
+        nproc.setBarQueryCount(barAdditionalCount);
+        
+        if (run && pair_index < 0) {
+            nproc.start();
+            pairs.add(nproc);
+        }
+        
+        return nproc;
+    }
+    
+    public void initBasePairs(String pairstxt) {
         pairs.forEach((pair)->{
             pair.set_do_remove_flag(true);
         });
@@ -73,51 +112,47 @@ public class tradePairProcessController {
         if (items.size() > 0) {
             items.forEach((symbol)->{
                 if (!symbol.isEmpty()) {
-                    boolean has_plus = symbol.contains("+");
-                    boolean has_2plus = symbol.contains("++");
-                    boolean has_minus = !has_plus && symbol.contains("-");
-                    symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "");
-                    int pair_index = searchCurrencyFirstPair(symbol);
-                    tradePairProcess nproc = null;
-                    if (pair_index < 0) {
-                        nproc = new tradePairProcess(app, profitsChecker.getClient(), profitsChecker, symbol);
-                        nproc.setStartDelay(pairs.size() * 1000 + 500);
-                        nproc.setTryingToSellUp(has_plus);
-                        nproc.setSellUpAll(has_2plus);
-                    } else {
-                        nproc = pairs.get(pair_index);
-                    }
-
-                    nproc.setTryingToBuyDip(has_minus);
-                    nproc.set_do_remove_flag(false);
-                    nproc.setTradingBalancePercent(tradingBalancePercent);
-                    nproc.setMainStrategy(mainStrategy);
-                    nproc.setBarInterval(barsInterval);
-                    nproc.setDelayTime(updateDelay);
-                    nproc.setCheckOtherStrategies(checkOtherStrategies);
-                    nproc.setUseBuyStopLimited(buyStop);
-                    nproc.setUseSellStopLimited(sellStop);
-                    nproc.setStopBuyLimitTimeout(buyStopLimitedTimeout);
-                    nproc.setStopSellLimitTimeout(sellStopLimitedTimeout);
-                    nproc.setBarQueryCount(barAdditionalCount);
-
-                    if (pair_index < 0) {
-                        nproc.start();
-                        pairs.add(nproc);
-                    }
+                    initializePair(symbol, true);
                 }
             });
         }
         int i = 0;
         while (i<pairs.size()) {
             if (pairs.get(i).is_do_remove_flag()) {
-                pairs.get(i).doStop();
-                profitsChecker.removeCurrencyPair(pairs.get(i).getSymbol());
-                pairs.remove(i);
+                removePair(i);
             } else {
                 i++;
             }
         }
+    }
+    
+    public tradePairProcess addPair(tradePairProcess newProc) {
+        pairs.add(newProc);
+        newProc.start();
+        return newProc;
+    }
+    public tradePairProcess addPair(String newPair) {
+        return initializePair(newPair, true);
+    }
+    public tradePairProcess addPairFastRun(String newPair) {
+        if (!hasPair(newPair)) {
+            tradePairProcess nproc = initializePair(newPair, false);
+            nproc.setTryingToSellUp(false);
+            nproc.setSellUpAll(false);
+            nproc.setTryingToBuyDip(false);
+            nproc.set_do_remove_flag(false);
+            nproc.setTradingBalancePercent(100);
+            nproc.setMainStrategy("Auto");
+            nproc.setBarInterval("5m");
+            nproc.setDelayTime(5);
+            nproc.setBuyOnStart(true);
+            nproc.setStopBuyLimitTimeout(120);
+            nproc.setStopSellLimitTimeout(240);
+            nproc.setUseBuyStopLimited(true);
+            nproc.setUseSellStopLimited(true);
+            return addPair(nproc);
+        }
+        return null;
     }
     
     public void stopPairs() {
@@ -137,12 +172,30 @@ public class tradePairProcessController {
         }
     }
     
+    public void removePair(String currencyPair) {
+        if (pairs.size() > 0) {
+            int pair_index = searchCurrencyFirstPair(currencyPair);
+            if (pair_index >= 0 && pair_index < pairs.size()) {
+                removePair(pair_index);
+            }
+        }
+    }
+    
+    private void removePair(int pairIndex) {
+        pairs.get(pairIndex).doStop();
+        profitsChecker.removeCurrencyPair(pairs.get(pairIndex).getSymbol());
+        pairs.remove(pairIndex);
+    }
+    
     public void pairAction(int index, String action) {
         if (pairs.size() > 0 && index >= 0) {
             String currencyPair = profitsChecker.getNthCurrencyPair(index);
             int pair_index = searchCurrencyFirstPair(currencyPair);
             if (pair_index >= 0 && pair_index < pairs.size()) {
                 switch (action) {
+                    case "REMOVE":
+                        removePair(pair_index);
+                        break;
                     case "BUY":
                         pairs.get(pair_index).doBuy();
                         break;
@@ -325,5 +378,9 @@ public class tradePairProcessController {
      */
     public void setSellStopLimitedTimeout(int sellStopLimitedTimeout) {
         this.sellStopLimitedTimeout = sellStopLimitedTimeout;
+    }
+    
+    public tradeProfitsController getProfitsChecker() {
+        return profitsChecker;
     }
 }

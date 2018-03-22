@@ -8,13 +8,17 @@ package com.evgcompany.binntrdbot;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
 import java.awt.Toolkit;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -22,6 +26,14 @@ import javax.swing.JComponent;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
 import javax.swing.text.DefaultCaret;
+import org.apache.commons.exec.CommandLine;
+import org.apache.commons.exec.DaemonExecutor;
+import org.apache.commons.exec.DefaultExecuteResultHandler;
+import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.ExecuteResultHandler;
+import org.apache.commons.exec.LogOutputStream;
+import org.apache.commons.exec.PumpStreamHandler;
+import org.apache.commons.exec.environment.EnvironmentUtils;
 
 /**
  *
@@ -34,8 +46,8 @@ public class mainApplication extends javax.swing.JFrame {
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
     private final tradeProfitsController profitsChecker = new tradeProfitsController(this);
-    private final CoinRatingController coinRatingController = new CoinRatingController(this);
     private final tradePairProcessController pairController = new tradePairProcessController(this, profitsChecker);
+    private final CoinRatingController coinRatingController = new CoinRatingController(this, pairController);
     
     private boolean is_paused = false;
     Preferences prefs = null;
@@ -106,7 +118,8 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefLoad(textFieldTradePairs, "trade_pairs");
         componentPrefLoad(checkboxTestMode, "test_mode");
         componentPrefLoad(checkBoxLowHold, "low_hold");
-        componentPrefLoad(checkboxAutoFastorder, "auto_heroes");
+        componentPrefLoad(checkboxAutoOrder, "auto_order");
+        componentPrefLoad(checkboxAutoFastorder, "auto_fastorder");
         componentPrefLoad(checkBoxAutoAnalyzer, "auto_anal");
         componentPrefLoad(checkBoxLimitedOrders, "limited_orders");
         componentPrefLoad(checkBoxCheckOtherStrategies, "strategies_add_check");
@@ -258,12 +271,22 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel14 = new javax.swing.JLabel();
         comboBoxBarsCount = new javax.swing.JComboBox<>();
         jPanel4 = new javax.swing.JPanel();
-        checkboxAutoFastorder = new javax.swing.JCheckBox();
+        checkboxAutoOrder = new javax.swing.JCheckBox();
         checkBoxAutoAnalyzer = new javax.swing.JCheckBox();
         spinnerScanRatingDelayTime = new javax.swing.JSpinner();
         jLabel15 = new javax.swing.JLabel();
         jLabel16 = new javax.swing.JLabel();
         spinnerScanRatingUpdateTime = new javax.swing.JSpinner();
+        checkboxAutoFastorder = new javax.swing.JCheckBox();
+        jPanel5 = new javax.swing.JPanel();
+        textFieldAPIID = new javax.swing.JTextField();
+        jLabel17 = new javax.swing.JLabel();
+        jLabel18 = new javax.swing.JLabel();
+        textFieldAPIHash = new javax.swing.JTextField();
+        jScrollPane7 = new javax.swing.JScrollPane();
+        jTextArea2 = new javax.swing.JTextArea();
+        jLabel19 = new javax.swing.JLabel();
+        buttonTlgConnect = new javax.swing.JButton();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -279,6 +302,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNBAdd = new javax.swing.JButton();
         buttonNNCTrain = new javax.swing.JButton();
         buttonNNCAdd = new javax.swing.JButton();
+        buttonRemove = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -663,15 +687,15 @@ public class mainApplication extends javax.swing.JFrame {
 
         jTabbedPane2.addTab("Strategies", jPanel1);
 
-        checkboxAutoFastorder.setText("Auto order");
-        checkboxAutoFastorder.addChangeListener(new javax.swing.event.ChangeListener() {
+        checkboxAutoOrder.setText("Auto order");
+        checkboxAutoOrder.addChangeListener(new javax.swing.event.ChangeListener() {
             public void stateChanged(javax.swing.event.ChangeEvent evt) {
-                checkboxAutoFastorderStateChanged(evt);
+                checkboxAutoOrderStateChanged(evt);
             }
         });
-        checkboxAutoFastorder.addActionListener(new java.awt.event.ActionListener() {
+        checkboxAutoOrder.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                checkboxAutoFastorderActionPerformed(evt);
+                checkboxAutoOrderActionPerformed(evt);
             }
         });
 
@@ -690,6 +714,13 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerScanRatingUpdateTime.setValue(10);
 
+        checkboxAutoFastorder.setText("Fast auto order");
+        checkboxAutoFastorder.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkboxAutoFastorderActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
@@ -698,7 +729,10 @@ public class mainApplication extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(checkBoxAutoAnalyzer)
-                    .addComponent(checkboxAutoFastorder)
+                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addComponent(checkboxAutoOrder)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(checkboxAutoFastorder))
                     .addGroup(jPanel4Layout.createSequentialGroup()
                         .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                             .addComponent(jLabel16)
@@ -715,7 +749,9 @@ public class mainApplication extends javax.swing.JFrame {
                 .addContainerGap()
                 .addComponent(checkBoxAutoAnalyzer)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(checkboxAutoFastorder)
+                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(checkboxAutoOrder)
+                    .addComponent(checkboxAutoFastorder))
                 .addGap(18, 18, 18)
                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -728,6 +764,70 @@ public class mainApplication extends javax.swing.JFrame {
         );
 
         jTabbedPane2.addTab("Coins rating", jPanel4);
+
+        jLabel17.setText("API ID:");
+
+        jLabel18.setText("API Hash:");
+
+        jTextArea2.setColumns(20);
+        jTextArea2.setRows(5);
+        jScrollPane7.setViewportView(jTextArea2);
+
+        jLabel19.setText("Channel signals:");
+
+        buttonTlgConnect.setText("Connect");
+        buttonTlgConnect.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonTlgConnectActionPerformed(evt);
+            }
+        });
+
+        javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
+        jPanel5.setLayout(jPanel5Layout);
+        jPanel5Layout.setHorizontalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                            .addComponent(textFieldAPIID)
+                            .addComponent(jLabel17)
+                            .addComponent(jLabel18)
+                            .addComponent(textFieldAPIHash, javax.swing.GroupLayout.DEFAULT_SIZE, 170, Short.MAX_VALUE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jScrollPane7, javax.swing.GroupLayout.DEFAULT_SIZE, 294, Short.MAX_VALUE)
+                            .addGroup(jPanel5Layout.createSequentialGroup()
+                                .addComponent(jLabel19)
+                                .addGap(0, 0, Short.MAX_VALUE))))
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addComponent(buttonTlgConnect)
+                        .addGap(0, 0, Short.MAX_VALUE)))
+                .addContainerGap())
+        );
+        jPanel5Layout.setVerticalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel17)
+                    .addComponent(jLabel19))
+                .addGap(7, 7, 7)
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addComponent(textFieldAPIID, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(jLabel18)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(textFieldAPIHash, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(jScrollPane7))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(buttonTlgConnect)
+                .addContainerGap(67, Short.MAX_VALUE))
+        );
+
+        jTabbedPane2.addTab("Signals", jPanel5);
 
         jTextArea1.setColumns(20);
         jTextArea1.setLineWrap(true);
@@ -810,7 +910,6 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNBTrain.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonNNBTrain.setText("NN B Train");
         buttonNNBTrain.setToolTipText("Neural network Base Train");
-        buttonNNBTrain.setActionCommand("NN B Train");
         buttonNNBTrain.setEnabled(false);
         buttonNNBTrain.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -831,7 +930,6 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCTrain.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
         buttonNNCTrain.setText("NN C Train");
         buttonNNCTrain.setToolTipText("Neural network Coin Train");
-        buttonNNCTrain.setActionCommand("NN C Train");
         buttonNNCTrain.setEnabled(false);
         buttonNNCTrain.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -846,6 +944,16 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCAdd.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 buttonNNCAddActionPerformed(evt);
+            }
+        });
+
+        buttonRemove.setFont(new java.awt.Font("Tahoma", 0, 8)); // NOI18N
+        buttonRemove.setText("Remove");
+        buttonRemove.setToolTipText("Remove selected coin");
+        buttonRemove.setEnabled(false);
+        buttonRemove.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                buttonRemoveActionPerformed(evt);
             }
         });
 
@@ -916,7 +1024,9 @@ public class mainApplication extends javax.swing.JFrame {
                                     .addComponent(buttonCancelLimit, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
                                     .addComponent(buttonNNCAdd, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(buttonUpdate, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addComponent(buttonUpdate, javax.swing.GroupLayout.DEFAULT_SIZE, 80, Short.MAX_VALUE)
+                                    .addComponent(buttonRemove, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                                 .addGap(78, 78, 78)
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                     .addComponent(buttonShowPlot, javax.swing.GroupLayout.DEFAULT_SIZE, 79, Short.MAX_VALUE)
@@ -1000,7 +1110,8 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(buttonWebBrowserOpen)
                             .addComponent(ButtonStatistics)
                             .addComponent(buttonNNBTrain)
-                            .addComponent(buttonNNBAdd))
+                            .addComponent(buttonNNBAdd)
+                            .addComponent(buttonRemove))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonNNCTrain)
@@ -1046,7 +1157,7 @@ public class mainApplication extends javax.swing.JFrame {
             
             log("", true);
             setPairParams();
-            pairController.initPairs(textFieldTradePairs.getText());
+            pairController.initBasePairs(textFieldTradePairs.getText());
             checkboxTestMode.setEnabled(false);
             buttonStop.setEnabled(true);
             buttonPause.setEnabled(true);
@@ -1062,6 +1173,7 @@ public class mainApplication extends javax.swing.JFrame {
             buttonNNCAdd.setEnabled(true);
             buttonNNBTrain.setEnabled(true);
             buttonNNCTrain.setEnabled(true);
+            buttonRemove.setEnabled(true);
         } catch (Exception e) {
             log("Error: " + e.getMessage(), true, true);
             buttonRun.setEnabled(true);
@@ -1087,6 +1199,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCAdd.setEnabled(false);
         buttonNNBTrain.setEnabled(false);
         buttonNNCTrain.setEnabled(false);
+        buttonRemove.setEnabled(false);
     }//GEN-LAST:event_buttonStopActionPerformed
 
     private void buttonClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonClearActionPerformed
@@ -1115,6 +1228,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCAdd.setEnabled(true);
         buttonNNBTrain.setEnabled(true);
         buttonNNCTrain.setEnabled(true);
+        buttonRemove.setEnabled(true);
     }//GEN-LAST:event_buttonPauseActionPerformed
 
     private void buttonBuyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonBuyActionPerformed
@@ -1131,7 +1245,7 @@ public class mainApplication extends javax.swing.JFrame {
         profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
         profitsChecker.setLowHold(checkBoxLowHold.isSelected());
         setPairParams();
-        pairController.initPairs(textFieldTradePairs.getText());
+        pairController.initBasePairs(textFieldTradePairs.getText());
     }//GEN-LAST:event_buttonSetPairsActionPerformed
 
     private void buttonUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonUpdateActionPerformed
@@ -1192,16 +1306,12 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkboxTestModeStateChanged
 
     private void checkBoxLowHoldStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxLowHoldStateChanged
-        if (coinRatingController != null) {
-            coinRatingController.setLowHold(checkBoxLowHold.isSelected());
-        }
+        coinRatingController.setLowHold(checkBoxLowHold.isSelected());
     }//GEN-LAST:event_checkBoxLowHoldStateChanged
 
-    private void checkboxAutoFastorderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkboxAutoFastorderStateChanged
-        if (coinRatingController != null) {
-            coinRatingController.setAutoOrder(checkboxAutoFastorder.isSelected());
-        }
-    }//GEN-LAST:event_checkboxAutoFastorderStateChanged
+    private void checkboxAutoOrderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkboxAutoOrderStateChanged
+        coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
+    }//GEN-LAST:event_checkboxAutoOrderStateChanged
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
         prefs.put("window_pos_x", String.valueOf(Math.round(getBounds().getX())));
@@ -1213,7 +1323,8 @@ public class mainApplication extends javax.swing.JFrame {
         componentPrefSave(textFieldTradePairs, "trade_pairs");
         componentPrefSave(checkboxTestMode, "test_mode");
         componentPrefSave(checkBoxLowHold, "low_hold");
-        componentPrefSave(checkboxAutoFastorder, "auto_heroes");
+        componentPrefSave(checkboxAutoOrder, "auto_order");
+        componentPrefSave(checkboxAutoFastorder, "auto_fastorder");
         componentPrefSave(checkBoxAutoAnalyzer, "auto_anal");
         componentPrefSave(checkBoxLimitedOrders, "limited_orders");
         componentPrefSave(checkBoxCheckOtherStrategies, "strategies_add_check");
@@ -1267,16 +1378,17 @@ public class mainApplication extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_comboBoxLimitedModeActionPerformed
 
-    private void checkboxAutoFastorderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoFastorderActionPerformed
+    private void checkboxAutoOrderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoOrderActionPerformed
         if (coinRatingController != null) {
-            coinRatingController.setAutoOrder(checkboxAutoFastorder.isSelected());
+            coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
         }
-    }//GEN-LAST:event_checkboxAutoFastorderActionPerformed
+    }//GEN-LAST:event_checkboxAutoOrderActionPerformed
 
     private void buttonRatingStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRatingStartActionPerformed
         initAPI();
         coinRatingController.setLowHold(checkBoxLowHold.isSelected());
-        coinRatingController.setAutoOrder(checkboxAutoFastorder.isSelected());
+        coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
+        coinRatingController.setAutoFastOrder(checkboxAutoFastorder.isSelected());
         coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
         coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
         coinRatingController.setUpdateTime((Integer) spinnerScanRatingUpdateTime.getValue());
@@ -1327,6 +1439,60 @@ public class mainApplication extends javax.swing.JFrame {
         pairController.pairAction(listCurrencies.getSelectedIndex(), "NNCADD");
     }//GEN-LAST:event_buttonNNCAddActionPerformed
 
+    private void buttonRemoveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRemoveActionPerformed
+        pairController.pairAction(listCurrencies.getSelectedIndex(), "REMOVE");
+    }//GEN-LAST:event_buttonRemoveActionPerformed
+
+    private void checkboxAutoFastorderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoFastorderActionPerformed
+        coinRatingController.setAutoFastOrder(checkboxAutoFastorder.isSelected());
+    }//GEN-LAST:event_checkboxAutoFastorderActionPerformed
+
+    private void buttonTlgConnectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonTlgConnectActionPerformed
+        execAsync("D:\\Progs\\Python\\python.exe C:\\Users\\EVG_adm_T\\Documents\\NetBeansProjects\\binnTrdbot\\TGsignalsListener.py");
+    }//GEN-LAST:event_buttonTlgConnectActionPerformed
+
+    public void execAsync(String cmd) {
+        
+        
+        try {
+            ProcessExecutor.runProcess(CommandLine.parse(cmd), new ProcessExecutorHandler() {
+                @Override
+                public void onStandardOutput(String msg) {
+                    System.out.println("output msg = " + msg);
+                }
+                
+                @Override
+                public void onStandardError(String msg) {
+                    System.out.println("error msg = " + msg);
+                }
+            }, 100);
+        } catch (IOException ex) {
+            System.out.println("error");
+        }
+        
+
+        
+        /*
+        CommandLine commandline = CommandLine.parse(cmd);
+        log("executing async command: " + commandline);
+        DaemonExecutor exec = new DaemonExecutor();
+        DefaultExecuteResultHandler handler = new DefaultExecuteResultHandler();
+        LogOutputStream logStream = new LogOutputStream(0) {
+            @Override
+            protected void processLine(String line, int logLevel) {
+                log("processLine: " + line);
+            }
+        };
+        PumpStreamHandler streamHandler = new PumpStreamHandler(logStream);
+        streamHandler.setStopTimeout(0);
+        exec.setStreamHandler(streamHandler);
+        try {
+            exec.execute(commandline, handler);
+        } catch (IOException e) {
+            log("An error occured while executing shell command: " + commandline);
+        }*/
+    }
+    
     /**
      * @param args the command line arguments
      */
@@ -1374,11 +1540,13 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonRatingCheck;
     private javax.swing.JButton buttonRatingStart;
     private javax.swing.JButton buttonRatingStop;
+    private javax.swing.JButton buttonRemove;
     private javax.swing.JButton buttonRun;
     private javax.swing.JButton buttonSell;
     private javax.swing.JButton buttonSetPairs;
     private javax.swing.JButton buttonShowPlot;
     private javax.swing.JButton buttonStop;
+    private javax.swing.JButton buttonTlgConnect;
     private javax.swing.JButton buttonUpdate;
     private javax.swing.JButton buttonWebBrowserOpen;
     private javax.swing.JCheckBox checkBoxAutoAnalyzer;
@@ -1390,6 +1558,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkBoxStopGain;
     private javax.swing.JCheckBox checkBoxStopLoss;
     private javax.swing.JCheckBox checkboxAutoFastorder;
+    private javax.swing.JCheckBox checkboxAutoOrder;
     private javax.swing.JCheckBox checkboxTestMode;
     private javax.swing.JComboBox<String> comboBoxBarsCount;
     private javax.swing.JComboBox<String> comboBoxBarsInterval;
@@ -1404,6 +1573,9 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel14;
     private javax.swing.JLabel jLabel15;
     private javax.swing.JLabel jLabel16;
+    private javax.swing.JLabel jLabel17;
+    private javax.swing.JLabel jLabel18;
+    private javax.swing.JLabel jLabel19;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
@@ -1416,14 +1588,17 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
+    private javax.swing.JPanel jPanel5;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
+    private javax.swing.JScrollPane jScrollPane7;
     private javax.swing.JTabbedPane jTabbedPane2;
     private javax.swing.JTextArea jTextArea1;
+    private javax.swing.JTextArea jTextArea2;
     private javax.swing.JList<String> listCurrencies;
     private javax.swing.JList<String> listProfit;
     private javax.swing.JList<String> listRating;
@@ -1438,6 +1613,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JSpinner spinnerStopGain;
     private javax.swing.JSpinner spinnerStopLoss;
     private javax.swing.JSpinner spinnerUpdateDelay;
+    private javax.swing.JTextField textFieldAPIHash;
+    private javax.swing.JTextField textFieldAPIID;
     private javax.swing.JTextField textFieldApiKey;
     private javax.swing.JTextField textFieldApiSecret;
     private javax.swing.JTextField textFieldTradePairs;

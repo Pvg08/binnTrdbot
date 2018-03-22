@@ -75,6 +75,7 @@ public class tradePairProcess extends Thread {
     private boolean is_hodling = false;
     private BigDecimal sold_price = BigDecimal.ZERO;
     private BigDecimal sold_amount = BigDecimal.ZERO;
+    private BigDecimal last_trade_profit = BigDecimal.ZERO;
     
     private long delayTime = 10;
     
@@ -110,6 +111,7 @@ public class tradePairProcess extends Thread {
     private int stopBuyLimitTimeout = 120;
     private boolean useSellStopLimited = false;
     private boolean isInitialized = false;
+    private boolean isTriedBuy = false;
     private int stopSellLimitTimeout = 1200;
     
     private long lastOrderMillis = 0;
@@ -121,7 +123,6 @@ public class tradePairProcess extends Thread {
         app = application;
         symbol = pair;
         client = rclient;
-        isInitialized = false;
         profitsChecker = rprofitsChecker;
         strategiesController = new StrategiesController(symbol, app, profitsChecker);
         setBarInterval("1m");
@@ -136,6 +137,7 @@ public class tradePairProcess extends Thread {
     }
     
     private void doEnter(BigDecimal curPrice) {
+        isTriedBuy = true;
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
@@ -196,6 +198,7 @@ public class tradePairProcess extends Thread {
                     is_hodling = false;
                     orderToCancelOnSellUp.clear();
                     isTryingToSellUp = false;
+                    last_trade_profit = incomeWithoutComissionPercent;
                     lastOrderMillis = System.currentTimeMillis();
                     if (limitOrderId == 0) {
                         strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
@@ -937,7 +940,21 @@ public class tradePairProcess extends Thread {
         return isInitialized;
     }
     
+    /**
+     * @return the isTriedBuy
+     */
+    public boolean isTriedBuy() {
+        return isTriedBuy;
+    }
+    
     public boolean isInLimitOrder() {
         return limitOrderId>0;
+    }
+
+    /**
+     * @return the last_trade_profit
+     */
+    public BigDecimal getLastTradeProfit() {
+        return last_trade_profit;
     }
 }
