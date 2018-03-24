@@ -60,7 +60,8 @@ public class CoinRatingController extends Thread {
     
     private final mainApplication app;
     private tradePairProcessController paircontroller;
-    TradingAPIAbstractInterface client = null;
+    private SignalController signalcontroller = null;
+    private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
     
     private StrategiesController strategiesController = null;
@@ -95,6 +96,7 @@ public class CoinRatingController extends Thread {
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
         strategiesController.setMainStrategy("No strategy");
+        signalcontroller = new SignalController();
     }
 
     private void checkFromTop() {
@@ -594,6 +596,8 @@ public class CoinRatingController extends Thread {
 
         doWait(1000);
 
+        signalcontroller.startSignalsProcess();
+        
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
             if ((Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) > 0.00001 && !balance.getAsset().equals("BNB")) {
@@ -627,6 +631,8 @@ public class CoinRatingController extends Thread {
             doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
         }
         
+        signalcontroller.stopSignalsProcess();
+        
         if (orderEvent != null) {
             try {
                 orderEvent.close();
@@ -659,8 +665,16 @@ public class CoinRatingController extends Thread {
 
     void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
+        signalcontroller.setClient(client);
     }
 
+    /**
+     * @return the signalcontroller
+     */
+    public SignalController getSignalController() {
+        return signalcontroller;
+    }
+    
     /**
      * @return the lowHold
      */
@@ -709,7 +723,7 @@ public class CoinRatingController extends Thread {
     public CoinRatingSort getSortby() {
         return sortby;
     }
-
+    
     /**
      * @param sortby the sortby to set
      */

@@ -8,32 +8,14 @@ package com.evgcompany.binntrdbot;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
 import java.awt.Toolkit;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Semaphore;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.prefs.Preferences;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JSpinner;
-import javax.swing.JTextField;
 import javax.swing.text.DefaultCaret;
-import org.apache.commons.exec.CommandLine;
-import org.apache.commons.exec.DaemonExecutor;
-import org.apache.commons.exec.DefaultExecuteResultHandler;
-import org.apache.commons.exec.DefaultExecutor;
-import org.apache.commons.exec.ExecuteResultHandler;
-import org.apache.commons.exec.LogOutputStream;
-import org.apache.commons.exec.PumpStreamHandler;
-import org.apache.commons.exec.environment.EnvironmentUtils;
 
 /**
  *
@@ -45,40 +27,17 @@ public class mainApplication extends javax.swing.JFrame {
     
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
+    private final ComponentsConfigController config = new ComponentsConfigController(this);
     private final tradeProfitsController profitsChecker = new tradeProfitsController(this);
     private final tradePairProcessController pairController = new tradePairProcessController(this, profitsChecker);
     private final CoinRatingController coinRatingController = new CoinRatingController(this, pairController);
     
     private boolean is_paused = false;
-    Preferences prefs = null;
     
     private static volatile mainApplication instance = null;
     
     public static mainApplication getInstance() {
         return instance;
-    }
-    
-    private void componentPrefLoad(JComponent cb, String name) {
-        if (cb instanceof JCheckBox) {
-            ((JCheckBox)cb).setSelected("true".equals(prefs.get(name, ((JCheckBox)cb).isSelected() ? "true" : "false")));
-        } else if (cb instanceof JTextField) {
-            ((JTextField)cb).setText(prefs.get(name, ((JTextField)cb).getText()));
-        } else if (cb instanceof JSpinner) {
-            ((JSpinner)cb).setValue(Integer.parseInt(prefs.get(name, ((Integer) ((JSpinner)cb).getValue()).toString())));
-        } else if (cb instanceof JComboBox) {
-            ((JComboBox<String>)cb).setSelectedIndex(Integer.parseInt(prefs.get(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString())));
-        }
-    }
-    private void componentPrefSave(JComponent cb, String name) {
-        if (cb instanceof JCheckBox) {
-            prefs.put(name, ((JCheckBox)cb).isSelected() ? "true" : "false");
-        } else if (cb instanceof JTextField) {
-            prefs.put(name, ((JTextField)cb).getText());
-        } else if (cb instanceof JSpinner) {
-            prefs.put(name, ((JSpinner)cb).getValue().toString());
-        } else if (cb instanceof JComboBox) {
-            prefs.put(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString());
-        }
     }
     
     public void systemSound() {
@@ -106,37 +65,36 @@ public class mainApplication extends javax.swing.JFrame {
             ComboBoxMainStrategy.addItem(strategy_name);
         });
         
-        prefs = Preferences.userNodeForPackage(this.getClass());
-        setBounds(
-            Integer.parseInt(prefs.get("window_pos_x", String.valueOf(Math.round(getBounds().getX())))),
-            Integer.parseInt(prefs.get("window_pos_y", String.valueOf(Math.round(getBounds().getY())))),
-            Integer.parseInt(prefs.get("window_size_x", String.valueOf(Math.round(getBounds().getWidth())))),
-            Integer.parseInt(prefs.get("window_size_y", String.valueOf(Math.round(getBounds().getHeight()))))
-        );
-        componentPrefLoad(textFieldApiKey, "api_key");
-        componentPrefLoad(textFieldApiSecret, "api_secret");
-        componentPrefLoad(textFieldTradePairs, "trade_pairs");
-        componentPrefLoad(checkboxTestMode, "test_mode");
-        componentPrefLoad(checkBoxLowHold, "low_hold");
-        componentPrefLoad(checkboxAutoOrder, "auto_order");
-        componentPrefLoad(checkboxAutoFastorder, "auto_fastorder");
-        componentPrefLoad(checkBoxAutoAnalyzer, "auto_anal");
-        componentPrefLoad(checkBoxLimitedOrders, "limited_orders");
-        componentPrefLoad(checkBoxCheckOtherStrategies, "strategies_add_check");
-        componentPrefLoad(spinnerUpdateDelay, "update_delay");
-        componentPrefLoad(spinnerBuyPercent, "buy_percent");
-        componentPrefLoad(comboBoxBarsInterval, "bars");
-        componentPrefLoad(comboBoxBarsCount, "bars_queries_index");
-        componentPrefLoad(ComboBoxMainStrategy, "main_strategy");
-        componentPrefLoad(checkBoxStopGain, "use_stop_gain");
-        componentPrefLoad(checkBoxStopLoss, "use_stop_loss");
-        componentPrefLoad(spinnerStopGain, "stop_gain");
-        componentPrefLoad(spinnerStopLoss, "stop_loss");
-        componentPrefLoad(checkBoxBuyStopLimited, "use_buy_stop_limited_timeout");
-        componentPrefLoad(spinnerBuyStopLimited, "buy_stop_limited_timeout");
-        componentPrefLoad(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
-        componentPrefLoad(spinnerSellStopLimited, "sell_stop_limited_timeout");
-        componentPrefLoad(comboBoxLimitedMode, "limited_mode");
+        config.addComponent(instance, "window");
+        config.addComponent(textFieldApiKey, "api_key");
+        config.addComponent(textFieldApiSecret, "api_secret");
+        config.addComponent(textFieldTradePairs, "trade_pairs");
+        config.addComponent(checkboxTestMode, "test_mode");
+        config.addComponent(checkBoxLowHold, "low_hold");
+        config.addComponent(checkboxAutoOrder, "auto_order");
+        config.addComponent(checkboxAutoFastorder, "auto_fastorder");
+        config.addComponent(checkBoxAutoAnalyzer, "auto_anal");
+        config.addComponent(checkBoxLimitedOrders, "limited_orders");
+        config.addComponent(checkBoxCheckOtherStrategies, "strategies_add_check");
+        config.addComponent(spinnerUpdateDelay, "update_delay");
+        config.addComponent(spinnerBuyPercent, "buy_percent");
+        config.addComponent(comboBoxBarsInterval, "bars");
+        config.addComponent(comboBoxBarsCount, "bars_queries_index");
+        config.addComponent(ComboBoxMainStrategy, "main_strategy");
+        config.addComponent(checkBoxStopGain, "use_stop_gain");
+        config.addComponent(checkBoxStopLoss, "use_stop_loss");
+        config.addComponent(spinnerStopGain, "stop_gain");
+        config.addComponent(spinnerStopLoss, "stop_loss");
+        config.addComponent(checkBoxBuyStopLimited, "use_buy_stop_limited_timeout");
+        config.addComponent(spinnerBuyStopLimited, "buy_stop_limited_timeout");
+        config.addComponent(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
+        config.addComponent(spinnerSellStopLimited, "sell_stop_limited_timeout");
+        config.addComponent(comboBoxLimitedMode, "limited_mode");
+        config.addComponent(textFieldAPIID, "signals_api_id");
+        config.addComponent(textFieldAPIHash, "signals_api_hash");
+        config.addComponent(textFieldPhone, "signals_api_phone");
+        config.addComponent(comboBoxSignalsOrder, "signals_order");
+        config.Load();
     }
     
     public void log(String txt) {
@@ -283,10 +241,11 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel17 = new javax.swing.JLabel();
         jLabel18 = new javax.swing.JLabel();
         textFieldAPIHash = new javax.swing.JTextField();
-        jScrollPane7 = new javax.swing.JScrollPane();
-        jTextArea2 = new javax.swing.JTextArea();
-        jLabel19 = new javax.swing.JLabel();
         buttonTlgConnect = new javax.swing.JButton();
+        jLabel20 = new javax.swing.JLabel();
+        textFieldPhone = new javax.swing.JTextField();
+        comboBoxSignalsOrder = new javax.swing.JComboBox<>();
+        jLabel19 = new javax.swing.JLabel();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -769,42 +728,53 @@ public class mainApplication extends javax.swing.JFrame {
 
         jLabel18.setText("API Hash:");
 
-        jTextArea2.setColumns(20);
-        jTextArea2.setRows(5);
-        jScrollPane7.setViewportView(jTextArea2);
-
-        jLabel19.setText("Channel signals:");
-
-        buttonTlgConnect.setText("Connect");
+        buttonTlgConnect.setText("Test");
         buttonTlgConnect.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 buttonTlgConnectActionPerformed(evt);
             }
         });
 
+        jLabel20.setText("Phone:");
+
+        textFieldPhone.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                textFieldPhoneActionPerformed(evt);
+            }
+        });
+
+        comboBoxSignalsOrder.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "No order", "Buy instantly", "Add to pairs" }));
+
+        jLabel19.setText("Auto order:");
+
         javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel5Layout.createSequentialGroup()
-                .addContainerGap()
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(textFieldAPIID)
+                        .addGap(10, 10, 10)
+                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel17)
-                            .addComponent(jLabel18)
-                            .addComponent(textFieldAPIHash, javax.swing.GroupLayout.DEFAULT_SIZE, 170, Short.MAX_VALUE))
+                            .addComponent(textFieldAPIID, javax.swing.GroupLayout.PREFERRED_SIZE, 124, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jScrollPane7, javax.swing.GroupLayout.DEFAULT_SIZE, 294, Short.MAX_VALUE)
+                            .addComponent(jLabel18)
+                            .addComponent(textFieldAPIHash, javax.swing.GroupLayout.PREFERRED_SIZE, 124, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(jPanel5Layout.createSequentialGroup()
-                                .addComponent(jLabel19)
-                                .addGap(0, 0, Short.MAX_VALUE))))
+                                .addComponent(textFieldPhone, javax.swing.GroupLayout.PREFERRED_SIZE, 123, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(buttonTlgConnect))
+                            .addComponent(jLabel20)))
                     .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addComponent(buttonTlgConnect)
-                        .addGap(0, 0, Short.MAX_VALUE)))
-                .addContainerGap())
+                        .addContainerGap()
+                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(comboBoxSignalsOrder, javax.swing.GroupLayout.PREFERRED_SIZE, 132, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel19))))
+                .addContainerGap(38, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -812,19 +782,19 @@ public class mainApplication extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel17)
-                    .addComponent(jLabel19))
-                .addGap(7, 7, 7)
-                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addComponent(textFieldAPIID, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(jLabel18)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(textFieldAPIHash, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addComponent(jScrollPane7))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(buttonTlgConnect)
-                .addContainerGap(67, Short.MAX_VALUE))
+                    .addComponent(jLabel18)
+                    .addComponent(jLabel20))
+                .addGap(6, 6, 6)
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(textFieldAPIID, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(textFieldAPIHash, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(textFieldPhone, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(buttonTlgConnect))
+                .addGap(18, 18, 18)
+                .addComponent(jLabel19)
+                .addGap(6, 6, 6)
+                .addComponent(comboBoxSignalsOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(87, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
@@ -1070,7 +1040,7 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addGap(9, 9, 9)
                                 .addComponent(jLabel7)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 269, Short.MAX_VALUE)))
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE)))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonClear)
@@ -1097,7 +1067,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jLabel10)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 128, Short.MAX_VALUE)
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 165, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonBuy)
@@ -1314,34 +1284,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkboxAutoOrderStateChanged
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
-        prefs.put("window_pos_x", String.valueOf(Math.round(getBounds().getX())));
-        prefs.put("window_pos_y", String.valueOf(Math.round(getBounds().getY())));
-        prefs.put("window_size_x", String.valueOf(Math.round(getBounds().getWidth())));
-        prefs.put("window_size_y", String.valueOf(Math.round(getBounds().getHeight())));
-        componentPrefSave(textFieldApiKey, "api_key");
-        componentPrefSave(textFieldApiSecret, "api_secret");
-        componentPrefSave(textFieldTradePairs, "trade_pairs");
-        componentPrefSave(checkboxTestMode, "test_mode");
-        componentPrefSave(checkBoxLowHold, "low_hold");
-        componentPrefSave(checkboxAutoOrder, "auto_order");
-        componentPrefSave(checkboxAutoFastorder, "auto_fastorder");
-        componentPrefSave(checkBoxAutoAnalyzer, "auto_anal");
-        componentPrefSave(checkBoxLimitedOrders, "limited_orders");
-        componentPrefSave(checkBoxCheckOtherStrategies, "strategies_add_check");
-        componentPrefSave(spinnerUpdateDelay, "update_delay");
-        componentPrefSave(spinnerBuyPercent, "buy_percent");
-        componentPrefSave(comboBoxBarsInterval, "bars");
-        componentPrefSave(comboBoxBarsCount, "bars_queries_index");
-        componentPrefSave(ComboBoxMainStrategy, "main_strategy");
-        componentPrefSave(checkBoxStopGain, "use_stop_gain");
-        componentPrefSave(checkBoxStopLoss, "use_stop_loss");
-        componentPrefSave(spinnerStopGain, "stop_gain");
-        componentPrefSave(spinnerStopLoss, "stop_loss");
-        componentPrefSave(checkBoxBuyStopLimited, "use_buy_stop_limited_timeout");
-        componentPrefSave(spinnerBuyStopLimited, "buy_stop_limited_timeout");
-        componentPrefSave(checkBoxSellStopLimited, "use_sell_stop_limited_timeout");
-        componentPrefSave(spinnerSellStopLimited, "sell_stop_limited_timeout");
-        componentPrefSave(comboBoxLimitedMode, "limited_mode");
+        config.Save();
     }//GEN-LAST:event_formWindowClosing
 
     private void checkBoxStopLossStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxStopLossStateChanged
@@ -1395,6 +1338,9 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setProgressBar(progressBarRatingAnalPercent);
         comboBoxRatingSortActionPerformed(null);
         comboBoxRatingSortbyActionPerformed(null);
+        coinRatingController.getSignalController().setApiId(textFieldAPIID.getText());
+        coinRatingController.getSignalController().setApiHash(textFieldAPIHash.getText());
+        coinRatingController.getSignalController().setApiPhone(textFieldPhone.getText());
         coinRatingController.start();
         buttonRatingStart.setEnabled(false);
         buttonRatingCheck.setEnabled(true);
@@ -1448,51 +1394,17 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkboxAutoFastorderActionPerformed
 
     private void buttonTlgConnectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonTlgConnectActionPerformed
-        execAsync("D:\\Progs\\Python\\python.exe C:\\Users\\EVG_adm_T\\Documents\\NetBeansProjects\\binnTrdbot\\TGsignalsListener.py");
+        SignalController ccc = new SignalController();
+        ccc.setApiId(textFieldAPIID.getText());
+        ccc.setApiHash(textFieldAPIHash.getText());
+        ccc.setApiPhone(textFieldPhone.getText());
+        ccc.startSignalsProcess(true);
     }//GEN-LAST:event_buttonTlgConnectActionPerformed
 
-    public void execAsync(String cmd) {
-        
-        
-        try {
-            ProcessExecutor.runProcess(CommandLine.parse(cmd), new ProcessExecutorHandler() {
-                @Override
-                public void onStandardOutput(String msg) {
-                    System.out.println("output msg = " + msg);
-                }
-                
-                @Override
-                public void onStandardError(String msg) {
-                    System.out.println("error msg = " + msg);
-                }
-            }, 100);
-        } catch (IOException ex) {
-            System.out.println("error");
-        }
-        
+    private void textFieldPhoneActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_textFieldPhoneActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_textFieldPhoneActionPerformed
 
-        
-        /*
-        CommandLine commandline = CommandLine.parse(cmd);
-        log("executing async command: " + commandline);
-        DaemonExecutor exec = new DaemonExecutor();
-        DefaultExecuteResultHandler handler = new DefaultExecuteResultHandler();
-        LogOutputStream logStream = new LogOutputStream(0) {
-            @Override
-            protected void processLine(String line, int logLevel) {
-                log("processLine: " + line);
-            }
-        };
-        PumpStreamHandler streamHandler = new PumpStreamHandler(logStream);
-        streamHandler.setStopTimeout(0);
-        exec.setStreamHandler(streamHandler);
-        try {
-            exec.execute(commandline, handler);
-        } catch (IOException e) {
-            log("An error occured while executing shell command: " + commandline);
-        }*/
-    }
-    
     /**
      * @param args the command line arguments
      */
@@ -1565,6 +1477,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JComboBox<String> comboBoxLimitedMode;
     private javax.swing.JComboBox<String> comboBoxRatingSort;
     private javax.swing.JComboBox<String> comboBoxRatingSortby;
+    private javax.swing.JComboBox<String> comboBoxSignalsOrder;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
@@ -1577,6 +1490,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel18;
     private javax.swing.JLabel jLabel19;
     private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel jLabel20;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -1595,10 +1509,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
-    private javax.swing.JScrollPane jScrollPane7;
     private javax.swing.JTabbedPane jTabbedPane2;
     private javax.swing.JTextArea jTextArea1;
-    private javax.swing.JTextArea jTextArea2;
     private javax.swing.JList<String> listCurrencies;
     private javax.swing.JList<String> listProfit;
     private javax.swing.JList<String> listRating;
@@ -1617,6 +1529,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JTextField textFieldAPIID;
     private javax.swing.JTextField textFieldApiKey;
     private javax.swing.JTextField textFieldApiSecret;
+    private javax.swing.JTextField textFieldPhone;
     private javax.swing.JTextField textFieldTradePairs;
     // End of variables declaration//GEN-END:variables
 

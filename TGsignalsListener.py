@@ -12,43 +12,63 @@ from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.extensions import markdown
 
 class RegBlock(object):
-    def __init__(self, name):
-        self.name = name
+    def __init__(self):
+        self.name = ''
+        self.rating = 0
         self.reg_has = None
         self.reg_skip = None
         self.reg_coin = None
+        self.reg_coin2 = None
         self.reg_price_from = None
         self.reg_price_to = None
         self.reg_price_target = None
 
+def enable_win_unicode_console():
+    if sys.version_info >= (3, 6):
+        return
+    import win_unicode_console
+    win_unicode_console.enable() 
+
 def getFirstMatch(regex, txt):
-    matches = re.finditer(regex, txt, re.UNICODE | re.IGNORECASE)
-    for matchNum, match in enumerate(matches):
-        for groupNum in range(0, len(match.groups())):
-            return match.group(1)
+    if regex:
+        matches = re.finditer(regex, txt, re.UNICODE | re.IGNORECASE | re.MULTILINE)
+        for matchNum, match in enumerate(matches):
+            for groupNum in range(0, len(match.groups())):
+                return match.group(1)
     return ''
+
+def numFix(txt):
+    if txt and txt.find('k')>=0:
+        num = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
+        num = num * 1000
+        txt = str(num)
+    return txt
 
 def textCheck(txt, date, client):
     if (txt is None) or (txt == ''):
         return
 
     global signal_expr
+
     non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
     txt = txt.translate(non_bmp_map)
+    #print(txt)
+    #print("_________________")
 
     i = 0
     while i < len(signal_expr):
         hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
         skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
         if hasmatch and not skipmatch:
-            #print(txt)
             coin = getFirstMatch(signal_expr[i].reg_coin, txt)
-            price_from = getFirstMatch(signal_expr[i].reg_price_from, txt)
-            price_to = getFirstMatch(signal_expr[i].reg_price_to, txt)
-            price_target = getFirstMatch(signal_expr[i].reg_price_target, txt)
-            print(date + ";" + coin + ";" + price_from + ";" + price_to + ";" + price_target)
+            coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt)
+            price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
+            price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
+            price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
+            print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
+            return
         i = i + 1
-    
+
     return
 
 def checkCurchan(channame, client):
@@ -64,7 +84,7 @@ def checkCurchan(channame, client):
         response = client.invoke(ResolveUsernameRequest(channame))
         channel_id = response.peer.channel_id
 
-    for msg in client.get_messages(channel_id, limit=10):
+    for msg in client.get_messages(channel_id, limit=50):
         if (msg != '') and not (msg is None):
             if not hasattr(msg, 'text'):
                 msg.text = None
@@ -77,32 +97,44 @@ def checkCurchan(channame, client):
     return channel_id
 
 def main():
-    #sys.argv[1]
+    if not sys.argv[1] or not sys.argv[2] or not sys.argv[3]:
+        return
+    enable_win_unicode_console()
 
     global signal_expr
     signal_expr = []
 
-    config = configparser.ConfigParser()
+    config = configparser.RawConfigParser()
     config.read('signals_listener.ini')
     session_name = config['main']['session_fname']
-    api_id = config['main']['api_id']
-    api_hash = config['main']['api_hash']
-    phone = config['main']['phone_number']
+    api_id = sys.argv[1]
+    api_hash = sys.argv[2]
+    phone = sys.argv[3]
 
     chancount = int(config['channels']['count'])
     channames = []
 
     chan_index = 1
+    cname = ''
+    last_cname = ''
     while chan_index <= chancount:
-        cname = config['channels']['name' + str(chan_index)]
-        channames.append(cname)
-        expr_b = RegBlock(cname)
-        expr_b.reg_has = config['channels']['signal_has_' + str(chan_index)]
-        expr_b.reg_skip = config['channels']['signal_skip_' + str(chan_index)]
-        expr_b.reg_coin = config['channels']['signal_coin_' + str(chan_index)]
-        expr_b.reg_price_from = config['channels']['signal_price_from_' + str(chan_index)]
-        expr_b.reg_price_to = config['channels']['signal_price_to_' + str(chan_index)]
-        expr_b.reg_price_target = config['channels']['signal_price_target_' + str(chan_index)]
+        if cname:
+            last_cname = cname
+        cname = config['channel_' + str(chan_index)]['name']
+        expr_b = RegBlock()
+        if cname:
+            channames.append(cname)
+            expr_b.name = cname
+        else:
+            expr_b.name = last_cname
+        expr_b.rating = int(config['channel_' + str(chan_index)]['signal_rating'])
+        expr_b.reg_has = config['channel_' + str(chan_index)]['signal_has']
+        expr_b.reg_skip = config['channel_' + str(chan_index)]['signal_skip']
+        expr_b.reg_coin = config['channel_' + str(chan_index)]['signal_coin']
+        expr_b.reg_coin2 = config['channel_' + str(chan_index)]['signal_coin2']
+        expr_b.reg_price_from = config['channel_' + str(chan_index)]['signal_price_from']
+        expr_b.reg_price_to = config['channel_' + str(chan_index)]['signal_price_to']
+        expr_b.reg_price_target = config['channel_' + str(chan_index)]['signal_price_target']
         signal_expr.append(expr_b)
         chan_index = chan_index + 1
 
@@ -125,23 +157,24 @@ def main():
 
     if not client.is_user_authorized():
         client.send_code_request(phone)
-        client.sign_in(phone, input('Enter the code ('+phone+'): '))
+        print('Enter the code ('+phone+'): ')
+        code = input()
+        client.sign_in(phone, code)
 
     print(client.session.server_address)   # Successfull
 
     chan_index = 0
     while chan_index < len(channames):
+        print(channames[chan_index])
         channames[chan_index] = checkCurchan(channames[chan_index], client)
         time.sleep(1)
         chan_index = chan_index + 1
-
-    print("Channels: " + str(channames))
 
     @client.on(events.NewMessage(chats=channames, incoming=True))
     def normal_handler(event):
         textCheck(event.text, str(event.date), client)
 
-    print('Listening for new messages...')
+    print('------------------')
 
     while True:
         time.sleep(0.1)
