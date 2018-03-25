@@ -964,7 +964,7 @@
             </Component>
             <Component class="javax.swing.JCheckBox" name="checkBoxAutoAnalyzer">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Auto analyzer"/>
+                <Property name="text" type="java.lang.String" value="Analyzer"/>
               </Properties>
             </Component>
             <Component class="javax.swing.JSpinner" name="spinnerScanRatingDelayTime">
@@ -1016,10 +1016,15 @@
           <Layout>
             <DimensionLayout dim="0">
               <Group type="103" groupAlignment="0" attributes="0">
-                  <Group type="102" attributes="0">
+                  <Group type="102" alignment="0" attributes="0">
+                      <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="102" attributes="0">
-                              <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
+                              <Component id="checkboxAutoSignalOrder" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                              <Component id="checkboxAutoSignalFastorder" min="-2" max="-2" attributes="0"/>
+                          </Group>
+                          <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="jLabel17" min="-2" max="-2" attributes="0"/>
                                   <Component id="textFieldAPIID" min="-2" pref="124" max="-2" attributes="0"/>
@@ -1037,13 +1042,6 @@
                                       <Component id="buttonTlgConnect" min="-2" max="-2" attributes="0"/>
                                   </Group>
                                   <Component id="jLabel20" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                          </Group>
-                          <Group type="102" alignment="0" attributes="0">
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="comboBoxSignalsOrder" alignment="0" min="-2" pref="132" max="-2" attributes="0"/>
-                                  <Component id="jLabel19" min="-2" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                       </Group>
@@ -1068,10 +1066,11 @@
                           <Component id="buttonTlgConnect" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace type="separate" max="-2" attributes="0"/>
-                      <Component id="jLabel19" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
-                      <Component id="comboBoxSignalsOrder" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace pref="87" max="32767" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="checkboxAutoSignalOrder" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="checkboxAutoSignalFastorder" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace pref="104" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1105,28 +1104,22 @@
               </Properties>
             </Component>
             <Component class="javax.swing.JTextField" name="textFieldPhone">
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="checkboxAutoSignalOrder">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Auto order"/>
+              </Properties>
               <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="textFieldPhoneActionPerformed"/>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkboxAutoSignalOrderActionPerformed"/>
               </Events>
             </Component>
-            <Component class="javax.swing.JComboBox" name="comboBoxSignalsOrder">
+            <Component class="javax.swing.JCheckBox" name="checkboxAutoSignalFastorder">
               <Properties>
-                <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-                  <StringArray count="3">
-                    <StringItem index="0" value="No order"/>
-                    <StringItem index="1" value="Buy instantly"/>
-                    <StringItem index="2" value="Add to pairs"/>
-                  </StringArray>
-                </Property>
+                <Property name="text" type="java.lang.String" value="Fast auto order"/>
               </Properties>
-              <AuxValues>
-                <AuxValue name="JavaCodeGenerator_TypeParameters" type="java.lang.String" value="&lt;String&gt;"/>
-              </AuxValues>
-            </Component>
-            <Component class="javax.swing.JLabel" name="jLabel19">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Auto order:"/>
-              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkboxAutoSignalFastorderActionPerformed"/>
+              </Events>
             </Component>
           </SubComponents>
         </Container>
@@ -1211,7 +1204,7 @@
     <Component class="javax.swing.JComboBox" name="comboBoxRatingSortby">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="12">
+          <StringArray count="13">
             <StringItem index="0" value="Rank"/>
             <StringItem index="1" value="Market cap"/>
             <StringItem index="2" value="% from prog start"/>
@@ -1223,7 +1216,8 @@
             <StringItem index="8" value="Strategies to enter value"/>
             <StringItem index="9" value="Strategies to exit value"/>
             <StringItem index="10" value="Strategies value"/>
-            <StringItem index="11" value="Calculated rating"/>
+            <StringItem index="11" value="Signals rating"/>
+            <StringItem index="12" value="Calculated rating"/>
           </StringArray>
         </Property>
       </Properties>

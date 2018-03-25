@@ -29,7 +29,6 @@ import com.binance.api.client.domain.market.TickerPrice;
 import com.binance.api.client.domain.market.TickerStatistics;
 import java.io.Closeable;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -48,9 +47,7 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
 
     private BinanceApiClientFactory factory = null;
     private BinanceApiRestClient client = null;
-    
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
-    
+
     public TradingAPIBinance(String secret, String key) {
         super(secret, key);
     }
@@ -163,15 +160,15 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         NewOrderResponse newOrderResponse = null;
         if (is_buy) {
             if (is_market) {
-                newOrderResponse = client.newOrder(marketBuy(pair, df8.format(amount).replace(".","").replace(",",".")));
+                newOrderResponse = client.newOrder(marketBuy(pair, format_num(amount)));
             } else {
-                newOrderResponse = client.newOrder(limitBuy(pair, TimeInForce.GTC, df8.format(amount).replace(".","").replace(",","."), df8.format(price).replace(".","").replace(",",".")));
+                newOrderResponse = client.newOrder(limitBuy(pair, TimeInForce.GTC, format_num(amount), format_num(price)));
             }
         } else {
             if (is_market) {
-                newOrderResponse = client.newOrder(marketSell(pair, df8.format(amount).replace(".","").replace(",",".")));
+                newOrderResponse = client.newOrder(marketSell(pair, format_num(amount)));
             } else {
-                newOrderResponse = client.newOrder(limitSell(pair, TimeInForce.GTC, df8.format(amount).replace(".","").replace(",","."), df8.format(price).replace(".","").replace(",",".")));
+                newOrderResponse = client.newOrder(limitSell(pair, TimeInForce.GTC, format_num(amount), format_num(price)));
             }
         }
         return (newOrderResponse != null && newOrderResponse.getOrderId()>0) ? newOrderResponse.getOrderId() : -1;

@@ -12,15 +12,13 @@ import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.RateLimit;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
-import com.evgcompany.binntrdbot.tradePairProcess;
 import java.io.Closeable;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.ta4j.core.Bar;
 import org.ta4j.core.TimeSeries;
 
@@ -29,7 +27,9 @@ import org.ta4j.core.TimeSeries;
  * @author EVG_adm_T
  */
 public abstract class TradingAPIAbstractInterface {
+    
     String secret, key;
+    private static final DecimalFormat df8 = new DecimalFormat("0.########");
     
     public TradingAPIAbstractInterface(String secret, String key) {
         this.secret = secret;
@@ -38,6 +38,10 @@ public abstract class TradingAPIAbstractInterface {
     
     abstract public boolean connect();
     abstract public boolean disconnect();
+    
+    protected String format_num(BigDecimal num) {
+        return df8.format(num).replace(".","").replace(",",".").replace(" ","");
+    }
     
     public long getServerTime() {
         return System.currentTimeMillis();

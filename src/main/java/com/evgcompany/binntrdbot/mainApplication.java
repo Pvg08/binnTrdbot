@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
+import com.evgcompany.binntrdbot.signal.SignalController;
 import java.awt.Toolkit;
 import java.math.BigDecimal;
 import java.text.Format;
@@ -93,7 +94,8 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(textFieldAPIID, "signals_api_id");
         config.addComponent(textFieldAPIHash, "signals_api_hash");
         config.addComponent(textFieldPhone, "signals_api_phone");
-        config.addComponent(comboBoxSignalsOrder, "signals_order");
+        config.addComponent(checkboxAutoSignalOrder, "auto_signals_order");
+        config.addComponent(checkboxAutoSignalFastorder, "auto_signals_fast_order");
         config.Load();
     }
     
@@ -244,8 +246,8 @@ public class mainApplication extends javax.swing.JFrame {
         buttonTlgConnect = new javax.swing.JButton();
         jLabel20 = new javax.swing.JLabel();
         textFieldPhone = new javax.swing.JTextField();
-        comboBoxSignalsOrder = new javax.swing.JComboBox<>();
-        jLabel19 = new javax.swing.JLabel();
+        checkboxAutoSignalOrder = new javax.swing.JCheckBox();
+        checkboxAutoSignalFastorder = new javax.swing.JCheckBox();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -658,7 +660,7 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        checkBoxAutoAnalyzer.setText("Auto analyzer");
+        checkBoxAutoAnalyzer.setText("Analyzer");
 
         spinnerScanRatingDelayTime.setValue(2);
         spinnerScanRatingDelayTime.addChangeListener(new javax.swing.event.ChangeListener() {
@@ -737,24 +739,32 @@ public class mainApplication extends javax.swing.JFrame {
 
         jLabel20.setText("Phone:");
 
-        textFieldPhone.addActionListener(new java.awt.event.ActionListener() {
+        checkboxAutoSignalOrder.setText("Auto order");
+        checkboxAutoSignalOrder.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                textFieldPhoneActionPerformed(evt);
+                checkboxAutoSignalOrderActionPerformed(evt);
             }
         });
 
-        comboBoxSignalsOrder.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "No order", "Buy instantly", "Add to pairs" }));
-
-        jLabel19.setText("Auto order:");
+        checkboxAutoSignalFastorder.setText("Fast auto order");
+        checkboxAutoSignalFastorder.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkboxAutoSignalFastorderActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel5Layout.createSequentialGroup()
+                .addGap(10, 10, 10)
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addGap(10, 10, 10)
+                        .addComponent(checkboxAutoSignalOrder)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(checkboxAutoSignalFastorder))
+                    .addGroup(jPanel5Layout.createSequentialGroup()
                         .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel17)
                             .addComponent(textFieldAPIID, javax.swing.GroupLayout.PREFERRED_SIZE, 124, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -768,12 +778,7 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addComponent(textFieldPhone, javax.swing.GroupLayout.PREFERRED_SIZE, 123, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(buttonTlgConnect))
-                            .addComponent(jLabel20)))
-                    .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(comboBoxSignalsOrder, javax.swing.GroupLayout.PREFERRED_SIZE, 132, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jLabel19))))
+                            .addComponent(jLabel20))))
                 .addContainerGap(38, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
@@ -791,10 +796,10 @@ public class mainApplication extends javax.swing.JFrame {
                     .addComponent(textFieldPhone, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(buttonTlgConnect))
                 .addGap(18, 18, 18)
-                .addComponent(jLabel19)
-                .addGap(6, 6, 6)
-                .addComponent(comboBoxSignalsOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(87, Short.MAX_VALUE))
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(checkboxAutoSignalOrder)
+                    .addComponent(checkboxAutoSignalFastorder))
+                .addContainerGap(104, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
@@ -845,7 +850,7 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "% from prog start", "% last hour", "% 24hr", "Events count", "Last event anno date", "Volatility", "Strategies to enter value", "Strategies to exit value", "Strategies value", "Calculated rating" }));
+        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "% from prog start", "% last hour", "% 24hr", "Events count", "Last event anno date", "Volatility", "Strategies to enter value", "Strategies to exit value", "Strategies value", "Signals rating", "Calculated rating" }));
         comboBoxRatingSortby.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxRatingSortbyActionPerformed(evt);
@@ -1322,9 +1327,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_comboBoxLimitedModeActionPerformed
 
     private void checkboxAutoOrderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoOrderActionPerformed
-        if (coinRatingController != null) {
-            coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
-        }
+        coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
     }//GEN-LAST:event_checkboxAutoOrderActionPerformed
 
     private void buttonRatingStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRatingStartActionPerformed
@@ -1332,6 +1335,8 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setLowHold(checkBoxLowHold.isSelected());
         coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
         coinRatingController.setAutoFastOrder(checkboxAutoFastorder.isSelected());
+        coinRatingController.setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
+        coinRatingController.setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
         coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
         coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
         coinRatingController.setUpdateTime((Integer) spinnerScanRatingUpdateTime.getValue());
@@ -1401,9 +1406,13 @@ public class mainApplication extends javax.swing.JFrame {
         ccc.startSignalsProcess(true);
     }//GEN-LAST:event_buttonTlgConnectActionPerformed
 
-    private void textFieldPhoneActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_textFieldPhoneActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_textFieldPhoneActionPerformed
+    private void checkboxAutoSignalOrderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoSignalOrderActionPerformed
+        coinRatingController.setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
+    }//GEN-LAST:event_checkboxAutoSignalOrderActionPerformed
+
+    private void checkboxAutoSignalFastorderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoSignalFastorderActionPerformed
+        coinRatingController.setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
+    }//GEN-LAST:event_checkboxAutoSignalFastorderActionPerformed
 
     /**
      * @param args the command line arguments
@@ -1471,13 +1480,14 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkBoxStopLoss;
     private javax.swing.JCheckBox checkboxAutoFastorder;
     private javax.swing.JCheckBox checkboxAutoOrder;
+    private javax.swing.JCheckBox checkboxAutoSignalFastorder;
+    private javax.swing.JCheckBox checkboxAutoSignalOrder;
     private javax.swing.JCheckBox checkboxTestMode;
     private javax.swing.JComboBox<String> comboBoxBarsCount;
     private javax.swing.JComboBox<String> comboBoxBarsInterval;
     private javax.swing.JComboBox<String> comboBoxLimitedMode;
     private javax.swing.JComboBox<String> comboBoxRatingSort;
     private javax.swing.JComboBox<String> comboBoxRatingSortby;
-    private javax.swing.JComboBox<String> comboBoxSignalsOrder;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
@@ -1488,7 +1498,6 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel16;
     private javax.swing.JLabel jLabel17;
     private javax.swing.JLabel jLabel18;
-    private javax.swing.JLabel jLabel19;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel20;
     private javax.swing.JLabel jLabel3;

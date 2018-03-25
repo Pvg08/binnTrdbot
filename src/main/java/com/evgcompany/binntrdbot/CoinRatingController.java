@@ -9,6 +9,7 @@ import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.signal.SignalController;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -55,11 +56,12 @@ public class CoinRatingController extends Thread {
         CR_STRATEGIES_SHOULD_ENTER,
         CR_STRATEGIES_SHOULD_EXIT,
         CR_STRATEGIES_DIRECTION,
+        CR_SIGNALS_RATING,
         CR_CALCULATED_RATING
     }
     
     private final mainApplication app;
-    private tradePairProcessController paircontroller;
+    private final tradePairProcessController paircontroller;
     private SignalController signalcontroller = null;
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
@@ -68,6 +70,10 @@ public class CoinRatingController extends Thread {
     private boolean lowHold = true;
     private boolean autoOrder = true;
     private boolean autoFastOrder = false;
+
+    private boolean autoSignalOrder = false;
+    private boolean autoSignalFastOrder = false;
+
     private boolean analyzer = false;
     private CoinRatingSort sortby = CoinRatingSort.CR_RANK;
     private boolean sortAsc = true;
@@ -130,6 +136,7 @@ public class CoinRatingController extends Thread {
     }
     
     private void updatePair(CoinRatingPairLogItem curr) {
+        System.out.println("Update pair: " + curr.symbol);
         curr.update_counter++;
         List<Bar> bars_h = client.getBars(curr.symbol, "5m");
         List<Bar> bars_d = client.getBars(curr.symbol, "2h", 13, System.currentTimeMillis() - 24*60*60*1000, System.currentTimeMillis() + 100000);
@@ -177,6 +184,7 @@ public class CoinRatingController extends Thread {
         strategiesController.resetStrategies();
         curr.strategies_shouldenter_cnt = strategiesController.getStrategiesEnterActive(6);
         curr.strategies_shouldexit_cnt = strategiesController.getStrategiesExitActive(6);
+        curr.signal_rating = (float) signalcontroller.getPairSignalRating(curr.symbol);
         curr.calculateRating();
         curr.last_rating_update_millis = System.currentTimeMillis();
     }
@@ -373,6 +381,9 @@ public class CoinRatingController extends Thread {
                 case CR_EVENTS_COUNT:
                     entry.getValue().sort = (float) entry.getValue().events_count;
                     break;
+                case CR_SIGNALS_RATING:
+                    entry.getValue().sort = (float) entry.getValue().signal_rating;
+                    break;
                 case CR_CALCULATED_RATING:
                     entry.getValue().sort = (float) entry.getValue().rating;
                     break;
@@ -421,6 +432,9 @@ public class CoinRatingController extends Thread {
                     case CR_EVENTS_COUNT:
                         text += curr.events_count;
                         break;
+                    case CR_SIGNALS_RATING:
+                        text += df3.format(curr.signal_rating);
+                        break;
                     case CR_CALCULATED_RATING:
                         text += df3.format(curr.rating);
                         break;
@@ -457,6 +471,73 @@ public class CoinRatingController extends Thread {
         }
     }
 
+    private void signalOrderEnter(String pair) {
+        if (autoSignalOrder && entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
+            if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
+                enterMillis = System.currentTimeMillis();
+                entered = heroesMap.get(pair);
+                if (entered != null) {
+                    if (autoSignalFastOrder) {
+                        app.log("Trying to auto fast-enter signal with pair: " + pair);
+                        entered.pair = paircontroller.addPairFastRun(pair);
+                    } else {
+                        app.log("Trying to auto enter signal with pair: " + pair);
+                        entered.pair = paircontroller.addPair(pair);
+                    }
+                    doWait(1000);
+                }
+            }
+        }
+    }
+    
+    private void baseOrderEnter(String pair) {
+        if (autoOrder && entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
+            if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
+                enterMillis = System.currentTimeMillis();
+                entered = heroesMap.get(pair);
+                if (entered != null) {
+                    if (autoFastOrder) {
+                        app.log("Trying to auto fast-enter with pair: " + pair);
+                        entered.pair = paircontroller.addPairFastRun(pair);
+                    } else {
+                        app.log("Trying to auto enter with pair: " + pair);
+                        entered.pair = paircontroller.addPair(pair);
+                    }
+                    doWait(1000);
+                }
+            }
+        }
+    }
+    
+    private void checkOrderExit() {
+        if (entered != null) {
+            if (
+                    (
+                        entered.pair.isInitialized() && 
+                        !entered.pair.isTriedBuy() && 
+                        (System.currentTimeMillis() - enterMillis) > 10 * 60 * 1000 // max wait time = 10min
+                    ) ||
+                    (
+                        entered.pair.isInitialized() && 
+                        entered.pair.isTriedBuy() && 
+                        !entered.pair.isHodling() && 
+                        !entered.pair.isInLimitOrder()
+                    ) ||
+                    (
+                        entered.pair.isInitialized() &&
+                        !entered.pair.isAlive()
+                    )
+            ) {
+                paircontroller.removePair(entered.pair.getSymbol());
+                if (entered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0) {
+                    entered.fastbuy_skip = true;
+                }
+                entered.pair = null;
+                entered = null;
+            }
+        }
+    }
+    
     private void checkFastEnter() {
         if (entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
             String pairMax = "";
@@ -482,41 +563,9 @@ public class CoinRatingController extends Thread {
                     }
                 }
             }
-            if (!pairMax.isEmpty() && !paircontroller.hasPair(pairMax)) {
-                enterMillis = System.currentTimeMillis();
-                entered = heroesMap.get(pairMax);
-                if (entered != null) {
-                    if (autoFastOrder) {
-                        app.log("Trying to auto fast-enter with pair: " + pairMax);
-                        entered.pair = paircontroller.addPairFastRun(pairMax);
-                    } else {
-                        app.log("Trying to auto enter with pair: " + pairMax);
-                        entered.pair = paircontroller.addPair(pairMax);
-                    }
-                    doWait(1000);
-                }
-            }
-        } else if (entered != null) {
-            if (
-                    (
-                        entered.pair.isInitialized() && 
-                        !entered.pair.isTriedBuy() && 
-                        (System.currentTimeMillis() - enterMillis) > 10 * 60 * 1000 // max wait time = 10min
-                    ) ||
-                    (
-                        entered.pair.isInitialized() && 
-                        entered.pair.isTriedBuy() && 
-                        !entered.pair.isHodling() && 
-                        !entered.pair.isInLimitOrder()
-                    )
-            ) {
-                paircontroller.removePair(entered.pair.getSymbol());
-                if (entered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0) {
-                    entered.fastbuy_skip = true;
-                }
-                entered.pair = null;
-                entered = null;
-            }
+            baseOrderEnter(pairMax);
+        } else {
+            checkOrderExit();
         }
     }
 
@@ -596,8 +645,6 @@ public class CoinRatingController extends Thread {
 
         doWait(1000);
 
-        signalcontroller.startSignalsProcess();
-        
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
             if ((Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) > 0.00001 && !balance.getAsset().equals("BNB")) {
@@ -606,6 +653,22 @@ public class CoinRatingController extends Thread {
         });
         String coinsPattern = String.join("|", accountCoins);
 
+        updateCurrentPrices(coinsPattern);
+        
+        signalcontroller.setSignalEvent((item, rating) -> {
+            if (heroesMap.containsKey(item.getPair())) {
+                heroesMap.get(item.getPair()).signal_rating = (float) rating;
+                updateList();
+                if (!item.isDone() && !item.isTimeout() && item.getMillisFromSignalStart() < 120 * 1000) {
+                    signalOrderEnter(item.getPair());
+                }
+            }
+        });
+        signalcontroller.startSignalsProcess();
+        while (!need_stop && !signalcontroller.isInitialSignalsLoaded()) {
+            doWait(1000);
+        }
+        
         orderEvent = client.OnOrderEvent(null, event -> {
             app.log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
             app.systemSound();
@@ -780,5 +843,33 @@ public class CoinRatingController extends Thread {
      */
     public void setAutoFastOrder(boolean autoFastOrder) {
         this.autoFastOrder = autoFastOrder;
+    }
+
+    /**
+     * @return the autoSignalOrder
+     */
+    public boolean isAutoSignalOrder() {
+        return autoSignalOrder;
+    }
+
+    /**
+     * @param autoSignalOrder the autoSignalOrder to set
+     */
+    public void setAutoSignalOrder(boolean autoSignalOrder) {
+        this.autoSignalOrder = autoSignalOrder;
+    }
+
+    /**
+     * @return the autoSignalFastOrder
+     */
+    public boolean isAutoSignalFastOrder() {
+        return autoSignalFastOrder;
+    }
+
+    /**
+     * @param autoSignalFastOrder the autoSignalFastOrder to set
+     */
+    public void setAutoSignalFastOrder(boolean autoSignalFastOrder) {
+        this.autoSignalFastOrder = autoSignalFastOrder;
     }
 }

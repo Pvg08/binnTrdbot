@@ -30,6 +30,8 @@ public class CoinRatingPairLogItem {
     Float hour_volume = 0f;
     Float day_volume = 0f;
     Float volatility = 0f;
+    
+    Float signal_rating = 0f;
 
     boolean do_remove_flag = false;
     boolean fastbuy_skip = false;
@@ -79,5 +81,6 @@ public class CoinRatingPairLogItem {
         if (hour_volume > 0.25 * day_volume) {
             rating++;
         }
+        rating += signal_rating * 1.5;
     }
 }
