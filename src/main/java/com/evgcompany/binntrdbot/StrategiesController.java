@@ -23,6 +23,9 @@ import org.ta4j.core.indicators.helpers.*;
 import org.ta4j.core.indicators.ichimoku.*;
 import org.ta4j.core.indicators.keltner.*;
 import org.ta4j.core.indicators.statistics.*;
+import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
+import org.ta4j.core.indicators.volume.MVWAPIndicator;
+import org.ta4j.core.indicators.volume.VWAPIndicator;
 import org.ta4j.core.trading.rules.*;
 
 /**
@@ -180,7 +183,53 @@ public class StrategiesController {
         
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
-    
+
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildChaikinMoneyFlowStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        ChaikinMoneyFlowIndicator cmf = new ChaikinMoneyFlowIndicator(series, 7);
+        RSIIndicator rsi = new RSIIndicator(closePrice, 4);
+
+        Rule entryRule = new CrossedDownIndicatorRule(cmf, Decimal.valueOf(0.05))
+                .and(new UnderIndicatorRule(rsi, Decimal.valueOf(50)));
+        
+        // Exit rule
+        Rule exitRule = new CrossedUpIndicatorRule(cmf, Decimal.valueOf(-0.05))
+                .and(new OverIndicatorRule(rsi, Decimal.valueOf(50)));
+        
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
+    }
+
+    /**
+     * @param series a time series
+     * @return a strategy
+     */
+    private Strategy buildVWAPSimpleStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        VWAPIndicator vwap = new VWAPIndicator(series, 10);
+        MVWAPIndicator mvwap = new MVWAPIndicator(vwap, 3);
+
+        Rule entryRule = new CrossedUpIndicatorRule(mvwap, closePrice)
+                .and(new OverIndicatorRule(closePrice, openPrice));
+        
+        Rule exitRule = new CrossedDownIndicatorRule(mvwap, closePrice)
+                .and(new UnderIndicatorRule(closePrice, openPrice));
+        
+        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
+    }
+
     /**
      * @param series a time series
      * @return a strategy
@@ -963,6 +1012,8 @@ public class StrategiesController {
         strategiesI.put("Bollinger2", s -> buildBollinger2Strategy(s));
         strategiesI.put("Keltner Channel", s -> buildKeltnerChannelStrategy(s));
         strategiesI.put("Bearish Engulfing EMA", s -> buildBearishEngulfingEMAStrategy(s));
+        strategiesI.put("Chaikin Money Flow", s -> buildChaikinMoneyFlowStrategy(s));
+        strategiesI.put("VWAP Simple", s -> buildVWAPSimpleStrategy(s));
         strategiesI.put("My WIP Strategy", s -> buildMyMainStrategy(s));
         return strategiesI;
     }
