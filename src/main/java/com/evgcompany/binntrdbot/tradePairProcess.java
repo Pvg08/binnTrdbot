@@ -17,6 +17,7 @@ import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.exception.BinanceApiException;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.strategies.StrategyItem;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -702,7 +703,8 @@ public class tradePairProcess extends Thread {
     }
     
     public void doShowPlot() {
-        plot = new CurrencyPlot(symbol, series, barSeconds);
+        StrategyItem item = strategiesController.getMainStrategyItem();
+        plot = new CurrencyPlot(symbol, series, item != null ? item.getInitializer() : null);
         for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
             plot.addMarker(strategiesController.getStrategyMarkers().get(i).label, strategiesController.getStrategyMarkers().get(i).timeStamp, strategiesController.getStrategyMarkers().get(i).typeIndex);
         }

@@ -59,10 +59,7 @@ public class mainApplication extends javax.swing.JFrame {
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
         listRating.setModel(coinRatingController.getListHeroesModel());
         
-        StrategiesController scontroller = new StrategiesController();
-        List<String> s_items = new ArrayList<>(scontroller.getStrategiesInitializerMap().keySet());
-        java.util.Collections.sort(s_items);
-        s_items.forEach((strategy_name)->{
+        new StrategiesController().getStrategiesNames().forEach((strategy_name)->{
             ComboBoxMainStrategy.addItem(strategy_name);
         });
         

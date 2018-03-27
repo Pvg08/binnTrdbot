@@ -56,6 +56,15 @@ public class SignalController extends Thread {
         signalsListenerFile = "TGsignalsListener.py";
     }
     
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        if (signalsProcess != null && signalsProcess.getProcess().isAlive()) {
+            signalsProcess.getProcess().destroy();
+            signalsProcess = null;
+        }
+    }
+    
     private void doWait(long ms) {
         try {
             Thread.sleep(ms);
@@ -88,12 +97,14 @@ public class SignalController extends Thread {
                 .redirectOutput(new LogOutputStream() {
                     @Override
                     protected void processLine(String line) {
+                        System.out.println(line);
                         newlines.addLast(line);
                     }
                 })
                 .redirectError(new LogOutputStream() {
                     @Override
                     protected void processLine(String line) {
+                        System.out.println(line);
                         mainApplication.getInstance().log("Error: " + line);
                     }
                 })

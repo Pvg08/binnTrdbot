@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.analysis.*;
+import com.evgcompany.binntrdbot.strategies.*;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.stream.Collectors;
 import org.ta4j.core.*;
 import org.ta4j.core.analysis.criteria.*;
 import org.ta4j.core.indicators.*;
@@ -52,7 +54,9 @@ public class StrategiesController {
     private tradeProfitsController profitsChecker = null;
     private TimeSeries series = null;
     HashMap<String, Strategy> strategies = new HashMap<>();
+    List<StrategyItem> strategy_items = new ArrayList<>();
     private String mainStrategy = "Auto";
+    private int strategyItemIndex = -1;
     private int barSeconds;
     private String groupName;
     private final List<StrategyMarker> markers = new ArrayList<>();
@@ -85,6 +89,10 @@ public class StrategiesController {
     
     public List<StrategyMarker> getStrategyMarkers() {
         return markers;
+    }
+    
+    public tradeProfitsController getProfitsChecker() {
+        return profitsChecker;
     }
     
     /**
@@ -126,559 +134,6 @@ public class StrategiesController {
     public TimeSeries resetSeries() {
         series = new BaseTimeSeries(groupName + "_SERIES");
         return series;
-    }
-    
-    /**
-     * @param series a time series
-     * @return a dummy strategy
-     */
-    private Strategy buildNoStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-        return new BaseStrategy(
-            new BooleanRule(false),
-            addStopLossGain(new BooleanRule(false), series)
-        );
-    }
-    
-    /**
-     * @param series a time series
-     * @return a dummy strategy
-     */
-    private Strategy buildSMAStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator sma = new SMAIndicator(closePrice, 12);
-
-        // Signals
-        // Buy when SMA goes over close price
-        // Sell when close price goes over SMA
-        return new BaseStrategy(
-                new OverIndicatorRule(sma, closePrice),
-                addStopLossGain(new UnderIndicatorRule(sma, closePrice), series)
-        );
-    }
-
-    /**
-     * @param series a time series
-     * @return a dummy strategy
-     */
-    private Strategy buildBearishEngulfingEMAStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        EMAIndicator ema_long = new EMAIndicator(closePrice, 21);
-        EMAIndicator ema_short = new EMAIndicator(closePrice, 9);
-
-        Rule entryRule = new CrossedUpIndicatorRule(ema_short, ema_long);
-        
-        // Exit rule
-        Rule exitRule = new BooleanIndicatorRule(new BearishEngulfingIndicator(series));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildChaikinMoneyFlowStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        ChaikinMoneyFlowIndicator cmf = new ChaikinMoneyFlowIndicator(series, 7);
-        RSIIndicator rsi = new RSIIndicator(closePrice, 4);
-
-        Rule entryRule = new CrossedDownIndicatorRule(cmf, Decimal.valueOf(0.05))
-                .and(new UnderIndicatorRule(rsi, Decimal.valueOf(50)));
-        
-        // Exit rule
-        Rule exitRule = new CrossedUpIndicatorRule(cmf, Decimal.valueOf(-0.05))
-                .and(new OverIndicatorRule(rsi, Decimal.valueOf(50)));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildVWAPSimpleStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        VWAPIndicator vwap = new VWAPIndicator(series, 10);
-        MVWAPIndicator mvwap = new MVWAPIndicator(vwap, 3);
-
-        Rule entryRule = new CrossedUpIndicatorRule(mvwap, closePrice)
-                .and(new OverIndicatorRule(closePrice, openPrice));
-        
-        Rule exitRule = new CrossedDownIndicatorRule(mvwap, closePrice)
-                .and(new UnderIndicatorRule(closePrice, openPrice));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildThreeSoldiersStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ThreeWhiteSoldiersIndicator tws = new ThreeWhiteSoldiersIndicator(series, 2, Decimal.valueOf(5));
-        ThreeBlackCrowsIndicator tbc = new ThreeBlackCrowsIndicator(series, 1, Decimal.valueOf(1));
-
-        return new BaseStrategy(
-            new BooleanIndicatorRule(tws),
-            addStopLossGain(new BooleanIndicatorRule(tbc), series)
-        );
-    }
-    
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildKAMAStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        KAMAIndicator kama2 = new KAMAIndicator(closePrice, 10, 2, 30);
-        KAMAIndicator kama5 = new KAMAIndicator(closePrice, 10, 5, 30);
-        
-        // Entry rule
-        Rule entryRule = new UnderIndicatorRule(kama5, kama2)
-                .and(new CrossedUpIndicatorRule(kama2, closePrice));
-        
-        // Exit rule
-        Rule exitRule = new OverIndicatorRule(kama5, kama2)
-                .and(new CrossedDownIndicatorRule(kama2, closePrice));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildBollingerStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        MinPriceIndicator minPrice = new MinPriceIndicator(series);
-        MaxPriceIndicator maxPrice = new MaxPriceIndicator(series);
-        RSIIndicator rsi = new RSIIndicator(closePrice, 2);
-        
-        EMAIndicator avg14 = new EMAIndicator(closePrice, 14);
-        StandardDeviationIndicator sd14 = new StandardDeviationIndicator(closePrice, 14);
-        
-        BollingerBandsMiddleIndicator bollingerM = new BollingerBandsMiddleIndicator(avg14);
-        BollingerBandsLowerIndicator bollingerL = new BollingerBandsLowerIndicator(bollingerM, sd14);
-        BollingerBandsUpperIndicator bollingerU = new BollingerBandsUpperIndicator(bollingerM, sd14);
-        
-        // Entry rule
-        Rule entryRule = new CrossedDownIndicatorRule(bollingerL, minPrice)
-                .and(new InPipeRule(rsi, Decimal.valueOf(55), Decimal.valueOf(0)))
-                .and(new IsRisingRule(rsi, 1));
-                
-                /*new UnderIndicatorRule(bollingerL, closePrice)
-                .and(new OverIndicatorRule(bollingerM, closePrice))
-            .and(new InPipeRule(rsi, Decimal.valueOf(55), Decimal.valueOf(25)))
-            .and(new IsRisingRule(rsi, 2))
-            .and(
-                    new InPipeRule(new PreviousValueIndicator(bollingerU, 1), new PreviousValueIndicator(maxPrice, 1), new PreviousValueIndicator(minPrice, 1))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 2), new PreviousValueIndicator(maxPrice, 2), new PreviousValueIndicator(minPrice, 2)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 3), new PreviousValueIndicator(maxPrice, 3), new PreviousValueIndicator(minPrice, 3)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 4), new PreviousValueIndicator(maxPrice, 4), new PreviousValueIndicator(minPrice, 4)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 5), new PreviousValueIndicator(maxPrice, 5), new PreviousValueIndicator(minPrice, 5)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 6), new PreviousValueIndicator(maxPrice, 6), new PreviousValueIndicator(minPrice, 6)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 7), new PreviousValueIndicator(maxPrice, 7), new PreviousValueIndicator(minPrice, 7)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 8), new PreviousValueIndicator(maxPrice, 8), new PreviousValueIndicator(minPrice, 8)))
-                .or(new InPipeRule(new PreviousValueIndicator(bollingerU, 9), new PreviousValueIndicator(maxPrice, 9), new PreviousValueIndicator(minPrice, 9)))
-            );*/
-        
-        // Exit rule
-        Rule exitRule = new CrossedUpIndicatorRule(bollingerU, maxPrice) 
-                .and(new InPipeRule(rsi, Decimal.valueOf(100), Decimal.valueOf(45)))
-                .and(new IsFallingRule(rsi, 1));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildBollinger2Strategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        
-        EMAIndicator avg14 = new EMAIndicator(closePrice, 14);
-        StandardDeviationIndicator sd14 = new StandardDeviationIndicator(closePrice, 14);
-        
-        BollingerBandsMiddleIndicator bollingerM = new BollingerBandsMiddleIndicator(avg14);
-        BollingerBandsLowerIndicator BBB = new BollingerBandsLowerIndicator(bollingerM, sd14, Decimal.TWO);
-        BollingerBandsUpperIndicator BBT = new BollingerBandsUpperIndicator(bollingerM, sd14, Decimal.TWO);
-        
-        Rule entryRule = new OverIndicatorRule(closePrice, BBB)
-                .and(new UnderIndicatorRule(new PreviousValueIndicator(closePrice, 1), new PreviousValueIndicator(BBB, 1)));
-        
-        Rule exitRule = new UnderIndicatorRule(closePrice, BBT)
-                .and(new OverIndicatorRule(new PreviousValueIndicator(closePrice, 1), new PreviousValueIndicator(BBT, 1)));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildCMOStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        
-        CMOIndicator cmo = new CMOIndicator(closePrice, 50);
-        
-        Rule entryRule = new UnderIndicatorRule(cmo, Decimal.valueOf(-10));
-        
-        Rule exitRule = new OverIndicatorRule(cmo, Decimal.valueOf(10));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a strategy
-     */
-    private Strategy buildKeltnerChannelStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        MACDIndicator macd = new MACDIndicator(closePrice, 9, 15);
-        
-        KeltnerChannelMiddleIndicator keltnerM = new KeltnerChannelMiddleIndicator(closePrice, 20);
-        KeltnerChannelLowerIndicator keltnerL = new KeltnerChannelLowerIndicator(keltnerM, Decimal.valueOf(1.5), 20);
-        KeltnerChannelUpperIndicator keltnerU = new KeltnerChannelUpperIndicator(keltnerM, Decimal.valueOf(1.5), 20);
-        
-        // Entry rule
-        Rule entryRule = new UnderIndicatorRule(keltnerL, closePrice)
-                .and(new UnderIndicatorRule(new PreviousValueIndicator(keltnerL, 1), new PreviousValueIndicator(closePrice, 1)))
-                .and(new OverIndicatorRule(keltnerM, closePrice))
-                .and(new IsRisingRule(macd, 2));
-        
-        // Exit rule
-        Rule exitRule = new OverIndicatorRule(keltnerU, closePrice)
-                .and(new OverIndicatorRule(new PreviousValueIndicator(keltnerU, 1), new PreviousValueIndicator(closePrice, 1)))
-                .and(new UnderIndicatorRule(keltnerM, closePrice))
-                .and(new IsFallingRule(macd, 2));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a AdvancedEMA strategy
-     */
-    private Strategy buildAdvancedEMAStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        EMAIndicator ema_y = new EMAIndicator(closePrice, 55);
-        EMAIndicator ema_1 = new EMAIndicator(closePrice, 21);
-        EMAIndicator ema_2 = new EMAIndicator(closePrice, 13);
-        EMAIndicator ema_3 = new EMAIndicator(closePrice, 8);
-        
-        // Entry rule
-        Rule entryRule = new UnderIndicatorRule(ema_y, ema_1)
-                .and(new UnderIndicatorRule(ema_y, ema_2))
-                .and(new UnderIndicatorRule(ema_y, ema_3));
-        
-        // Exit rule
-        Rule exitRule = new OverIndicatorRule(ema_y, ema_1)
-                .and(new OverIndicatorRule(ema_y, ema_2))
-                .and(new OverIndicatorRule(ema_y, ema_3));
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    
-    /**
-     * @param series a time series
-     * @return a Ichimoku strategy
-     */
-    private Strategy buildIchimokuStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
-        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
-        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
-        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
-        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
-        
-        // Entry rule
-        Rule entryRule = new CrossedDownIndicatorRule(kijunSen, tenkanSen);
-        
-        // Exit rule
-        Rule exitRule = new CrossedUpIndicatorRule(kijunSen, tenkanSen);
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a Ichimoku strategy
-     */
-    private Strategy buildIchimoku2Strategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
-        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
-        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
-        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
-        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
-        
-        // Entry rule
-        Rule entryRule = new CrossedDownIndicatorRule(closePrice, kijunSen);
-        
-        // Exit rule
-        Rule exitRule = new CrossedUpIndicatorRule(closePrice, kijunSen);
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a Ichimoku strategy
-     */
-    private Strategy buildIchimoku3Strategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
-        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
-        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
-        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
-        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
-        
-        // Entry rule
-        Rule entryRule = new CrossedDownIndicatorRule(closePrice, senkouSpanB);
-        
-        // Exit rule
-        Rule exitRule = new CrossedUpIndicatorRule(closePrice, senkouSpanB);
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a dummy strategy
-     */
-    private Strategy buildMyMainStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        // http://www.tradingsystemlab.com/files/The%20Fisher%20Transform.pdf
-        // FisherIndicator fisher = new FisherIndicator(series);
-
-        // https://alanhull.com/hull-moving-average
-        // HMAIndicator hma = new HMAIndicator(new ClosePriceIndicator(series), 9);
-        
-        // http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:aroon
-        // AroonUpIndicator arronUp = new AroonUpIndicator(series, 5);
-
-        //OpenPriceIndicator openPriceIndicator = new OpenPriceIndicator(series);
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        
-        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
-        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
-        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
-        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
-        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
-        
-        EMAIndicator shortEma = new EMAIndicator(closePrice, 5);
-        EMAIndicator longEma = new EMAIndicator(closePrice, 20);
-
-        RSIIndicator rsi = new RSIIndicator(closePrice, 2);
-        SMAIndicator sma = new SMAIndicator(closePrice, 12);
-        MACDIndicator macd = new MACDIndicator(closePrice, 9, 15);
-
-        Rule entryRule = new CrossedDownIndicatorRule(closePrice, kijunSen)
-                //new OverIndicatorRule(shortEma, longEma)
-                //.and(new OverIndicatorRule(shortEma, closePrice))
-                //.and(new OverIndicatorRule(sma, closePrice))
-                //.and(new IsRisingRule(macd, 2))
-                .and(new UnderIndicatorRule(rsi, new ConstantIndicator(Decimal.valueOf(90))))
-                ;
-
-        Rule exitRule = new CrossedUpIndicatorRule(closePrice, kijunSen)
-                //new UnderIndicatorRule(shortEma, longEma)
-                //.and(new UnderIndicatorRule(shortEma, closePrice))
-                //.and(new UnderIndicatorRule(sma, closePrice))
-                //.and(new IsFallingRule(macd, 2))
-                .and(new OverIndicatorRule(rsi, new ConstantIndicator(Decimal.valueOf(10))))
-                ;
-
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a moving momentum strategy
-     */
-    private Strategy buildMovingMomentumStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        
-        // The bias is bullish when the shorter-moving average moves above the longer moving average.
-        // The bias is bearish when the shorter-moving average moves below the longer moving average.
-        EMAIndicator shortEma = new EMAIndicator(closePrice, 9);
-        EMAIndicator longEma = new EMAIndicator(closePrice, 26);
-
-        StochasticOscillatorKIndicator stochasticOscillK = new StochasticOscillatorKIndicator(series, 14);
-
-        MACDIndicator macd = new MACDIndicator(closePrice, 9, 26);
-        EMAIndicator emaMacd = new EMAIndicator(macd, 18);
-        
-        // Entry rule
-        Rule entryRule = new OverIndicatorRule(shortEma, longEma) // Trend
-                .and(new CrossedDownIndicatorRule(stochasticOscillK, Decimal.valueOf(20))) // Signal 1
-                .and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
-        
-        // Exit rule
-        Rule exitRule = new UnderIndicatorRule(shortEma, longEma) // Trend
-                .and(new CrossedUpIndicatorRule(stochasticOscillK, Decimal.valueOf(80))) // Signal 1
-                .and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-    }
-
-    /**
-     * @param series a time series
-     * @return a CCI correction strategy
-     */
-    private Strategy buildCCICorrectionStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        CCIIndicator longCci = new CCIIndicator(series, 200);
-        CCIIndicator shortCci = new CCIIndicator(series, 5);
-        Decimal plus100 = Decimal.HUNDRED;
-        Decimal minus100 = Decimal.valueOf(-100);
-        
-        Rule entryRule = new OverIndicatorRule(longCci, plus100) // Bull trend
-                .and(new UnderIndicatorRule(shortCci, minus100)); // Signal
-        
-        Rule exitRule = new UnderIndicatorRule(longCci, minus100) // Bear trend
-                .and(new OverIndicatorRule(shortCci, plus100)); // Signal
-        
-        Strategy strategy = new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
-        strategy.setUnstablePeriod(5);
-        return strategy;
-    }
-    
-    /**
-     * @param series a time series
-     * @return a global extrema strategy
-     */
-    private Strategy buildGlobalExtremaStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        int bars_per_day = Math.round(60f * (60f / barSeconds) * 24f);
-        
-        ClosePriceIndicator closePrices = new ClosePriceIndicator(series);
-
-        // Getting the max price over the past day
-        MaxPriceIndicator maxPrices = new MaxPriceIndicator(series);
-        HighestValueIndicator dayMaxPrice = new HighestValueIndicator(maxPrices, bars_per_day);
-        // Getting the min price over the past day
-        MinPriceIndicator minPrices = new MinPriceIndicator(series);
-        LowestValueIndicator dayMinPrice = new LowestValueIndicator(minPrices, bars_per_day);
-
-        // Going long if the close price goes below the min price
-        MultiplierIndicator downDay = new MultiplierIndicator(dayMinPrice, Decimal.valueOf("1.005"));
-        Rule buyingRule = new UnderIndicatorRule(closePrices, downDay);
-
-        // Going short if the close price goes above the max price
-        MultiplierIndicator upDay = new MultiplierIndicator(dayMaxPrice, Decimal.valueOf("0.995"));
-        Rule sellingRule = new OverIndicatorRule(closePrices, upDay);
-
-        return new BaseStrategy(buyingRule, addStopLossGain(sellingRule, series));
-    }
-    
-    /**
-     * @param series a time series
-     * @return a 2-period RSI strategy
-     */
-    private Strategy buildRSI2Strategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator shortSma = new SMAIndicator(closePrice, 5);
-        SMAIndicator longSma = new SMAIndicator(closePrice, 200);
-
-        // We use a 2-period RSI indicator to identify buying
-        // or selling opportunities within the bigger trend.
-        RSIIndicator rsi = new RSIIndicator(closePrice, 2);
-        
-        // Entry rule
-        // The long-term trend is up when a security is above its 200-period SMA.
-        Rule entryRule = new OverIndicatorRule(shortSma, longSma) // Trend
-                .and(new CrossedDownIndicatorRule(rsi, Decimal.valueOf(5))) // Signal 1
-                .and(new OverIndicatorRule(shortSma, closePrice)); // Signal 2
-        
-        // Exit rule
-        // The long-term trend is down when a security is below its 200-period SMA.
-        Rule exitRule = new UnderIndicatorRule(shortSma, longSma) // Trend
-                .and(new CrossedUpIndicatorRule(rsi, Decimal.valueOf(95))) // Signal 1
-                .and(new UnderIndicatorRule(shortSma, closePrice)); // Signal 2
-        
-        // TODO: Finalize the strategy
-        
-        return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
     
     private Rule addStopLossGain(Rule rule, TimeSeries series) {
@@ -743,11 +198,10 @@ public class StrategiesController {
     public void resetStrategies() {
         markers.clear();
         strategies.clear();
-        HashMap<String, StrategyInitializer> strategies_init = getStrategiesInitializerMap();
-        strategies_init.entrySet().forEach((entry) -> {
-            strategies.put(entry.getKey(), entry.getValue().onInit(series));
+        getStrategiesInitializerMap();
+        strategy_items.forEach((entry) -> {
+            strategies.put(entry.getStrategyName(), entry.buildStrategy(series));
         });
-        strategies_init.clear();
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
             if (app != null) app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
@@ -758,7 +212,12 @@ public class StrategiesController {
             mainStrategy = keysAsArray.get(r.nextInt(keysAsArray.size()));
             if (app != null) app.log("Strategy for " + groupName + " is not found. Using random = " + mainStrategy, true, false);
         }
-
+        strategyItemIndex = -1;
+        for(int i=0; i < strategy_items.size(); i++) {
+            if (strategy_items.get(i).getStrategyName().equals(mainStrategy)) {
+                strategyItemIndex = i;
+            }
+        }
         logStatistics(true);
     }
     
@@ -992,34 +451,43 @@ public class StrategiesController {
         return StrategiesAction.DO_NOTHING;
     }
 
-    public HashMap<String, StrategyInitializer> getStrategiesInitializerMap() {
-        HashMap<String, StrategyInitializer> strategiesI = new HashMap<>();
-        strategiesI.put("No strategy", s -> buildNoStrategy(s));
-        strategiesI.put("Neural Network", s -> buildNoStrategy(s)); // @todo
-        strategiesI.put("Three Soldiers", s -> buildThreeSoldiersStrategy(s));
-        strategiesI.put("MovingMomentum", s -> buildMovingMomentumStrategy(s));
-        strategiesI.put("CCICorrection", s -> buildCCICorrectionStrategy(s));
-        strategiesI.put("RSI2", s -> buildRSI2Strategy(s));
-        strategiesI.put("GlobalExtrema", s -> buildGlobalExtremaStrategy(s));
-        strategiesI.put("SMA", s -> buildSMAStrategy(s));
-        strategiesI.put("Advanced EMA", s -> buildAdvancedEMAStrategy(s));
-        strategiesI.put("Ichimoku", s -> buildIchimokuStrategy(s));
-        strategiesI.put("Ichimoku2", s -> buildIchimoku2Strategy(s));
-        strategiesI.put("Ichimoku3", s -> buildIchimoku3Strategy(s));
-        strategiesI.put("KAMA", s -> buildKAMAStrategy(s));
-        strategiesI.put("CMO", s -> buildCMOStrategy(s));
-        strategiesI.put("Bollinger", s -> buildBollingerStrategy(s));
-        strategiesI.put("Bollinger2", s -> buildBollinger2Strategy(s));
-        strategiesI.put("Keltner Channel", s -> buildKeltnerChannelStrategy(s));
-        strategiesI.put("Bearish Engulfing EMA", s -> buildBearishEngulfingEMAStrategy(s));
-        strategiesI.put("Chaikin Money Flow", s -> buildChaikinMoneyFlowStrategy(s));
-        strategiesI.put("VWAP Simple", s -> buildVWAPSimpleStrategy(s));
-        strategiesI.put("My WIP Strategy", s -> buildMyMainStrategy(s));
-        return strategiesI;
+    public StrategyItem getMainStrategyItem() {
+        return strategyItemIndex>=0 ? strategy_items.get(strategyItemIndex) : null;
     }
     
+    public List<StrategyItem> getStrategiesInitializerMap() {
+        strategy_items.add(new StrategyNo(this));
+        strategy_items.add(new StrategyNeuralNetwork(this));  // @todo
+        strategy_items.add(new StrategySMA(this));
+        strategy_items.add(new StrategyThreeSoldiers(this));
+        strategy_items.add(new StrategyMovingMomentum(this));
+        strategy_items.add(new StrategyCCICorrection(this));
+        strategy_items.add(new StrategyGlobalExtrema(this));
+        strategy_items.add(new StrategyAdvancedEMA(this));
+        strategy_items.add(new StrategyRSI2(this));
+        strategy_items.add(new StrategyCMO(this));
+        strategy_items.add(new StrategyKAMA(this));
+        strategy_items.add(new StrategyKeltnerChannel(this));
+        strategy_items.add(new StrategyBearishEngulfingEMA(this));
+        strategy_items.add(new StrategyChaikinMoneyFlow(this));
+        strategy_items.add(new StrategyVWAP(this));
+        strategy_items.add(new StrategyWIP(this));
+        strategy_items.add(new StrategyIchimoku(this, 1));
+        strategy_items.add(new StrategyIchimoku(this, 2));
+        strategy_items.add(new StrategyIchimoku(this, 3));
+        strategy_items.add(new StrategyBollinger(this, 1));
+        strategy_items.add(new StrategyBollinger(this, 2));
+        strategy_items.add(new StrategyBollinger(this, 3));
+        return strategy_items;
+    }
+
     public List<String> getStrategiesNames() {
-        return new ArrayList<>(strategies.keySet());
+        if (strategy_items.isEmpty()) {
+            getStrategiesInitializerMap();
+        }
+        return strategy_items.stream().map((item) -> {
+            return item.getStrategyName();
+        }).collect(Collectors.toList());
     }
 
     /**
