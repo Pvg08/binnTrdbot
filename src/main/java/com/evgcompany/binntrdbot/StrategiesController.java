@@ -478,6 +478,7 @@ public class StrategiesController {
         strategy_items.add(new StrategyBollinger(this, 1));
         strategy_items.add(new StrategyBollinger(this, 2));
         strategy_items.add(new StrategyBollinger(this, 3));
+        strategy_items.add(new StrategyFractalBreakout(this));
         return strategy_items;
     }
 

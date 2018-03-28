@@ -65,8 +65,39 @@ def textCheck(txt, date, client):
             price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
             price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
             price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
-            return
+            if coin and (price_from or price_to) and price_target:
+                print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
+                return
+        i = i + 1
+
+    i = 0
+    while i < len(signal_expr):
+        hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
+        skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
+        if hasmatch and not skipmatch:
+            coin = getFirstMatch(signal_expr[i].reg_coin, txt)
+            coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt)
+            price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
+            price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
+            price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
+            if coin and price_target:
+                print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
+                return
+        i = i + 1
+
+    i = 0
+    while i < len(signal_expr):
+        hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
+        skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
+        if hasmatch and not skipmatch:
+            coin = getFirstMatch(signal_expr[i].reg_coin, txt)
+            coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt)
+            price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
+            price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
+            price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
+            if coin:
+                print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
+                return
         i = i + 1
 
     return
@@ -94,7 +125,7 @@ def checkCurchan(channame, client):
                 msg.text = msg.message
             textCheck(msg.text, str(msg.date), client)
 
-    return channel_id
+    return client.get_input_entity(channel_id)
 
 def main():
     if not sys.argv[1] or not sys.argv[2] or not sys.argv[3]:
@@ -172,7 +203,7 @@ def main():
 
     @client.on(events.NewMessage(chats=channames, incoming=True))
     def normal_handler(event):
-        textCheck(event.text, str(event.date), client)
+        textCheck(event.text, str(event.message.date), client)
 
     print('------------------')
 
