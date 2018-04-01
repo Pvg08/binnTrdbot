@@ -18,16 +18,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import org.ta4j.core.*;
 import org.ta4j.core.analysis.criteria.*;
-import org.ta4j.core.indicators.*;
-import org.ta4j.core.indicators.bollinger.*;
-import org.ta4j.core.indicators.candles.*;
 import org.ta4j.core.indicators.helpers.*;
-import org.ta4j.core.indicators.ichimoku.*;
-import org.ta4j.core.indicators.keltner.*;
-import org.ta4j.core.indicators.statistics.*;
-import org.ta4j.core.indicators.volume.ChaikinMoneyFlowIndicator;
-import org.ta4j.core.indicators.volume.MVWAPIndicator;
-import org.ta4j.core.indicators.volume.VWAPIndicator;
 import org.ta4j.core.trading.rules.*;
 
 /**
@@ -479,6 +470,7 @@ public class StrategiesController {
         strategy_items.add(new StrategyBollinger(this, 2));
         strategy_items.add(new StrategyBollinger(this, 3));
         strategy_items.add(new StrategyFractalBreakout(this));
+        strategy_items.add(new StrategyParabolicSAR(this));
         return strategy_items;
     }
 
