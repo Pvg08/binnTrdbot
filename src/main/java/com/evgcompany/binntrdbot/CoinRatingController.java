@@ -478,10 +478,10 @@ public class CoinRatingController extends Thread {
                 entered = heroesMap.get(pair);
                 if (entered != null) {
                     if (autoSignalFastOrder) {
-                        app.log("Trying to auto fast-enter signal with pair: " + pair);
+                        app.log("Trying to auto fast-enter signal with pair: " + pair, true, true);
                         entered.pair = paircontroller.addPairFastRun(pair);
                     } else {
-                        app.log("Trying to auto enter signal with pair: " + pair);
+                        app.log("Trying to auto enter signal with pair: " + pair, true, true);
                         entered.pair = paircontroller.addPair(pair);
                     }
                     doWait(1000);

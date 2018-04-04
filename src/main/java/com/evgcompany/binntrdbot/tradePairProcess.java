@@ -226,6 +226,10 @@ public class tradePairProcess extends Thread {
         }
         Order order = client.getOrderStatus(symbol, limitOrderId);
         if(order != null) {
+            System.out.println(order);
+            if (order.getStatus() == OrderStatus.PARTIALLY_FILLED && Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())) {
+                return;
+            }
             if (
                 order.getStatus() == OrderStatus.FILLED || 
                 order.getStatus() == OrderStatus.PARTIALLY_FILLED || 
@@ -234,7 +238,11 @@ public class tradePairProcess extends Thread {
                 order.getStatus() == OrderStatus.REJECTED
             ) {
                 limitOrderId = 0;
-                if (order.getStatus() != OrderStatus.FILLED) {
+                if (
+                        order.getStatus() != OrderStatus.FILLED ||
+                        Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())
+                    ) 
+                {
                     if(order.getSide() == OrderSide.BUY) {
                         isTryingToSellUp = false;
                         is_hodling = false;
@@ -243,7 +251,11 @@ public class tradePairProcess extends Thread {
                     } else {
                         is_hodling = true;
                     }
-                    if (order.getStatus() == OrderStatus.PARTIALLY_FILLED) {
+                    if (
+                            (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.PARTIALLY_FILLED) &&
+                            Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())
+                        ) 
+                    {
                         profitsChecker.finishOrderPart(symbol, new BigDecimal(order.getPrice()), new BigDecimal(order.getExecutedQty()));
                         sold_amount = sold_amount.subtract(new BigDecimal(order.getExecutedQty()));
                         app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is partially finished! Price = "+order.getPrice() + "; Quantity = " + order.getExecutedQty(), true, true);

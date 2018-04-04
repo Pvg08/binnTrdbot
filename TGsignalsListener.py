@@ -65,7 +65,7 @@ def textCheck(txt, date, client):
             price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
             price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
             price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            if coin and (price_from or price_to) and price_target:
+            if coin and coin != 'BINANCE' and (price_from or price_to) and price_target:
                 print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
                 return
         i = i + 1
@@ -80,7 +80,7 @@ def textCheck(txt, date, client):
             price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
             price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
             price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            if coin and price_target:
+            if coin and coin != 'BINANCE' and price_target:
                 print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
                 return
         i = i + 1
@@ -95,7 +95,7 @@ def textCheck(txt, date, client):
             price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
             price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
             price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            if coin:
+            if coin and coin != 'BINANCE':
                 print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
                 return
         i = i + 1
@@ -166,6 +166,8 @@ def main():
         expr_b.reg_price_from = config['channel_' + str(chan_index)]['signal_price_from']
         expr_b.reg_price_to = config['channel_' + str(chan_index)]['signal_price_to']
         expr_b.reg_price_target = config['channel_' + str(chan_index)]['signal_price_target']
+        if not expr_b.reg_has:
+            expr_b.reg_has = expr_b.reg_coin
         signal_expr.append(expr_b)
         chan_index = chan_index + 1
 
@@ -198,12 +200,11 @@ def main():
     while chan_index < len(channames):
         print(channames[chan_index])
         channames[chan_index] = checkCurchan(channames[chan_index], client)
+        @client.on(events.NewMessage(chats=[channames[chan_index]], incoming=True))
+        def normal_handler(event):
+            textCheck(event.text, str(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
-
-    @client.on(events.NewMessage(chats=channames, incoming=True))
-    def normal_handler(event):
-        textCheck(event.text, str(event.message.date), client)
 
     print('------------------')
 
