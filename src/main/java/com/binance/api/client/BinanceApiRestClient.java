@@ -14,6 +14,7 @@ import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
 import com.binance.api.client.domain.general.ExchangeInfo;
+import com.binance.api.client.domain.general.Asset;
 import com.binance.api.client.domain.market.AggTrade;
 import com.binance.api.client.domain.market.BookTicker;
 import com.binance.api.client.domain.market.Candlestick;
@@ -47,6 +48,11 @@ public interface BinanceApiRestClient {
    * @return Current exchange trading rules and symbol information
    */
   ExchangeInfo getExchangeInfo();
+
+  /**
+   * @return All the supported assets and whether or not they can be withdrawn.
+   */
+  List<Asset> getAllAssets();
 
   // Market Data endpoints
 
@@ -123,7 +129,7 @@ public interface BinanceApiRestClient {
    * @param symbol ticker symbol (e.g. ETHBTC)
    */
   TickerStatistics get24HrPriceStatistics(String symbol);
-  
+
   /**
    * Get 24 hour price change statistics for all symbols.
    */
@@ -133,10 +139,10 @@ public interface BinanceApiRestClient {
    * Get Latest price for all symbols.
    */
   List<TickerPrice> getAllPrices();
-  
+
   /**
    * Get latest price for <code>symbol</code>.
-   * 
+   *
    * @param symbol ticker symbol (e.g. ETHBTC)
    */
   TickerPrice getPrice(String symbol);

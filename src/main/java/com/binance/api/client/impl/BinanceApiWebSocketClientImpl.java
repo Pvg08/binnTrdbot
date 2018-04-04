@@ -22,13 +22,13 @@ import java.util.List;
  */
 public class BinanceApiWebSocketClientImpl implements BinanceApiWebSocketClient, Closeable {
 
-  private OkHttpClient client;
+    private OkHttpClient client;
 
-  public BinanceApiWebSocketClientImpl() {
-    Dispatcher d = new Dispatcher();
-    d.setMaxRequestsPerHost(100);
-    this.client = new OkHttpClient.Builder().dispatcher(d).build();
-  }
+    public BinanceApiWebSocketClientImpl() {
+        Dispatcher d = new Dispatcher();
+        d.setMaxRequestsPerHost(100);
+        this.client = new OkHttpClient.Builder().dispatcher(d).build();
+    }
 
     public Closeable onDepthEvent(String symbol, BinanceApiCallback<DepthEvent> callback) {
         final String channel = String.format("%s@depth", symbol);

@@ -231,7 +231,7 @@ public class TickerStatistics {
 	this.symbol = symbol;
   }
 
-@Override
+  @Override
   public String toString() {
     return new ToStringBuilder(this, BinanceApiConstants.TO_STRING_BUILDER_STYLE)
         .append("symbol", symbol)
