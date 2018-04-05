@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -93,8 +94,9 @@ public class CoinRatingController extends Thread {
     private final DefaultListModel<String> listHeroesModel = new DefaultListModel<>();
     private final List<String> accountCoins = new ArrayList<>(0);
 
-    private CoinRatingPairLogItem entered = null;
-    private long enterMillis = 0;
+    private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
+    private int maxEnter = 3;
+    private int secondsOrderEnterWait = 600;
     private JProgressBar progressBar = null;
 
     public CoinRatingController(mainApplication application, tradePairProcessController paircontroller) {
@@ -338,29 +340,21 @@ public class CoinRatingController extends Thread {
 
     private static Map<String, CoinRatingPairLogItem> sortByComparator(Map<String, CoinRatingPairLogItem> unsortMap, final boolean order) {
         List<Entry<String, CoinRatingPairLogItem>> list = new LinkedList<>(unsortMap.entrySet());
-        // Sorting the list based on values
-        Collections.sort(list, new Comparator<Entry<String, CoinRatingPairLogItem>>() {
-            @Override
-            public int compare(Entry<String, CoinRatingPairLogItem> o1,
-                    Entry<String, CoinRatingPairLogItem> o2) {
-                if (order) {
-                    return o1.getValue().sort.compareTo(o2.getValue().sort);
-                } else {
-                    return o2.getValue().sort.compareTo(o1.getValue().sort);
-                }
+        Collections.sort(list, (Entry<String, CoinRatingPairLogItem> o1, Entry<String, CoinRatingPairLogItem> o2) -> {
+            if (order) {
+                return o1.getValue().sort.compareTo(o2.getValue().sort);
+            } else {
+                return o2.getValue().sort.compareTo(o1.getValue().sort);
             }
         });
-        // Maintaining insertion order with the help of LinkedList
         Map<String, CoinRatingPairLogItem> sortedMap = new LinkedHashMap<>();
-        for (Entry<String, CoinRatingPairLogItem> entry : list) {
+        list.forEach((entry) -> {
             sortedMap.put(entry.getKey(), entry.getValue());
-        }
-
+        });
         return sortedMap;
     }
 
     private void updateList() {
-        
         for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
             if (null != sortby) switch (sortby) {
                 case CR_RANK:
@@ -472,18 +466,18 @@ public class CoinRatingController extends Thread {
     }
 
     private void signalOrderEnter(String pair) {
-        if (autoSignalOrder && entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
+        if (autoSignalOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()/* && !app.getPairController().getPairs().isEmpty()*/) {
             if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
-                enterMillis = System.currentTimeMillis();
-                entered = heroesMap.get(pair);
-                if (entered != null) {
+                CoinRatingPairLogItem toenter = heroesMap.get(pair);
+                if (toenter != null) {
                     if (autoSignalFastOrder) {
                         app.log("Trying to auto fast-enter signal with pair: " + pair, true, true);
-                        entered.pair = paircontroller.addPairFastRun(pair);
+                        toenter.pair = paircontroller.addPairFastRun(pair);
                     } else {
                         app.log("Trying to auto enter signal with pair: " + pair, true, true);
-                        entered.pair = paircontroller.addPair(pair);
+                        toenter.pair = paircontroller.addPair(pair);
                     }
+                    entered.put(pair, toenter);
                     doWait(1000);
                 }
             }
@@ -491,70 +485,76 @@ public class CoinRatingController extends Thread {
     }
     
     private void baseOrderEnter(String pair) {
-        if (autoOrder && entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
+        if (autoOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()/* && !app.getPairController().getPairs().isEmpty()*/) {
             if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
-                enterMillis = System.currentTimeMillis();
-                entered = heroesMap.get(pair);
-                if (entered != null) {
+                CoinRatingPairLogItem toenter = heroesMap.get(pair);
+                if (toenter != null) {
                     if (autoFastOrder) {
                         app.log("Trying to auto fast-enter with pair: " + pair);
-                        entered.pair = paircontroller.addPairFastRun(pair);
+                        toenter.pair = paircontroller.addPairFastRun(pair);
                     } else {
                         app.log("Trying to auto enter with pair: " + pair);
-                        entered.pair = paircontroller.addPair(pair);
+                        toenter.pair = paircontroller.addPair(pair);
                     }
+                    entered.put(pair, toenter);
                     doWait(1000);
                 }
             }
         }
     }
-    
+
     private void checkOrderExit() {
-        if (entered != null) {
-            if (
-                    (
-                        entered.pair.isInitialized() && 
-                        !entered.pair.isTriedBuy() && 
-                        (System.currentTimeMillis() - enterMillis) > 10 * 60 * 1000 // max wait time = 10min
-                    ) ||
-                    (
-                        entered.pair.isInitialized() && 
-                        entered.pair.isTriedBuy() && 
-                        !entered.pair.isHodling() && 
-                        !entered.pair.isInLimitOrder()
-                    ) ||
-                    (
-                        entered.pair.isInitialized() &&
-                        !entered.pair.isAlive()
-                    )
-            ) {
-                paircontroller.removePair(entered.pair.getSymbol());
-                if (entered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0) {
-                    entered.fastbuy_skip = true;
+        if (entered.size() > 0) {
+            List<String> listRemove = new ArrayList<>();
+            for (Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
+                CoinRatingPairLogItem rentered = entry.getValue();
+                if (    (
+                            rentered.pair.isInitialized() && 
+                            !rentered.pair.isTriedBuy() && 
+                            (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
+                        ) || (
+                            rentered.pair.isInitialized() && 
+                            rentered.pair.isTriedBuy() && 
+                            !rentered.pair.isHodling() && 
+                            !rentered.pair.isInLimitOrder()
+                        ) || (
+                            rentered.pair.isInitialized() &&
+                            !rentered.pair.isAlive()
+                        )
+                ) {
+                    paircontroller.removePair(rentered.pair.getSymbol());
+                    if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) <= 0) {
+                        rentered.fastbuy_skip = true;
+                    }
+                    listRemove.add(rentered.pair.getSymbol());
+                    rentered.pair = null;
                 }
-                entered.pair = null;
-                entered = null;
             }
+            listRemove.forEach((entry) -> {
+                entered.remove(entry);
+            });
         }
     }
-    
+
     private void checkFastEnter() {
-        if (entered == null && !heroesMap.isEmpty() && !app.getPairController().getPairs().isEmpty()) {
+        checkOrderExit();
+        if (entered.size() < maxEnter && !heroesMap.isEmpty()/* && !app.getPairController().getPairs().isEmpty()*/) {
             String pairMax = "";
             float maxK = 0;
             for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
                 CoinRatingPairLogItem curr = entry.getValue();
                 if (
                         curr != null && 
+                        !entered.containsKey(curr.symbol) &&
                         !curr.fastbuy_skip && 
                         curr.last_rating_update_millis > 0 &&
                         curr.last_rating_update_millis > System.currentTimeMillis() - 600000 &&
-                        curr.volatility > 0.007 &&
+                        curr.volatility > 0.003 &&
                         curr.percent_hour > 0.002 &&
-                        curr.market_cap > 200000 &&
+                        curr.market_cap > 100000 &&
                         curr.hour_volume > curr.day_volume / 24 &&
-                        (curr.rank == 9999 || curr.rank < 400) &&
-                        curr.strategies_shouldenter_cnt > 1
+                        (curr.rank == 9999 || curr.rank < 500) &&
+                        curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt
                 ) {
                     float k = curr.rating;
                     if (k > maxK) {
@@ -564,8 +564,6 @@ public class CoinRatingController extends Thread {
                 }
             }
             baseOrderEnter(pairMax);
-        } else {
-            checkOrderExit();
         }
     }
 
@@ -647,7 +645,7 @@ public class CoinRatingController extends Thread {
 
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
-            if ((Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) > 0.00001 && !balance.getAsset().equals("BNB")) {
+            if ((Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) >= 0.0005 && !balance.getAsset().equals("BNB")) {
                 accountCoins.add(balance.getAsset());
             }
         });
@@ -871,5 +869,26 @@ public class CoinRatingController extends Thread {
      */
     public void setAutoSignalFastOrder(boolean autoSignalFastOrder) {
         this.autoSignalFastOrder = autoSignalFastOrder;
+    }
+
+    /**
+     * @param maxEnter the maxEnter to set
+     */
+    public void setMaxEnter(int maxEnter) {
+        this.maxEnter = maxEnter;
+    }
+
+    /**
+     * @return the secondsOrderEnterWait
+     */
+    public int getSecondsOrderEnterWait() {
+        return secondsOrderEnterWait;
+    }
+
+    /**
+     * @param secondsOrderEnterWait the secondsOrderEnterWait to set
+     */
+    public void setSecondsOrderEnterWait(int secondsOrderEnterWait) {
+        this.secondsOrderEnterWait = secondsOrderEnterWait;
     }
 }

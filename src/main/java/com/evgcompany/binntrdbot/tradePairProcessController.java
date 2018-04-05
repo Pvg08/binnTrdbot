@@ -141,13 +141,13 @@ public class tradePairProcessController {
             nproc.setSellUpAll(false);
             nproc.setTryingToBuyDip(false);
             nproc.set_do_remove_flag(false);
-            nproc.setTradingBalancePercent(100);
+            nproc.setTradingBalancePercent(tradingBalancePercent);
             nproc.setMainStrategy("Auto");
             nproc.setBarInterval("5m");
-            nproc.setDelayTime(5);
+            nproc.setDelayTime(8);
             nproc.setBuyOnStart(true);
             nproc.setStopBuyLimitTimeout(120);
-            nproc.setStopSellLimitTimeout(240);
+            nproc.setStopSellLimitTimeout(300);
             nproc.setUseBuyStopLimited(true);
             nproc.setUseSellStopLimited(true);
             return addPair(nproc);

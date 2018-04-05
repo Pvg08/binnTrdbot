@@ -81,6 +81,6 @@ public class CoinRatingPairLogItem {
         if (hour_volume > 0.25 * day_volume) {
             rating++;
         }
-        rating += signal_rating * 1.5;
+        rating += signal_rating * 1.25;
     }
 }

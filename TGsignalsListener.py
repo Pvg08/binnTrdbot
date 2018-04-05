@@ -23,6 +23,33 @@ class RegBlock(object):
         self.reg_price_to = None
         self.reg_price_target = None
 
+class SignalRow(object):
+    def __init__(self):
+        self.coin = None
+        self.coin2 = None
+        self.price_from = None
+        self.price_to = None
+        self.price_target = None
+        self.rating = None
+        self.date = None
+        self.index = None
+        self.sort = 0.0
+
+    def init_sort(self):
+        self.sort = 0.0
+        if self.price_from:
+            self.sort = self.sort + 1.0
+        if self.price_to:
+            self.sort = self.sort + 1.0
+        if self.price_target:
+            self.sort = self.sort + 1.0
+        if self.coin2:
+            self.sort = self.sort + 0.75
+        self.sort = self.sort + self.rating / 20.0
+
+    def __repr__(self):
+        return str(self.rating) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + str(self.index)
+
 def enable_win_unicode_console():
     if sys.version_info >= (3, 6):
         return
@@ -38,7 +65,9 @@ def getFirstMatch(regex, txt):
     return ''
 
 def numFix(txt):
-    if txt and txt.find('k')>=0:
+    if txt:
+        txt = txt.replace(',', '.')
+    if txt and (txt.find('k')>=0 or txt.find('K')>=0):
         num = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
         num = num * 1000
         txt = str(num)
@@ -55,50 +84,60 @@ def textCheck(txt, date, client):
     #print(txt)
     #print("_________________")
 
-    i = 0
-    while i < len(signal_expr):
-        hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
-        skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
-        if hasmatch and not skipmatch:
-            coin = getFirstMatch(signal_expr[i].reg_coin, txt)
-            coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt)
-            price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
-            price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
-            price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            if coin and coin != 'BINANCE' and (price_from or price_to) and price_target:
-                print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
-                return
-        i = i + 1
+    stop_coin_names = [
+        'BINANCE', 
+        'BITTREX', 
+        'YOBIT', 
+        'CRYPTOPIA', 
+        'SIGNAL', 
+        'ZONE', 
+        'UPDATE', 
+        'PRICE', 
+        'COIN', 
+        'VIP', 
+        'INSIDE', 
+        'PRIVATE', 
+        'AGAIN', 
+        'RESULT', 
+        'RESULTS', 
+        'AROUND', 
+        'NEAR', 
+        'STOP', 
+        'PART', 
+        'SOME'
+    ]
+    best_item = None
 
     i = 0
     while i < len(signal_expr):
-        hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
-        skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
-        if hasmatch and not skipmatch:
-            coin = getFirstMatch(signal_expr[i].reg_coin, txt)
-            coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt)
-            price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
-            price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
-            price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            if coin and coin != 'BINANCE' and price_target:
-                print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
-                return
+        if signal_expr[i].reg_has:
+            hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
+            skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
+            if hasmatch and not skipmatch:
+                coin = getFirstMatch(signal_expr[i].reg_coin, txt).upper()
+                coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt).upper()
+                price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
+                price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
+                price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
+                if coin and coin not in stop_coin_names and coin2 not in stop_coin_names and (price_from or price_to or price_target):
+                    ri = SignalRow()
+                    ri.coin = coin
+                    ri.coin2 = coin2
+                    ri.price_from = price_from
+                    ri.price_to = price_to
+                    ri.price_target = price_target
+                    ri.rating = signal_expr[i].rating
+                    ri.date = date
+                    ri.index = i + 1
+                    ri.init_sort()
+                    if best_item is None or best_item.sort < ri.sort:
+                        best_item = ri
         i = i + 1
 
-    i = 0
-    while i < len(signal_expr):
-        hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
-        skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
-        if hasmatch and not skipmatch:
-            coin = getFirstMatch(signal_expr[i].reg_coin, txt)
-            coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt)
-            price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
-            price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
-            price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-            if coin and coin != 'BINANCE':
-                print(str(signal_expr[i].rating) + ";" + date + ";" + coin + ";" + coin2 + ";" + price_from + ";" + price_to + ";" + price_target)
-                return
-        i = i + 1
+    if best_item is not None:
+        #if best_item.coin == 'NANO':
+        #    print(txt)
+        print(str(best_item))
 
     return
 
@@ -109,11 +148,19 @@ def checkCurchan(channame, client):
         int_chan = 0
 
     if int_chan != 0:
-        input_channel =  client(GetFullChannelRequest(int_chan))
-        channel_id = input_channel.full_chat.id
+        try:
+            input_channel =  client(GetFullChannelRequest(int_chan))
+            channel_id = input_channel.full_chat.id
+        except Exception as e:
+            print(str(e))
+            return None
     else:
-        response = client.invoke(ResolveUsernameRequest(channame))
-        channel_id = response.peer.channel_id
+        try:
+            response = client.invoke(ResolveUsernameRequest(channame))
+            channel_id = response.peer.channel_id
+        except Exception as e:
+            print(str(e))
+            return None
 
     for msg in client.get_messages(channel_id, limit=50):
         if (msg != '') and not (msg is None):
@@ -200,9 +247,10 @@ def main():
     while chan_index < len(channames):
         print(channames[chan_index])
         channames[chan_index] = checkCurchan(channames[chan_index], client)
-        @client.on(events.NewMessage(chats=[channames[chan_index]], incoming=True))
-        def normal_handler(event):
-            textCheck(event.text, str(event.message.date), client)
+        if channames[chan_index]:
+            @client.on(events.NewMessage(chats=[channames[chan_index]], incoming=True))
+            def normal_handler(event):
+                textCheck(event.text, str(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
 

@@ -159,7 +159,7 @@ public class SignalController extends Thread {
             return;
         }
         String[] parts = line.split(";");
-        if (parts.length != 7) {
+        if (parts.length != 8) {
             return;
         }
         if (!isChecking) {

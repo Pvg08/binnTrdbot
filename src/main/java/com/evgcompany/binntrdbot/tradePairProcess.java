@@ -117,6 +117,7 @@ public class tradePairProcess extends Thread {
     
     private long lastOrderMillis = 0;
     private long lastStrategyPriceMillis = 0;
+    private long startMillis = 0;
     private BigDecimal currentPrice = BigDecimal.ZERO;
     private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
@@ -126,6 +127,7 @@ public class tradePairProcess extends Thread {
         client = rclient;
         profitsChecker = rprofitsChecker;
         strategiesController = new StrategiesController(symbol, app, profitsChecker);
+        startMillis = System.currentTimeMillis();
         setBarInterval("1m");
     }
 
@@ -624,6 +626,8 @@ public class tradePairProcess extends Thread {
             quoteStartBalance = quote.getInitialValue();
         }
         
+        startMillis = System.currentTimeMillis();
+        
         if (buyOnStart) {
             doBuy();
         }
@@ -865,15 +869,18 @@ public class tradePairProcess extends Thread {
         this.delayTime = delayTime;
     }
 
-    void setBuyOnStart(boolean buyOnStart) {
+    public void setBuyOnStart(boolean buyOnStart) {
         this.buyOnStart = buyOnStart;
     }
+    public boolean isBuyOnStart() {
+        return buyOnStart;
+    }
 
-    void setStartDelay(int startDelayTime) {
+    public void setStartDelay(int startDelayTime) {
         this.startDelayTime = startDelayTime;
     }
 
-    void setCheckOtherStrategies(boolean checkOtherStrategies) {
+    public void setCheckOtherStrategies(boolean checkOtherStrategies) {
         this.checkOtherStrategies = checkOtherStrategies;
     }
 
@@ -970,5 +977,12 @@ public class tradePairProcess extends Thread {
      */
     public BigDecimal getLastTradeProfit() {
         return last_trade_profit;
+    }
+
+    /**
+     * @return the startMillis
+     */
+    public long getStartMillis() {
+        return startMillis;
     }
 }
