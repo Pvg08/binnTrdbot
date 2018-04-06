@@ -73,14 +73,28 @@ def numFix(txt):
         txt = str(num)
     return txt
 
-def textCheck(txt, date, client):
+def separateCheck(txt, date, client):
     if (txt is None) or (txt == ''):
         return
-
-    global signal_expr
-
     non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
     txt = txt.translate(non_bmp_map)
+    global signal_separator
+    if signal_separator:
+        parts = re.split(signal_separator, txt, flags = re.UNICODE | re.IGNORECASE | re.MULTILINE)
+        if parts and len(parts) > 0:
+            i = 0
+            while i < len(parts):
+                textCheck(parts[i], date, client)
+                i = i + 1
+        else:
+            textCheck(txt, date, client)
+    else:
+        textCheck(txt, date, client)
+    return
+
+def textCheck(txt, date, client):
+    global signal_expr
+
     #print(txt)
     #print("_________________")
 
@@ -170,7 +184,7 @@ def checkCurchan(channame, client):
                 msg.text = markdown.unparse(msg.message, msg.entities or [])
             if msg.text is None and msg.message:
                 msg.text = msg.message
-            textCheck(msg.text, str(msg.date), client)
+            separateCheck(msg.text, str(msg.date), client)
 
     return client.get_input_entity(channel_id)
 
@@ -180,6 +194,7 @@ def main():
     enable_win_unicode_console()
 
     global signal_expr
+    global signal_separator
     signal_expr = []
 
     config = configparser.RawConfigParser()
@@ -190,6 +205,7 @@ def main():
     phone = sys.argv[3]
 
     chancount = int(config['channels']['count'])
+    signal_separator = str(config['channels']['signal_separator'])
     channames = []
 
     chan_index = 1
@@ -250,7 +266,7 @@ def main():
         if channames[chan_index]:
             @client.on(events.NewMessage(chats=[channames[chan_index]], incoming=True))
             def normal_handler(event):
-                textCheck(event.text, str(event.message.date), client)
+                separateCheck(event.text, str(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
 

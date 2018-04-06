@@ -19,10 +19,8 @@ import java.text.SimpleDateFormat;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -97,6 +95,7 @@ public class CoinRatingController extends Thread {
     private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
     private int maxEnter = 3;
     private int secondsOrderEnterWait = 600;
+    private float minRatingForOrder = 5;
     private JProgressBar progressBar = null;
 
     public CoinRatingController(mainApplication application, tradePairProcessController paircontroller) {
@@ -138,7 +137,6 @@ public class CoinRatingController extends Thread {
     }
     
     private void updatePair(CoinRatingPairLogItem curr) {
-        System.out.println("Update pair: " + curr.symbol);
         curr.update_counter++;
         List<Bar> bars_h = client.getBars(curr.symbol, "5m");
         List<Bar> bars_d = client.getBars(curr.symbol, "2h", 13, System.currentTimeMillis() - 24*60*60*1000, System.currentTimeMillis() + 100000);
@@ -179,6 +177,9 @@ public class CoinRatingController extends Thread {
             volatility_day = vol_indicator.getValue(series.getEndIndex()).floatValue() / sma.getValue(series.getEndIndex()).floatValue();
         }
         curr.volatility = volatility_hour * 0.7f + volatility_day * 0.3f;
+        if (strategiesController.getProfitsChecker() == null) {
+            strategiesController.setProfitsChecker(mainApplication.getInstance().getProfitsChecker());
+        }
         strategiesController.setGroupName(curr.symbol);
         strategiesController.setBarSeconds(300);
         strategiesController.resetSeries();
@@ -466,7 +467,7 @@ public class CoinRatingController extends Thread {
     }
 
     private void signalOrderEnter(String pair) {
-        if (autoSignalOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()/* && !app.getPairController().getPairs().isEmpty()*/) {
+        if (autoSignalOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()) {
             if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
                 CoinRatingPairLogItem toenter = heroesMap.get(pair);
                 if (toenter != null) {
@@ -485,15 +486,15 @@ public class CoinRatingController extends Thread {
     }
     
     private void baseOrderEnter(String pair) {
-        if (autoOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()/* && !app.getPairController().getPairs().isEmpty()*/) {
+        if (autoOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()) {
             if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
                 CoinRatingPairLogItem toenter = heroesMap.get(pair);
                 if (toenter != null) {
                     if (autoFastOrder) {
-                        app.log("Trying to auto fast-enter with pair: " + pair);
+                        app.log("Trying to auto fast-enter with pair: " + pair, true, true);
                         toenter.pair = paircontroller.addPairFastRun(pair);
                     } else {
-                        app.log("Trying to auto enter with pair: " + pair);
+                        app.log("Trying to auto enter with pair: " + pair, true, true);
                         toenter.pair = paircontroller.addPair(pair);
                     }
                     entered.put(pair, toenter);
@@ -508,26 +509,30 @@ public class CoinRatingController extends Thread {
             List<String> listRemove = new ArrayList<>();
             for (Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
                 CoinRatingPairLogItem rentered = entry.getValue();
-                if (    (
-                            rentered.pair.isInitialized() && 
-                            !rentered.pair.isTriedBuy() && 
-                            (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
-                        ) || (
-                            rentered.pair.isInitialized() && 
-                            rentered.pair.isTriedBuy() && 
-                            !rentered.pair.isHodling() && 
-                            !rentered.pair.isInLimitOrder()
-                        ) || (
-                            rentered.pair.isInitialized() &&
-                            !rentered.pair.isAlive()
-                        )
-                ) {
-                    paircontroller.removePair(rentered.pair.getSymbol());
-                    if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) <= 0) {
-                        rentered.fastbuy_skip = true;
+                if (rentered != null && rentered.pair != null && rentered.pair.isInitialized()) {
+                    if (    (
+                                !rentered.pair.isTriedBuy() && 
+                                (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
+                            ) || (
+                                rentered.pair.isTriedBuy() && 
+                                !rentered.pair.isHodling() && 
+                                !rentered.pair.isInLimitOrder()
+                            ) || (
+                                !rentered.pair.isAlive()
+                            )
+                    ) {
+                        app.log("Exit from order: " + rentered.pair.getSymbol(), true, true);
+                        paircontroller.removePair(rentered.pair.getSymbol());
+                        if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0 || !rentered.pair.isTriedBuy()) {
+                            //rentered.fastbuy_skip = true;
+                            rentered.rating_inc -= 1;
+                        } else {
+                            rentered.rating_inc += 0.5;
+                        }
+                        rentered.calculateRating();
+                        listRemove.add(rentered.pair.getSymbol());
+                        rentered.pair = null;
                     }
-                    listRemove.add(rentered.pair.getSymbol());
-                    rentered.pair = null;
                 }
             }
             listRemove.forEach((entry) -> {
@@ -538,28 +543,28 @@ public class CoinRatingController extends Thread {
 
     private void checkFastEnter() {
         checkOrderExit();
-        if (entered.size() < maxEnter && !heroesMap.isEmpty()/* && !app.getPairController().getPairs().isEmpty()*/) {
+        if (entered.size() < maxEnter && !heroesMap.isEmpty()) {
             String pairMax = "";
-            float maxK = 0;
+            float maxR = 0;
             for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
                 CoinRatingPairLogItem curr = entry.getValue();
                 if (
                         curr != null && 
                         !entered.containsKey(curr.symbol) &&
                         !curr.fastbuy_skip && 
+                        curr.rating >= minRatingForOrder &&
                         curr.last_rating_update_millis > 0 &&
-                        curr.last_rating_update_millis > System.currentTimeMillis() - 600000 &&
-                        curr.volatility > 0.003 &&
-                        curr.percent_hour > 0.002 &&
-                        curr.market_cap > 100000 &&
+                        curr.last_rating_update_millis > (System.currentTimeMillis() - 800000) &&
+                        curr.volatility > 0.004 &&
+                        curr.percent_hour > 0.001 &&
+                        (curr.market_cap == 0 || curr.market_cap > 100000) &&
                         curr.hour_volume > curr.day_volume / 24 &&
                         (curr.rank == 9999 || curr.rank < 500) &&
                         curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt
                 ) {
-                    float k = curr.rating;
-                    if (k > maxK) {
+                    if (curr.rating > maxR) {
                         pairMax = entry.getKey();
-                        maxK = k;
+                        maxR = curr.rating;
                     }
                 }
             }
@@ -890,5 +895,19 @@ public class CoinRatingController extends Thread {
      */
     public void setSecondsOrderEnterWait(int secondsOrderEnterWait) {
         this.secondsOrderEnterWait = secondsOrderEnterWait;
+    }
+
+    /**
+     * @return the minRatingForOrder
+     */
+    public float getMinRatingForOrder() {
+        return minRatingForOrder;
+    }
+
+    /**
+     * @param minRatingForOrder the minRatingForOrder to set
+     */
+    public void setMinRatingForOrder(float minRatingForOrder) {
+        this.minRatingForOrder = minRatingForOrder;
     }
 }

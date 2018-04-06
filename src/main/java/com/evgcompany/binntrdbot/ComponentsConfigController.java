@@ -8,12 +8,14 @@ package com.evgcompany.binntrdbot;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Window;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.prefs.Preferences;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JList;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
 
@@ -55,6 +57,10 @@ public class ComponentsConfigController {
                 ((JSpinner)cb).setValue(Integer.parseInt(prefs.get(name, ((Integer) ((JSpinner)cb).getValue()).toString())));
             } else if (cb instanceof JComboBox) {
                 ((JComboBox<String>)cb).setSelectedIndex(Integer.parseInt(prefs.get(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString())));
+            } else if (cb instanceof JList) {
+                String indstr = prefs.get(name, "");
+                int[] indexes = Arrays.stream(indstr.substring(1, indstr.length()-1).split(",")).map(String::trim).mapToInt(Integer::parseInt).toArray();
+                ((JList<String>)cb).setSelectedIndices(indexes);
             } else if (cb instanceof Window) {
                 cb.setBounds(
                     Integer.parseInt(prefs.get(name+"_pos_x", String.valueOf(Math.round(cb.getBounds().getX())))),
@@ -75,6 +81,8 @@ public class ComponentsConfigController {
                 prefs.put(name, ((JSpinner)cb).getValue().toString());
             } else if (cb instanceof JComboBox) {
                 prefs.put(name, ((Integer) ((JComboBox<String>)cb).getSelectedIndex()).toString());
+            } else if (cb instanceof JList) {
+                prefs.put(name, Arrays.toString(((JList<String>)cb).getSelectedIndices()));
             } else if (cb instanceof Window) {
                 prefs.put(name+"_pos_x", String.valueOf(Math.round(cb.getBounds().getX())));
                 prefs.put(name+"_pos_y", String.valueOf(Math.round(cb.getBounds().getY())));

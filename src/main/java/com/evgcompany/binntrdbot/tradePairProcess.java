@@ -65,8 +65,6 @@ public class tradePairProcess extends Thread {
     private List<Long> orderToCancelOnSellUp = new ArrayList<>();
     private long last_time = 0;
     
-    private BigDecimal quoteStartBalance = BigDecimal.ZERO;
-    
     private long limitOrderId = 0;
     
     private BigDecimal tradingBalancePercent = new BigDecimal("50");
@@ -144,7 +142,7 @@ public class tradePairProcess extends Thread {
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        BigDecimal summ_to_buy = quoteStartBalance.multiply(tradingBalancePercent.divide(BigDecimal.valueOf(100)));
+        BigDecimal summ_to_buy = profitsChecker.getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent);
         sold_price = normalizePrice(curPrice);
         sold_amount = normalizeQuantity(summ_to_buy.divide(curPrice, RoundingMode.HALF_DOWN), true);
         sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
@@ -621,17 +619,12 @@ public class tradePairProcess extends Thread {
             tryStartSellUpSeq();
         }
         
-        currencyItem quote = profitsChecker.getProfitData(quoteAssetSymbol);
-        if (quote != null) {
-            quoteStartBalance = quote.getInitialValue();
-        }
-        
         startMillis = System.currentTimeMillis();
-        
-        if (buyOnStart) {
+
+        if (buyOnStart && !strategiesController.isShouldLeave()) {
             doBuy();
         }
-        
+
         isInitialized = true;
         app.log(symbol + " initialized. Current price = " + df8.format(currentPrice));
         

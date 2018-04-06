@@ -46,6 +46,7 @@ public class CoinRatingPairLogItem {
     int strategies_shouldexit_cnt = 0;
 
     float rating = 0;
+    float rating_inc = 0;
     
     public void calculateRating() {
         rating = 0;
@@ -82,5 +83,6 @@ public class CoinRatingPairLogItem {
             rating++;
         }
         rating += signal_rating * 1.25;
+        rating += rating_inc;
     }
 }

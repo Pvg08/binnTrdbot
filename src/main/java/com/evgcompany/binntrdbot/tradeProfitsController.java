@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,6 +49,8 @@ public class tradeProfitsController {
     private BigDecimal stopLossPercent = null;
     private BigDecimal stopGainPercent = null;
     private boolean lowHold = true;
+    
+    private List<String> autoStrategies = new ArrayList<>();
 
     private TradingAPIAbstractInterface client = null;
 
@@ -75,6 +78,24 @@ public class tradeProfitsController {
             updateAllBalances(false);
             listProfitModel.addElement(cbase.toString());
         }
+    }
+    
+    public BigDecimal getOrderAssetAmount(String symbolAsset, BigDecimal percent) {
+        currencyItem quote = curr_map.get(symbolAsset);
+        if (quote != null) {
+            BigDecimal quoteBalance;
+            if (quote.getInitialValue().compareTo(quote.getValue()) >= 0) {
+                quoteBalance = quote.getInitialValue();
+            } else {
+                quoteBalance = quote.getValue();
+            }
+            quoteBalance = quoteBalance.multiply(percent.divide(BigDecimal.valueOf(100)));
+            if (quote.getFreeValue().compareTo(quoteBalance) < 0) {
+                quoteBalance = quote.getFreeValue();
+            }
+            return quoteBalance;
+        }
+        return BigDecimal.ZERO;
     }
     
     public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
@@ -598,5 +619,19 @@ public class tradeProfitsController {
      */
     public BigDecimal getTradeMinProfitPercent() {
         return tradeMinProfitPercent;
+    }
+
+    /**
+     * @return the autoStrategies
+     */
+    public List<String> getAutoStrategies() {
+        return autoStrategies;
+    }
+
+    /**
+     * @param autoStrategies the autoStrategies to set
+     */
+    public void setAutoStrategies(List<String> autoStrategies) {
+        this.autoStrategies = autoStrategies;
     }
 }

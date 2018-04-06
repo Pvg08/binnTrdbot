@@ -12,10 +12,9 @@ import java.awt.Toolkit;
 import java.math.BigDecimal;
 import java.text.Format;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.concurrent.Semaphore;
+import javax.swing.DefaultListModel;
 import javax.swing.text.DefaultCaret;
 
 /**
@@ -58,9 +57,10 @@ public class mainApplication extends javax.swing.JFrame {
         listProfit.setModel(profitsChecker.getListProfitModel());
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
         listRating.setModel(coinRatingController.getListHeroesModel());
-        
+        listBoxAutoStrategies.setModel(new DefaultListModel<String>());
         new StrategiesController().getStrategiesNames().forEach((strategy_name)->{
             ComboBoxMainStrategy.addItem(strategy_name);
+            ((DefaultListModel)listBoxAutoStrategies.getModel()).addElement(strategy_name);
         });
         
         config.addComponent(instance, "window");
@@ -93,6 +93,12 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(textFieldPhone, "signals_api_phone");
         config.addComponent(checkboxAutoSignalOrder, "auto_signals_order");
         config.addComponent(checkboxAutoSignalFastorder, "auto_signals_fast_order");
+        config.addComponent(spinnerScanRatingDelayTime, "rating_scan_delay_time");
+        config.addComponent(spinnerScanRatingUpdateTime, "rating_scan_update_time");
+        config.addComponent(spinnerRatingMaxOrders, "rating_max_order_count");
+        config.addComponent(spinnerRatingMaxOrderWait, "rating_max_order_wait");
+        config.addComponent(spinnerRatingMinForOrder, "rating_min_for_order");
+        config.addComponent(listBoxAutoStrategies, "auto_strategies_list");
         config.Load();
     }
     
@@ -227,6 +233,9 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
         jLabel14 = new javax.swing.JLabel();
         comboBoxBarsCount = new javax.swing.JComboBox<>();
+        jScrollPane7 = new javax.swing.JScrollPane();
+        listBoxAutoStrategies = new javax.swing.JList<>();
+        jLabel23 = new javax.swing.JLabel();
         jPanel4 = new javax.swing.JPanel();
         checkboxAutoOrder = new javax.swing.JCheckBox();
         checkBoxAutoAnalyzer = new javax.swing.JCheckBox();
@@ -235,6 +244,12 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel16 = new javax.swing.JLabel();
         spinnerScanRatingUpdateTime = new javax.swing.JSpinner();
         checkboxAutoFastorder = new javax.swing.JCheckBox();
+        jLabel19 = new javax.swing.JLabel();
+        spinnerRatingMaxOrders = new javax.swing.JSpinner();
+        jLabel21 = new javax.swing.JLabel();
+        spinnerRatingMaxOrderWait = new javax.swing.JSpinner();
+        jLabel22 = new javax.swing.JLabel();
+        spinnerRatingMinForOrder = new javax.swing.JSpinner();
         jPanel5 = new javax.swing.JPanel();
         textFieldAPIID = new javax.swing.JTextField();
         jLabel17 = new javax.swing.JLabel();
@@ -570,6 +585,10 @@ public class mainApplication extends javax.swing.JFrame {
 
         comboBoxBarsCount.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "500", "1000", "1500", "2000", "3000", "4000", "5000" }));
 
+        jScrollPane7.setViewportView(listBoxAutoStrategies);
+
+        jLabel23.setText("Strategies for auto select:");
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -580,16 +599,7 @@ public class mainApplication extends javax.swing.JFrame {
                     .addComponent(jLabel4)
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addGap(2, 2, 2)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(checkBoxCheckOtherStrategies)
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(checkBoxStopGain)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(spinnerStopGain, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(checkBoxStopLoss)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(spinnerStopLoss, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(jPanel1Layout.createSequentialGroup()
                                 .addComponent(ComboBoxMainStrategy, javax.swing.GroupLayout.PREFERRED_SIZE, 148, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -604,8 +614,25 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(comboBoxBarsCount, javax.swing.GroupLayout.PREFERRED_SIZE, 64, javax.swing.GroupLayout.PREFERRED_SIZE)
                                     .addComponent(jLabel14)))
-                            .addComponent(checkBoxLowHold))))
-                .addContainerGap(117, Short.MAX_VALUE))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(checkBoxCheckOtherStrategies)
+                                    .addGroup(jPanel1Layout.createSequentialGroup()
+                                        .addComponent(checkBoxStopGain)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(spinnerStopGain, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addGroup(jPanel1Layout.createSequentialGroup()
+                                        .addComponent(checkBoxStopLoss)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(spinnerStopLoss, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(checkBoxLowHold))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(jScrollPane7)
+                                    .addGroup(jPanel1Layout.createSequentialGroup()
+                                        .addComponent(jLabel23)
+                                        .addGap(0, 0, Short.MAX_VALUE)))))))
+                .addContainerGap(39, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -629,18 +656,23 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(comboBoxBarsInterval, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(comboBoxBarsCount, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(checkBoxCheckOtherStrategies)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(checkBoxStopLoss)
-                    .addComponent(spinnerStopLoss, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(checkBoxStopGain)
-                    .addComponent(spinnerStopGain, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(checkBoxCheckOtherStrategies)
+                    .addComponent(jLabel23))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(checkBoxLowHold)
-                .addContainerGap(36, Short.MAX_VALUE))
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(checkBoxStopLoss)
+                            .addComponent(spinnerStopLoss, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(checkBoxStopGain)
+                            .addComponent(spinnerStopGain, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(checkBoxLowHold))
+                    .addComponent(jScrollPane7, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
+                .addContainerGap(35, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Strategies", jPanel1);
@@ -679,6 +711,18 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        jLabel19.setText("Max orders:");
+
+        spinnerRatingMaxOrders.setValue(3);
+
+        jLabel21.setText("Max order wait (sec):");
+
+        spinnerRatingMaxOrderWait.setValue(600);
+
+        jLabel22.setText("Min rating for order:");
+
+        spinnerRatingMinForOrder.setValue(5);
+
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
@@ -688,36 +732,63 @@ public class mainApplication extends javax.swing.JFrame {
                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(checkBoxAutoAnalyzer)
                     .addGroup(jPanel4Layout.createSequentialGroup()
-                        .addComponent(checkboxAutoOrder)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(checkboxAutoFastorder))
-                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(jPanel4Layout.createSequentialGroup()
+                                .addComponent(checkboxAutoOrder)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(checkboxAutoFastorder))
+                            .addGroup(jPanel4Layout.createSequentialGroup()
+                                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                    .addComponent(jLabel16)
+                                    .addComponent(jLabel15))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.DEFAULT_SIZE, 82, Short.MAX_VALUE)
+                                    .addComponent(spinnerScanRatingUpdateTime))))
+                        .addGap(25, 25, 25)
                         .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                            .addComponent(jLabel16)
-                            .addComponent(jLabel15))
+                            .addComponent(jLabel21)
+                            .addComponent(jLabel19)
+                            .addComponent(jLabel22))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.DEFAULT_SIZE, 82, Short.MAX_VALUE)
-                            .addComponent(spinnerScanRatingUpdateTime))))
-                .addContainerGap(263, Short.MAX_VALUE))
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(spinnerRatingMinForOrder, javax.swing.GroupLayout.DEFAULT_SIZE, 86, Short.MAX_VALUE)
+                            .addComponent(spinnerRatingMaxOrders)
+                            .addComponent(spinnerRatingMaxOrderWait, javax.swing.GroupLayout.DEFAULT_SIZE, 86, Short.MAX_VALUE))))
+                .addGap(45, 45, 45))
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel4Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(checkBoxAutoAnalyzer)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(checkboxAutoOrder)
-                    .addComponent(checkboxAutoFastorder))
-                .addGap(18, 18, 18)
-                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel15))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel16)
-                    .addComponent(spinnerScanRatingUpdateTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(checkBoxAutoAnalyzer)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(checkboxAutoOrder)
+                            .addComponent(checkboxAutoFastorder))
+                        .addGap(18, 18, 18)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel15))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel16)
+                            .addComponent(spinnerScanRatingUpdateTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addGroup(jPanel4Layout.createSequentialGroup()
+                        .addGap(40, 40, 40)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerRatingMaxOrders, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel19))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel21)
+                            .addComponent(spinnerRatingMaxOrderWait, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel22)
+                            .addComponent(spinnerRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                 .addContainerGap(79, Short.MAX_VALUE))
         );
 
@@ -1100,6 +1171,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonRun.setEnabled(false);
         try {
             initAPI();
+            profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
             profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
             profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
@@ -1212,6 +1284,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonSellActionPerformed
 
     private void buttonSetPairsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetPairsActionPerformed
+        profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
         profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
         profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
         profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
@@ -1337,6 +1410,9 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
         coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
         coinRatingController.setUpdateTime((Integer) spinnerScanRatingUpdateTime.getValue());
+        coinRatingController.setMaxEnter((Integer) spinnerRatingMaxOrders.getValue());
+        coinRatingController.setMinRatingForOrder((Integer) spinnerRatingMinForOrder.getValue());
+        coinRatingController.setSecondsOrderEnterWait((Integer) spinnerRatingMaxOrderWait.getValue());
         coinRatingController.setProgressBar(progressBarRatingAnalPercent);
         comboBoxRatingSortActionPerformed(null);
         comboBoxRatingSortbyActionPerformed(null);
@@ -1495,8 +1571,12 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel16;
     private javax.swing.JLabel jLabel17;
     private javax.swing.JLabel jLabel18;
+    private javax.swing.JLabel jLabel19;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel20;
+    private javax.swing.JLabel jLabel21;
+    private javax.swing.JLabel jLabel22;
+    private javax.swing.JLabel jLabel23;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -1515,8 +1595,10 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
     private javax.swing.JScrollPane jScrollPane6;
+    private javax.swing.JScrollPane jScrollPane7;
     private javax.swing.JTabbedPane jTabbedPane2;
     private javax.swing.JTextArea jTextArea1;
+    private javax.swing.JList<String> listBoxAutoStrategies;
     private javax.swing.JList<String> listCurrencies;
     private javax.swing.JList<String> listProfit;
     private javax.swing.JList<String> listRating;
@@ -1525,6 +1607,9 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JProgressBar progressBarRatingAnalPercent;
     private javax.swing.JSpinner spinnerBuyPercent;
     private javax.swing.JSpinner spinnerBuyStopLimited;
+    private javax.swing.JSpinner spinnerRatingMaxOrderWait;
+    private javax.swing.JSpinner spinnerRatingMaxOrders;
+    private javax.swing.JSpinner spinnerRatingMinForOrder;
     private javax.swing.JSpinner spinnerScanRatingDelayTime;
     private javax.swing.JSpinner spinnerScanRatingUpdateTime;
     private javax.swing.JSpinner spinnerSellStopLimited;

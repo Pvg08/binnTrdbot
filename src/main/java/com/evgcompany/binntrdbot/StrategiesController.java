@@ -46,6 +46,7 @@ public class StrategiesController {
     private TimeSeries series = null;
     HashMap<String, Strategy> strategies = new HashMap<>();
     List<StrategyItem> strategy_items = new ArrayList<>();
+    List<String> strategy_auto = new ArrayList<>();
     private String mainStrategy = "Auto";
     private int strategyItemIndex = -1;
     private int barSeconds;
@@ -93,6 +94,26 @@ public class StrategiesController {
         return mainStrategy;
     }
 
+    public Strategy getMainStrategyS() {
+        return strategies.get(mainStrategy);
+    }
+    
+    public boolean isShouldLeave() {
+        Strategy ms = getMainStrategyS();
+        if (ms != null) {
+            return ms.shouldExit(series.getEndIndex());
+        }
+        return false;
+    }
+
+    public boolean isShouldEnter() {
+        Strategy ms = getMainStrategyS();
+        if (ms != null) {
+            return ms.shouldEnter(series.getEndIndex());
+        }
+        return false;
+    }
+    
     /**
      * @param mainStrategy the mainStrategy to set
      */
@@ -193,6 +214,9 @@ public class StrategiesController {
         strategy_items.forEach((entry) -> {
             strategies.put(entry.getStrategyName(), entry.buildStrategy(series));
         });
+        if (profitsChecker != null) {
+            strategy_auto = profitsChecker.getAutoStrategies();
+        }
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
             if (app != null) app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
@@ -217,9 +241,10 @@ public class StrategiesController {
         int start_index = series.getEndIndex() - timeframe;
         if (start_index < 0) start_index = 0;
         int end_index = series.getEndIndex();
-        for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
+        List<Strategy> pick_list = getAutoListStrategies();
+        for (Strategy strategy : pick_list) {
             for(int i=start_index;i<=end_index;i++) {
-                if (entry.getValue().shouldEnter(i)) {
+                if (strategy.shouldEnter(i)) {
                     result++;
                     i = end_index+1;
                 }
@@ -234,9 +259,10 @@ public class StrategiesController {
         int start_index = series.getEndIndex() - timeframe;
         if (start_index < 0) start_index = 0;
         int end_index = series.getEndIndex();
-        for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
+        List<Strategy> pick_list = getAutoListStrategies();
+        for (Strategy strategy : pick_list) {
             for(int i=start_index;i<=end_index;i++) {
-                if (entry.getValue().shouldExit(i, tradingRecordT)) {
+                if (strategy.shouldExit(i, tradingRecordT)) {
                     result++;
                     i = end_index+1;
                 }
@@ -244,12 +270,41 @@ public class StrategiesController {
         }
         return result;
     }
+
+    private List<String> getAutoListString() {
+        if ((strategy_auto == null || strategy_auto.isEmpty()) && profitsChecker != null) {
+            strategy_auto = profitsChecker.getAutoStrategies();
+        }
+        if (strategy_auto != null && !strategy_auto.isEmpty()) {
+            return strategy_auto;
+        }
+        return new ArrayList<>(strategies.keySet());
+    }
+
+    private List<Strategy> getAutoListStrategies() {
+        if ((strategy_auto == null || strategy_auto.isEmpty()) && profitsChecker != null) {
+            strategy_auto = profitsChecker.getAutoStrategies();
+        }
+        if (strategy_auto != null && !strategy_auto.isEmpty()) {
+            List<Strategy> slist = new ArrayList<>();
+            strategy_auto.forEach((entry) -> {
+                slist.add(strategies.get(entry));
+            });
+            return slist;
+        }
+        return new ArrayList<>(strategies.values());
+    }
     
     private String findOptimalStrategy() {
         String result = "Unknown";
-        List<Strategy> slist = new ArrayList<>(strategies.values());
+        List<String> auto_list = getAutoListString();
+        List<Strategy> pick_list = getAutoListStrategies();
         List<TimeSeries> subseries = splitSeries(series, Duration.ofSeconds(barSeconds * 30), Duration.ofSeconds(barSeconds * 1440));
         AnalysisCriterion profitCriterion = null;
+        
+        System.out.println(profitsChecker);
+        
+        
         if (profitsChecker != null)
             profitCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
         else 
@@ -262,13 +317,13 @@ public class StrategiesController {
             // For each sub-series...
             log += "Sub-series: " + slice.getSeriesPeriodDescription() + "\n";
             TimeSeriesManager sliceManager = new TimeSeriesManager(slice);
-            for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
-                Strategy strategy = entry.getValue();
+            for (String strategy_key : auto_list) {
+                Strategy strategy = strategies.get(strategy_key);
                 TradingRecord tradingRecordC = sliceManager.run(strategy);
                 double profit = profitCriterion.calculate(slice, tradingRecordC);
-                log += "\tProfit wo comission for " + entry.getKey() + ": " + profit + "\n";
+                log += "\tProfit wo comission for " + strategy_key + ": " + profit + "\n";
             }
-            Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, slist);
+            Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, pick_list);
             
             String bestKey = result;
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
@@ -450,6 +505,7 @@ public class StrategiesController {
         strategy_items.add(new StrategyNo(this));
         strategy_items.add(new StrategyNeuralNetwork(this));  // @todo
         strategy_items.add(new StrategySMA(this));
+        strategy_items.add(new StrategyEMA(this));
         strategy_items.add(new StrategyThreeSoldiers(this));
         strategy_items.add(new StrategyMovingMomentum(this));
         strategy_items.add(new StrategyCCICorrection(this));
@@ -495,5 +551,12 @@ public class StrategiesController {
      */
     public void setTradingRecord(TradingRecord tradingRecord) {
         this.tradingRecord = tradingRecord;
+    }
+
+    /**
+     * @param profitsChecker the profitsChecker to set
+     */
+    public void setProfitsChecker(tradeProfitsController profitsChecker) {
+        this.profitsChecker = profitsChecker;
     }
 }
