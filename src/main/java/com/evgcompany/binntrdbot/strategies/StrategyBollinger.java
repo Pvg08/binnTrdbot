@@ -13,7 +13,6 @@ import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
-import org.ta4j.core.indicators.SMAIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
@@ -91,10 +90,10 @@ public class StrategyBollinger extends StrategyItem {
             case 1:
                 entryRule = new CrossedDownIndicatorRule(BBB, minPrice)
                 .and(new InPipeRule(rsi, Decimal.valueOf(55), Decimal.valueOf(0)))
-                .and(new IsRisingRule(rsi, 1));
+                .and(new IsRisingRule(rsi, 2));
                 exitRule = new CrossedUpIndicatorRule(BBT, maxPrice) 
                     .and(new InPipeRule(rsi, Decimal.valueOf(100), Decimal.valueOf(45)))
-                    .and(new IsFallingRule(rsi, 1));
+                    .and(new IsFallingRule(rsi, 2));
                 break;
             case 2:
                 entryRule = new OverIndicatorRule(closePrice, BBB)

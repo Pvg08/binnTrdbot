@@ -556,6 +556,7 @@ public class StrategiesController {
         strategy_items.add(new StrategyRSI2(this));
         strategy_items.add(new StrategyCMO(this));
         strategy_items.add(new StrategyKAMA(this));
+        strategy_items.add(new StrategyAroon(this));
         strategy_items.add(new StrategyKeltnerChannel(this));
         strategy_items.add(new StrategyBearishEngulfingEMA(this));
         strategy_items.add(new StrategyChaikinMoneyFlow(this));
