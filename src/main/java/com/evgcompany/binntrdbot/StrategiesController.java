@@ -7,8 +7,10 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.analysis.*;
 import com.evgcompany.binntrdbot.strategies.*;
+import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,15 +46,20 @@ public class StrategiesController {
     private mainApplication app = null;
     private tradeProfitsController profitsChecker = null;
     private TimeSeries series = null;
-    HashMap<String, Strategy> strategies = new HashMap<>();
-    List<StrategyItem> strategy_items = new ArrayList<>();
-    List<String> strategy_auto = new ArrayList<>();
+    private final HashMap<String, Strategy> strategies = new HashMap<>();
+    private final List<StrategyItem> strategy_items = new ArrayList<>();
+    
+    private List<String> strategy_auto = new ArrayList<>();
+    private boolean autoWalkForward = false;
+    
     private String mainStrategy = "Auto";
     private int strategyItemIndex = -1;
     private int barSeconds;
     private String groupName;
     private final List<StrategyMarker> markers = new ArrayList<>();
     private TradingRecord tradingRecord = null;
+    
+    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     public StrategiesController(String groupName, mainApplication app, tradeProfitsController profitsChecker) {
         this.groupName = groupName;
@@ -216,6 +223,7 @@ public class StrategiesController {
         });
         if (profitsChecker != null) {
             strategy_auto = profitsChecker.getAutoStrategies();
+            autoWalkForward = profitsChecker.isAutoWalkForward();
         }
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
@@ -274,6 +282,7 @@ public class StrategiesController {
     private List<String> getAutoListString() {
         if ((strategy_auto == null || strategy_auto.isEmpty()) && profitsChecker != null) {
             strategy_auto = profitsChecker.getAutoStrategies();
+            autoWalkForward = profitsChecker.isAutoWalkForward();
         }
         if (strategy_auto != null && !strategy_auto.isEmpty()) {
             return strategy_auto;
@@ -284,6 +293,7 @@ public class StrategiesController {
     private List<Strategy> getAutoListStrategies() {
         if ((strategy_auto == null || strategy_auto.isEmpty()) && profitsChecker != null) {
             strategy_auto = profitsChecker.getAutoStrategies();
+            autoWalkForward = profitsChecker.isAutoWalkForward();
         }
         if (strategy_auto != null && !strategy_auto.isEmpty()) {
             List<Strategy> slist = new ArrayList<>();
@@ -295,55 +305,87 @@ public class StrategiesController {
         return new ArrayList<>(strategies.values());
     }
     
+    private String getSeriesPeriodDescription(TimeSeries series) {
+        StringBuilder sb = new StringBuilder();
+        if (!series.getBarData().isEmpty()) {
+            Bar firstBar = series.getFirstBar();
+            Bar lastBar = series.getLastBar();
+            sb.append(firstBar.getEndTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy kk:mm:ss")))
+                    .append(" - ")
+                    .append(lastBar.getEndTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy kk:mm:ss")));
+        }
+        return sb.toString();
+    }
+    
+    private String getStrategyName(Strategy strategy, String default_name) {
+        for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
+            if (Objects.equals(strategy, entry.getValue())) {
+                return entry.getKey();
+            }
+        }
+        return default_name;
+    }
+    
     private String findOptimalStrategy() {
         String result = "Unknown";
         List<String> auto_list = getAutoListString();
         List<Strategy> pick_list = getAutoListStrategies();
-        List<TimeSeries> subseries = splitSeries(series, Duration.ofSeconds(barSeconds * 30), Duration.ofSeconds(barSeconds * 1440));
+        List<TimeSeries> subseries;
+        
+        if (autoWalkForward) {
+            subseries = splitSeries(
+                series, 
+                Duration.ofSeconds(2 * 60 * 60), 
+                Duration.ofSeconds(24 * 60 * 60)
+            );
+        } else {
+            subseries = new ArrayList<>();
+            subseries.add(series);
+        }
+
         AnalysisCriterion profitCriterion = null;
-        
-        System.out.println(profitsChecker);
-        
-        
         if (profitsChecker != null)
             profitCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
         else 
             profitCriterion = new TotalProfitCriterion();
-        Map<String, Integer> successMap = new HashMap<>();
+        Map<String, Double> successMap = new HashMap<>();
         
         String log = "";
         
         for (TimeSeries slice : subseries) {
-            // For each sub-series...
-            log += "Sub-series: " + slice.getSeriesPeriodDescription() + "\n";
+            log += "Sub-series: " + getSeriesPeriodDescription(slice) + "\n";
             TimeSeriesManager sliceManager = new TimeSeriesManager(slice);
             for (String strategy_key : auto_list) {
                 Strategy strategy = strategies.get(strategy_key);
                 TradingRecord tradingRecordC = sliceManager.run(strategy);
                 double profit = profitCriterion.calculate(slice, tradingRecordC);
-                log += "\tProfit wo comission for " + strategy_key + ": " + profit + "\n";
+                log += "    Profit wo comission for " + strategy_key + ": " + df6.format(profit) + "\n";
             }
             Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, pick_list);
+            String bestStrategyName = getStrategyName(bestStrategy, result);
+            log += "\t--> Best strategy: " + bestStrategyName + "\n\n";
             
-            String bestKey = result;
-            for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
-                if (Objects.equals(bestStrategy, entry.getValue())) {
-                    bestKey = entry.getKey();
-                }
+            TradingRecord tradingRecordC = sliceManager.run(bestStrategy);
+            if (tradingRecordC.getTradeCount() > 0) {
+                if (!successMap.containsKey(bestStrategyName)) successMap.put(bestStrategyName, 0.0);
+                successMap.put(bestStrategyName, successMap.get(bestStrategyName) + 1);
             }
-            if (!successMap.containsKey(bestKey)) {
-                successMap.put(bestKey, 1);
-            }
-            successMap.put(bestKey, successMap.get(bestKey)+1);
-            log += "\t\t--> Best strategy: " + bestKey + "\n";
         }
-        
-        int max_value = 0;
-        for (Map.Entry<String, Integer> entry : successMap.entrySet()) {
+
+        double max_value = 0;
+        for (Map.Entry<String, Double> entry : successMap.entrySet()) {
             if (entry.getValue() > max_value) {
                 max_value = entry.getValue();
                 result = entry.getKey();
             }
+        }
+
+        if (subseries.size() > 1) {
+            log += "\nSummary ("+subseries.size()+" slices):\n";
+            for (Map.Entry<String, Double> entry : successMap.entrySet()) {
+                log += "    Wins count for " + entry.getKey() + ": " + df6.format(entry.getValue()) + "\n";
+            }
+            log += "\t--> Summ Best strategy: " + result + "\n\n";
         }
         
         if (app != null) app.log(log);

@@ -99,6 +99,7 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerRatingMaxOrderWait, "rating_max_order_wait");
         config.addComponent(spinnerRatingMinForOrder, "rating_min_for_order");
         config.addComponent(listBoxAutoStrategies, "auto_strategies_list");
+        config.addComponent(checkBoxWalkForward, "auto_walkforward");
         config.Load();
     }
     
@@ -236,6 +237,7 @@ public class mainApplication extends javax.swing.JFrame {
         jScrollPane7 = new javax.swing.JScrollPane();
         listBoxAutoStrategies = new javax.swing.JList<>();
         jLabel23 = new javax.swing.JLabel();
+        checkBoxWalkForward = new javax.swing.JCheckBox();
         jPanel4 = new javax.swing.JPanel();
         checkboxAutoOrder = new javax.swing.JCheckBox();
         checkBoxAutoAnalyzer = new javax.swing.JCheckBox();
@@ -589,6 +591,13 @@ public class mainApplication extends javax.swing.JFrame {
 
         jLabel23.setText("Strategies for auto select:");
 
+        checkBoxWalkForward.setText("WalkForward");
+        checkBoxWalkForward.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkBoxWalkForwardActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -631,7 +640,8 @@ public class mainApplication extends javax.swing.JFrame {
                                     .addComponent(jScrollPane7)
                                     .addGroup(jPanel1Layout.createSequentialGroup()
                                         .addComponent(jLabel23)
-                                        .addGap(0, 0, Short.MAX_VALUE)))))))
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(checkBoxWalkForward)))))))
                 .addContainerGap(39, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
@@ -658,7 +668,8 @@ public class mainApplication extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkBoxCheckOtherStrategies)
-                    .addComponent(jLabel23))
+                    .addComponent(jLabel23)
+                    .addComponent(checkBoxWalkForward))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addGroup(jPanel1Layout.createSequentialGroup()
@@ -1171,6 +1182,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonRun.setEnabled(false);
         try {
             initAPI();
+            profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
             profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
             profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
@@ -1284,6 +1296,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonSellActionPerformed
 
     private void buttonSetPairsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetPairsActionPerformed
+        profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
         profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
         profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
         profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
@@ -1487,6 +1500,10 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
     }//GEN-LAST:event_checkboxAutoSignalFastorderActionPerformed
 
+    private void checkBoxWalkForwardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxWalkForwardActionPerformed
+        profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
+    }//GEN-LAST:event_checkBoxWalkForwardActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1551,6 +1568,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkBoxSellStopLimited;
     private javax.swing.JCheckBox checkBoxStopGain;
     private javax.swing.JCheckBox checkBoxStopLoss;
+    private javax.swing.JCheckBox checkBoxWalkForward;
     private javax.swing.JCheckBox checkboxAutoFastorder;
     private javax.swing.JCheckBox checkboxAutoOrder;
     private javax.swing.JCheckBox checkboxAutoSignalFastorder;

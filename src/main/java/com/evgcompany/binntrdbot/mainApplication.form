@@ -702,7 +702,7 @@
                                           <Component id="jLabel14" min="-2" max="-2" attributes="0"/>
                                       </Group>
                                   </Group>
-                                  <Group type="102" attributes="0">
+                                  <Group type="102" alignment="0" attributes="0">
                                       <Group type="103" groupAlignment="0" attributes="0">
                                           <Component id="checkBoxCheckOtherStrategies" alignment="0" min="-2" max="-2" attributes="0"/>
                                           <Group type="102" alignment="0" attributes="0">
@@ -722,7 +722,8 @@
                                           <Component id="jScrollPane7" max="32767" attributes="0"/>
                                           <Group type="102" attributes="0">
                                               <Component id="jLabel23" min="-2" max="-2" attributes="0"/>
-                                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
+                                              <EmptySpace max="32767" attributes="0"/>
+                                              <Component id="checkBoxWalkForward" min="-2" max="-2" attributes="0"/>
                                           </Group>
                                       </Group>
                                   </Group>
@@ -764,6 +765,7 @@
                       <Group type="103" groupAlignment="3" attributes="0">
                           <Component id="checkBoxCheckOtherStrategies" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel23" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="checkBoxWalkForward" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="0" max="-2" attributes="0">
@@ -931,6 +933,14 @@
               <Properties>
                 <Property name="text" type="java.lang.String" value="Strategies for auto select:"/>
               </Properties>
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="checkBoxWalkForward">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="WalkForward"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxWalkForwardActionPerformed"/>
+              </Events>
             </Component>
           </SubComponents>
         </Container>
