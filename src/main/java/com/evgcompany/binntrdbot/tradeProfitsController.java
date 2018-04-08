@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -110,11 +111,7 @@ public class tradeProfitsController {
 
     private void testPayTradeComission(BigDecimal price, String quoteSymbol) {
         boolean use_spec_currency = !tradeComissionCurrency.isEmpty() && !tradeComissionCurrency.equals(quoteSymbol);
-        BigDecimal comission_quote = price
-                .multiply(
-                    BigDecimal.valueOf(100).subtract(tradeComissionPercent)
-                )
-                .divide(BigDecimal.valueOf(100));
+        BigDecimal comission_quote = price.multiply(tradeComissionPercent).divide(BigDecimal.valueOf(100));
         if (use_spec_currency) {
             String comission_pair = (tradeComissionCurrency + quoteSymbol).toUpperCase();
             BigDecimal pair_price = null;
@@ -125,8 +122,9 @@ public class tradeProfitsController {
             }
             if (pair_price != null && pair_price.compareTo(BigDecimal.ZERO) > 0) {
                 currencyItem ccomm = curr_map.get(tradeComissionCurrency);
-                if (ccomm != null && ccomm.getFreeValue().compareTo(comission_quote.multiply(pair_price)) > 0) {
-                    ccomm.addFreeValue(comission_quote.multiply(pair_price).multiply(BigDecimal.valueOf(-1)));
+                BigDecimal trade_com = comission_quote.divide(pair_price, RoundingMode.HALF_DOWN);
+                if (ccomm != null && ccomm.getFreeValue().compareTo(trade_com) > 0) {
+                    ccomm.addFreeValue(trade_com.multiply(BigDecimal.valueOf(-1)));
                     updateBaseSymbolText(tradeComissionCurrency, false);
                 } else {
                     use_spec_currency = false;

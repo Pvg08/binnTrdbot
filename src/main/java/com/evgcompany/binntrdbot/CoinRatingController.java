@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
@@ -64,6 +65,8 @@ public class CoinRatingController extends Thread {
     private SignalController signalcontroller = null;
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
+    
+    private static final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
     
     private StrategiesController strategiesController = null;
     private boolean lowHold = true;
@@ -573,64 +576,70 @@ public class CoinRatingController extends Thread {
     }
 
     private void updateCurrentPrices(String coinsPattern) {
-        heroesMap.forEach((symbol, curr) -> {
-            curr.do_remove_flag = true;
-        });
-        List<TickerPrice> allPrices = client.getAllPrices();
-        if (heroesMap.isEmpty()) {
-            app.log("Found " + allPrices.size() + " prices...");
-            app.log("Checking them using pattern: " + coinsPattern);
-        }
-        allPrices.forEach((price) -> {
-            if (price != null && !price.getSymbol().isEmpty() && !price.getSymbol().contains("1") && !price.getPrice().isEmpty()) {
-                String symbol = price.getSymbol();                    
-                if (symbol.matches(".*(" + coinsPattern + ")$")) {
-                    float rprice = Float.parseFloat(price.getPrice());
-                    if (heroesMap.containsKey(symbol)) {
-                        CoinRatingPairLogItem clog = heroesMap.get(symbol);
-                        clog.current_price = rprice;
-                        clog.do_remove_flag = false;
-                        if (clog.start_price > 0) {
-                            clog.percent_from_begin = (clog.current_price - clog.start_price) / clog.start_price;
-                        }
-                        if (clog.hour_ago_price > 0) {
-                            clog.percent_hour = (clog.current_price - clog.hour_ago_price) / clog.hour_ago_price;
-                        }
-                        if (clog.day_ago_price > 0) {
-                            clog.percent_day = (clog.current_price - clog.day_ago_price) / clog.day_ago_price;
-                        }
-                    } else {
-                        CoinRatingPairLogItem newlog = new CoinRatingPairLogItem();
-                        newlog.symbol = symbol;
-                        newlog.do_remove_flag = false;
-                        newlog.current_price = rprice;
-                        newlog.start_price = rprice;
-                        newlog.percent_from_begin = 0f;
-                        newlog.update_counter = 0;
-                        newlog.pair = null;
-                        newlog.fastbuy_skip = false;
-
-                        String psymbol = symbol.substring(0, symbol.length() - 3).toUpperCase();
-                        if (coinRanks.containsKey(psymbol)) {
-                            newlog.rank = Integer.parseInt(coinRanks.get(psymbol).optString("rank", "9999"));
-                            newlog.market_cap = Float.parseFloat(coinRanks.get(psymbol).optString("market_cap_usd", "0"));
-                            newlog.fullname = coinRanks.get(psymbol).optString("name", symbol);
+        try {
+            SEMAPHORE_UPDATE.acquire();
+            heroesMap.forEach((symbol, curr) -> {
+                curr.do_remove_flag = true;
+            });
+            List<TickerPrice> allPrices = client.getAllPrices();
+            if (heroesMap.isEmpty()) {
+                app.log("Found " + allPrices.size() + " prices...");
+                app.log("Checking them using pattern: " + coinsPattern);
+            }
+            allPrices.forEach((price) -> {
+                if (price != null && !price.getSymbol().isEmpty() && !price.getSymbol().contains("1") && !price.getPrice().isEmpty()) {
+                    String symbol = price.getSymbol();                    
+                    if (symbol.matches(".*(" + coinsPattern + ")$")) {
+                        float rprice = Float.parseFloat(price.getPrice());
+                        if (heroesMap.containsKey(symbol)) {
+                            CoinRatingPairLogItem clog = heroesMap.get(symbol);
+                            clog.current_price = rprice;
+                            clog.do_remove_flag = false;
+                            if (clog.start_price > 0) {
+                                clog.percent_from_begin = (clog.current_price - clog.start_price) / clog.start_price;
+                            }
+                            if (clog.hour_ago_price > 0) {
+                                clog.percent_hour = (clog.current_price - clog.hour_ago_price) / clog.hour_ago_price;
+                            }
+                            if (clog.day_ago_price > 0) {
+                                clog.percent_day = (clog.current_price - clog.day_ago_price) / clog.day_ago_price;
+                            }
                         } else {
-                            newlog.rank = 9999;
-                            newlog.market_cap = 0;
-                            newlog.fullname = symbol;
-                        }
+                            CoinRatingPairLogItem newlog = new CoinRatingPairLogItem();
+                            newlog.symbol = symbol;
+                            newlog.do_remove_flag = false;
+                            newlog.current_price = rprice;
+                            newlog.start_price = rprice;
+                            newlog.percent_from_begin = 0f;
+                            newlog.update_counter = 0;
+                            newlog.pair = null;
+                            newlog.fastbuy_skip = false;
 
-                        heroesMap.put(symbol, newlog);
+                            String psymbol = symbol.substring(0, symbol.length() - 3).toUpperCase();
+                            if (coinRanks.containsKey(psymbol)) {
+                                newlog.rank = Integer.parseInt(coinRanks.get(psymbol).optString("rank", "9999"));
+                                newlog.market_cap = Float.parseFloat(coinRanks.get(psymbol).optString("market_cap_usd", "0"));
+                                newlog.fullname = coinRanks.get(psymbol).optString("name", symbol);
+                            } else {
+                                newlog.rank = 9999;
+                                newlog.market_cap = 0;
+                                newlog.fullname = symbol;
+                            }
+
+                            heroesMap.put(symbol, newlog);
+                        }
                     }
                 }
-            }
-        });
-        heroesMap.forEach((symbol, curr) -> {
-            if (curr.do_remove_flag) {
-                heroesMap.remove(symbol);
-            }
-        });
+            });
+            heroesMap.forEach((symbol, curr) -> {
+                if (curr.do_remove_flag) {
+                    heroesMap.remove(symbol);
+                }
+            });
+        } catch (InterruptedException ex) {
+            Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        SEMAPHORE_UPDATE.release();
     }
     
     @Override

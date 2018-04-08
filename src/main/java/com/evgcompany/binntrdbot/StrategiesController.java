@@ -546,6 +546,7 @@ public class StrategiesController {
     public List<StrategyItem> getStrategiesInitializerMap() {
         strategy_items.add(new StrategyNo(this));
         strategy_items.add(new StrategyNeuralNetwork(this));  // @todo
+        strategy_items.add(new StrategyANN(this));
         strategy_items.add(new StrategySMA(this));
         strategy_items.add(new StrategyEMA(this));
         strategy_items.add(new StrategyThreeSoldiers(this));

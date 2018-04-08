@@ -6,15 +6,13 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.ANNIndicator;
+import com.evgcompany.binntrdbot.analysis.OHLC4Indicator;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
-import org.ta4j.core.indicators.AroonDownIndicator;
-import org.ta4j.core.indicators.AroonUpIndicator;
-import org.ta4j.core.indicators.helpers.MinPriceIndicator;
-import org.ta4j.core.indicators.helpers.MaxPriceIndicator;
 import org.ta4j.core.trading.rules.OverIndicatorRule;
 import org.ta4j.core.trading.rules.UnderIndicatorRule;
 
@@ -22,11 +20,11 @@ import org.ta4j.core.trading.rules.UnderIndicatorRule;
  *
  * @author EVG_Adminer
  */
-public class StrategyAroon extends StrategyItem {
+public class StrategyANN extends StrategyItem {
 
-    public StrategyAroon(StrategiesController controller) {
+    public StrategyANN(StrategiesController controller) {
         super(controller);
-        StrategyName = "Aroon";
+        StrategyName = "ANN";
     }
 
     @Override
@@ -36,18 +34,18 @@ public class StrategyAroon extends StrategyItem {
         }
         initializer = (tseries, dataset) -> {};
         
-        MinPriceIndicator minPrice = new MinPriceIndicator(series);
-        MaxPriceIndicator maxPrice = new MaxPriceIndicator(series);
-        AroonUpIndicator aup = new AroonUpIndicator(series, maxPrice, 25);
-        AroonDownIndicator adn = new AroonDownIndicator(series, minPrice, 25);
+        double threshold = 0.0014;
+        
+        OHLC4Indicator ohlc = new OHLC4Indicator(series);
+        ANNIndicator ann_enter = new ANNIndicator(ohlc, 96);
+        ANNIndicator ann_exit = new ANNIndicator(ohlc, 1);
 
-        Rule entryRule = new UnderIndicatorRule(aup, Decimal.valueOf(20))
-                .and(new UnderIndicatorRule(adn, Decimal.valueOf(20)));
+        Rule entryRule = new UnderIndicatorRule(ann_enter, Decimal.valueOf(-threshold))
+                .and(new UnderIndicatorRule(ann_exit, Decimal.valueOf(-threshold)));
 
-        Rule exitRule = new OverIndicatorRule(aup, Decimal.valueOf(70))
-                .and(new OverIndicatorRule(adn, Decimal.valueOf(70)));
+        Rule exitRule = new OverIndicatorRule(ann_enter, Decimal.valueOf(threshold))
+                .and(new OverIndicatorRule(ann_exit, Decimal.valueOf(threshold)));
 
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
-    
 }
