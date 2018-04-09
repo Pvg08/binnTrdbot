@@ -24,7 +24,7 @@ public class StrategySMA extends StrategyItem {
     public StrategySMA(StrategiesController controller) {
         super(controller);
         StrategyName = "SMA";
-        config.Add("SMA-TimeFrame", new StrategyConfigItem("2", "30", "1", "12"));
+        config.Add("SMA-TimeFrame", new StrategyConfigItem("2", "30", "1", "22"));
     }
 
     @Override

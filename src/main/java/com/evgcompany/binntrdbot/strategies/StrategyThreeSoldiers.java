@@ -24,9 +24,9 @@ public class StrategyThreeSoldiers extends StrategyItem {
         super(controller);
         StrategyName = "Three Soldiers";
         config.Add("TWS-TimeFrame", new StrategyConfigItem("1", "10", "1", "2"));
-        config.Add("TWS-Factor", new StrategyConfigItem("0.5", "10", "0.25", "5"));
+        config.Add("TWS-Factor", new StrategyConfigItem("0.5", "10", "0.5", "5"));
         config.Add("TBC-TimeFrame", new StrategyConfigItem("1", "10", "1", "1"));
-        config.Add("TBC-Factor", new StrategyConfigItem("0.5", "10", "0.25", "1"));
+        config.Add("TBC-Factor", new StrategyConfigItem("0.5", "10", "0.5", "1"));
     }
 
     @Override

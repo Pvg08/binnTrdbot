@@ -50,9 +50,9 @@ public class StrategyBollinger extends StrategyItem {
             StrategyName += mode;
         }
         this.mode = mode;
-        config.Add("Bollinger-Length", new StrategyConfigItem("5", "40", "5", "20"));
-        config.Add("Bollinger-Mult", new StrategyConfigItem("1", "3", "0.25", "2"));
-        config.Add("RSI-TimeFrame", new StrategyConfigItem("1", "10", "0.5", "2")).setActive(mode == 1);
+        config.Add("Bollinger-Length", new StrategyConfigItem("5", "30", "5", "20"));
+        config.Add("Bollinger-Mult", new StrategyConfigItem("1", "3", "0.1", "2.25"));
+        config.Add("RSI-TimeFrame", new StrategyConfigItem("2", "8", "1", "2")).setActive(mode == 1);
     }
 
     @Override

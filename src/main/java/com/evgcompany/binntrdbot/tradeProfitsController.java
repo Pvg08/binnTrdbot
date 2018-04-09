@@ -53,6 +53,7 @@ public class tradeProfitsController {
     
     private List<String> autoStrategies = new ArrayList<>();
     private boolean autoWalkForward = false;
+    private boolean autoPickStrategyParams = false;
 
     private TradingAPIAbstractInterface client = null;
 
@@ -646,5 +647,19 @@ public class tradeProfitsController {
      */
     public void setAutoWalkForward(boolean autoWalkForward) {
         this.autoWalkForward = autoWalkForward;
+    }
+
+    /**
+     * @return the autoPickStrategyParams
+     */
+    public boolean isAutoPickStrategyParams() {
+        return autoPickStrategyParams;
+    }
+
+    /**
+     * @param autoPickStrategyParams the autoPickStrategyParams to set
+     */
+    public void setAutoPickStrategyParams(boolean autoPickStrategyParams) {
+        this.autoPickStrategyParams = autoPickStrategyParams;
     }
 }

@@ -462,6 +462,7 @@ public class tradePairProcess extends Thread {
     }
 
     private void resetSeries() {
+        need_bar_reset = false;
         series = strategiesController.resetSeries();
         
         if (strategiesController.getMainStrategy().equals("Neural Network")) {
@@ -470,8 +471,6 @@ public class tradePairProcess extends Thread {
                 predictor.toBase();
             }
         }
-        
-        need_bar_reset = false;
         
         stopSockets();
         
@@ -612,7 +611,6 @@ public class tradePairProcess extends Thread {
         }
         
         resetSeries();
-
         strategiesController.resetStrategies();
         
         if (isTryingToSellUp) {

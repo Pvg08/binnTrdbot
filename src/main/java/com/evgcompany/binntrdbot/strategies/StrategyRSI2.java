@@ -26,12 +26,14 @@ import org.ta4j.core.trading.rules.UnderIndicatorRule;
  */
 public class StrategyRSI2 extends StrategyItem {
 
+    // [SMA1-TimeFrame=21,SMA2-TimeFrame=51,RSI-TimeFrame=4,RSI-Threshold=14]
+
     public StrategyRSI2(StrategiesController controller) {
         super(controller);
         StrategyName = "RSI2";
-        config.Add("SMA1-TimeFrame", new StrategyConfigItem("3", "31", "2", "5"));
-        config.Add("SMA2-TimeFrame", new StrategyConfigItem("21", "151", "10", "151"));
-        config.Add("RSI-TimeFrame", new StrategyConfigItem("2", "15", "1", "2"));
+        config.Add("SMA1-TimeFrame", new StrategyConfigItem("3", "25", "2", "5"));
+        config.Add("SMA2-TimeFrame", new StrategyConfigItem("31", "151", "20", "151"));
+        config.Add("RSI-TimeFrame", new StrategyConfigItem("2", "12", "2", "2"));
         config.Add("RSI-Threshold", new StrategyConfigItem("1", "25", "1", "5"));
     }
 

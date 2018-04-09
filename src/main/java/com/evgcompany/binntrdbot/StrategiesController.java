@@ -191,7 +191,13 @@ public class StrategiesController {
                 }
             }
         }
-        
+
+        StrategyItem main = getMainStrategyItem();
+        if (main != null) {
+            app.log("");
+            app.log("Current params for " + main.getStrategyName() + " is: " + main.getConfig().toString(true));
+        }
+
         /**
          * Analysis criteria
          */
@@ -215,11 +221,22 @@ public class StrategiesController {
     }
     
     public void resetStrategies() {
+        boolean need_main_optimize = false;
         markers.clear();
         strategies.clear();
         getStrategiesInitializerMap();
         strategy_items.forEach((entry) -> {
-            strategies.put(entry.getStrategyName(), entry.buildStrategy(series));
+            Strategy nstrategy;
+            if (
+                    mainStrategy.equals(entry.getStrategyName()) && 
+                    profitsChecker != null && 
+                    profitsChecker.isAutoPickStrategyParams()
+            ) {
+                nstrategy = entry.buildStrategyWithBestParams(series);
+            } else {
+                nstrategy = entry.buildStrategy(series);
+            }
+            strategies.put(entry.getStrategyName(), nstrategy);
         });
         if (profitsChecker != null) {
             strategy_auto = profitsChecker.getAutoStrategies();
@@ -228,6 +245,7 @@ public class StrategiesController {
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
             if (app != null) app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
+            need_main_optimize = profitsChecker != null && profitsChecker.isAutoPickStrategyParams();
         }
         if (!strategies.containsKey(mainStrategy)) {
             List<String> keysAsArray = new ArrayList<>(strategies.keySet());
@@ -241,6 +259,15 @@ public class StrategiesController {
                 strategyItemIndex = i;
             }
         }
+
+        if (need_main_optimize) {
+            StrategyItem main = getMainStrategyItem();
+            if (main != null) {
+                app.log("Looking for best params for strategy: " + main.getStrategyName() + "...");
+                strategies.put(main.getStrategyName(), main.buildStrategyWithBestParams(series));
+            }
+        }
+
         logStatistics(true);
     }
     
@@ -347,7 +374,7 @@ public class StrategiesController {
             subseries.add(series);
         }
 
-        AnalysisCriterion profitCriterion = null;
+        AnalysisCriterion profitCriterion;
         if (profitsChecker != null)
             profitCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
         else 
@@ -548,6 +575,7 @@ public class StrategiesController {
     }
     
     public List<StrategyItem> getStrategiesInitializerMap() {
+        strategy_items.clear();
         strategy_items.add(new StrategyNo(this));
         strategy_items.add(new StrategyNeuralNetwork(this));  // @todo
         strategy_items.add(new StrategyANN(this));

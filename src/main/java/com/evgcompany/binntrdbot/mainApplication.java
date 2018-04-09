@@ -100,6 +100,7 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerRatingMinForOrder, "rating_min_for_order");
         config.addComponent(listBoxAutoStrategies, "auto_strategies_list");
         config.addComponent(checkBoxWalkForward, "auto_walkforward");
+        config.addComponent(checkBoxAutoStrategyParams, "auto_strategyparamspick");
         config.Load();
     }
     
@@ -238,6 +239,7 @@ public class mainApplication extends javax.swing.JFrame {
         listBoxAutoStrategies = new javax.swing.JList<>();
         jLabel23 = new javax.swing.JLabel();
         checkBoxWalkForward = new javax.swing.JCheckBox();
+        checkBoxAutoStrategyParams = new javax.swing.JCheckBox();
         jPanel4 = new javax.swing.JPanel();
         checkboxAutoOrder = new javax.swing.JCheckBox();
         checkBoxAutoAnalyzer = new javax.swing.JCheckBox();
@@ -534,7 +536,7 @@ public class mainApplication extends javax.swing.JFrame {
                     .addComponent(checkBoxSellStopLimited)
                     .addComponent(spinnerSellStopLimited, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(jLabel13))
-                .addContainerGap(41, Short.MAX_VALUE))
+                .addContainerGap(81, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Main", jPanel2);
@@ -598,6 +600,13 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        checkBoxAutoStrategyParams.setText("Auto pick strategy params");
+        checkBoxAutoStrategyParams.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkBoxAutoStrategyParamsActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -610,7 +619,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGap(2, 2, 2)
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(jPanel1Layout.createSequentialGroup()
-                                .addComponent(ComboBoxMainStrategy, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(ComboBoxMainStrategy, 0, 226, Short.MAX_VALUE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(jLabel3)
@@ -634,14 +643,13 @@ public class mainApplication extends javax.swing.JFrame {
                                         .addComponent(checkBoxStopLoss)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                         .addComponent(spinnerStopLoss, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                    .addComponent(checkBoxLowHold))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                    .addComponent(checkBoxLowHold)
+                                    .addComponent(checkBoxAutoStrategyParams))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(jScrollPane7)
-                                    .addGroup(jPanel1Layout.createSequentialGroup()
-                                        .addComponent(jLabel23)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addComponent(checkBoxWalkForward)))))))
+                                    .addComponent(jLabel23)
+                                    .addComponent(jScrollPane7, javax.swing.GroupLayout.PREFERRED_SIZE, 175, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(checkBoxWalkForward))))))
                 .addContainerGap(39, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
@@ -668,8 +676,7 @@ public class mainApplication extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkBoxCheckOtherStrategies)
-                    .addComponent(jLabel23)
-                    .addComponent(checkBoxWalkForward))
+                    .addComponent(jLabel23))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addGroup(jPanel1Layout.createSequentialGroup()
@@ -683,7 +690,11 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(checkBoxLowHold))
                     .addComponent(jScrollPane7, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
-                .addContainerGap(35, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(checkBoxAutoStrategyParams)
+                    .addComponent(checkBoxWalkForward))
+                .addContainerGap(45, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Strategies", jPanel1);
@@ -800,7 +811,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(jLabel22)
                             .addComponent(spinnerRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap(79, Short.MAX_VALUE))
+                .addContainerGap(119, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Coins rating", jPanel4);
@@ -878,7 +889,7 @@ public class mainApplication extends javax.swing.JFrame {
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkboxAutoSignalOrder)
                     .addComponent(checkboxAutoSignalFastorder))
-                .addContainerGap(104, Short.MAX_VALUE))
+                .addContainerGap(144, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
@@ -903,7 +914,7 @@ public class mainApplication extends javax.swing.JFrame {
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane6, javax.swing.GroupLayout.DEFAULT_SIZE, 177, Short.MAX_VALUE)
+                .addComponent(jScrollPane6, javax.swing.GroupLayout.DEFAULT_SIZE, 217, Short.MAX_VALUE)
                 .addContainerGap())
         );
 
@@ -1124,7 +1135,7 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addGap(9, 9, 9)
                                 .addComponent(jLabel7)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 306, Short.MAX_VALUE)))
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 301, Short.MAX_VALUE)))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonClear)
@@ -1138,7 +1149,7 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(textFieldTradePairs, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(buttonSetPairs))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jTabbedPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 227, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jTabbedPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 267, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonRun)
@@ -1151,7 +1162,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jLabel10)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 165, Short.MAX_VALUE)
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 120, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonBuy)
@@ -1182,6 +1193,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonRun.setEnabled(false);
         try {
             initAPI();
+            profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
             profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
             profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
             profitsChecker.setTestMode(checkboxTestMode.isSelected());
@@ -1296,6 +1308,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonSellActionPerformed
 
     private void buttonSetPairsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetPairsActionPerformed
+        profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
         profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
         profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
         profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
@@ -1404,9 +1417,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkBoxLimitedOrdersActionPerformed
 
     private void comboBoxLimitedModeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxLimitedModeActionPerformed
-        if (profitsChecker != null) {
-            profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
-        }
+        profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
     }//GEN-LAST:event_comboBoxLimitedModeActionPerformed
 
     private void checkboxAutoOrderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoOrderActionPerformed
@@ -1504,6 +1515,10 @@ public class mainApplication extends javax.swing.JFrame {
         profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
     }//GEN-LAST:event_checkBoxWalkForwardActionPerformed
 
+    private void checkBoxAutoStrategyParamsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxAutoStrategyParamsActionPerformed
+        profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
+    }//GEN-LAST:event_checkBoxAutoStrategyParamsActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1561,6 +1576,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JButton buttonUpdate;
     private javax.swing.JButton buttonWebBrowserOpen;
     private javax.swing.JCheckBox checkBoxAutoAnalyzer;
+    private javax.swing.JCheckBox checkBoxAutoStrategyParams;
     private javax.swing.JCheckBox checkBoxBuyStopLimited;
     private javax.swing.JCheckBox checkBoxCheckOtherStrategies;
     private javax.swing.JCheckBox checkBoxLimitedOrders;

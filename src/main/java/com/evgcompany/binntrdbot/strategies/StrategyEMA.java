@@ -24,7 +24,7 @@ public class StrategyEMA extends StrategyItem {
     public StrategyEMA(StrategiesController controller) {
         super(controller);
         StrategyName = "EMA";
-        config.Add("EMA-TimeFrame", new StrategyConfigItem("2", "40", "1", "20"));
+        config.Add("EMA-TimeFrame", new StrategyConfigItem("2", "40", "1", "25"));
     }
 
     @Override

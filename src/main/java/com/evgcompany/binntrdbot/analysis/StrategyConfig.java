@@ -11,7 +11,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.ta4j.core.Decimal;
+import org.ta4j.core.Strategy;
 
 /**
  *
@@ -26,6 +28,57 @@ public class StrategyConfig {
         params.put(name, item);
         param_names.add(name);
         return item;
+    }
+    
+    public static String ConfigRowToStr(HashMap<String, BigDecimal> row) {
+        String result = "";
+        for (Map.Entry<String, BigDecimal> entry : row.entrySet()) {
+            result += entry.getKey() + "=" + df6.format(entry.getValue()) + "; ";
+        }
+        return result;
+    }
+
+    private void addParamPosVariants(int pos, HashMap<String, BigDecimal> variant, List<HashMap<String, BigDecimal>> result) {
+        if (pos >= 0 && pos < param_names.size()) {
+            String param_name = param_names.get(pos);
+            StrategyConfigItem confitem = params.get(param_name);
+            if (variant == null) {
+                variant = new HashMap<>();
+            }
+            if (!confitem.isActive()) {
+                addParamPosVariants(pos + 1, variant, result);
+                return;
+            }
+            confitem.scanStart();
+            do {
+                variant.put(param_name, confitem.getValue());
+                addParamPosVariants(pos + 1, variant, result);
+            } while(confitem.scanNext());
+            confitem.resetValue();
+        } else if (pos >= param_names.size() && variant.size() > 0) {
+            result.add((HashMap<String, BigDecimal>) variant.clone());
+            //System.out.println(ConfigRowToStr(variant));
+        }
+    }
+    
+    public List<HashMap<String, BigDecimal>> GetParamVariants() {
+        List<HashMap<String, BigDecimal>> result = new ArrayList<>();
+        addParamPosVariants(0, null, result);
+        return result;
+    }
+
+    public void setParams(HashMap<String, BigDecimal> params) {
+        for (Map.Entry<String, BigDecimal> entry : params.entrySet()) {
+            if (this.params.containsKey(entry.getKey())) {
+                this.params.get(entry.getKey()).setValue(entry.getValue());
+            }
+        }
+    }
+
+    public void resetParams() {
+        for (Map.Entry<String, StrategyConfigItem> entry : params.entrySet()) {
+            entry.getValue().resetValue();
+        }
     }
     
     public StrategyConfigItem GetItem(String name) {
@@ -54,18 +107,26 @@ public class StrategyConfig {
         return Decimal.valueOf(params.get(name).getValue());
     }
     
-    @Override
-    public String toString() {
+    public String toString(boolean with_names) {
         List<String> parts = new ArrayList<>();
         param_names.forEach((pname) -> {
             StrategyConfigItem item = params.get(pname);
             if (item != null && item.isActive()) {
-                parts.add(df6.format(item.getValue()).replaceAll(",", "."));
+                if (with_names) {
+                    parts.add(pname + "=" + df6.format(item.getValue()).replaceAll(",", "."));
+                } else {
+                    parts.add(df6.format(item.getValue()).replaceAll(",", "."));
+                }
             }
         });
         if (!parts.isEmpty())
             return " " + Arrays.toString(parts.toArray()).replaceAll(" ", "");
         else 
             return "";
+    }
+    
+    @Override
+    public String toString() {
+        return toString(false);
     }
 }

@@ -42,17 +42,22 @@ public class StrategyConfigItem {
 
     public boolean scanNext() {
         value = value.add(step);
-        if (value.compareTo(max) >= 0) {
+        if (value.compareTo(max) > 0) {
             value = max;
-        }
-        return scanFinished();
-    }
-
-    public boolean scanFinished() {
-        if (value.compareTo(max) >= 0) {
             return false;
         }
         return true;
+    }
+
+    public boolean scanFinished() {
+        if (value.compareTo(max) < 0) {
+            return false;
+        }
+        return true;
+    }
+    
+    public void resetValue() {
+        value = default_value;
     }
 
     /**
