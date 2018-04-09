@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -24,6 +25,8 @@ public class StrategyCCICorrection extends StrategyItem {
     public StrategyCCICorrection(StrategiesController controller) {
         super(controller);
         StrategyName = "CCICorrection";
+        config.Add("CCI1-TimeFrame", new StrategyConfigItem("2", "19", "1", "5"));
+        config.Add("CCI2-TimeFrame", new StrategyConfigItem("20", "200", "10", "200"));
     }
 
     @Override
@@ -31,10 +34,14 @@ public class StrategyCCICorrection extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int short_tf = config.GetIntValue("CCI1-TimeFrame");
+        int long_tf = config.GetIntValue("CCI2-TimeFrame");
+        
         initializer = (tseries, dataset) -> {};
         
-        CCIIndicator longCci = new CCIIndicator(series, 200);
-        CCIIndicator shortCci = new CCIIndicator(series, 5);
+        CCIIndicator shortCci = new CCIIndicator(series, short_tf);
+        CCIIndicator longCci = new CCIIndicator(series, long_tf);
         Decimal plus100 = Decimal.HUNDRED;
         Decimal minus100 = Decimal.valueOf(-100);
         

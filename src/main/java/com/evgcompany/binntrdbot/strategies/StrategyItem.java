@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfig;
 import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
 import com.evgcompany.binntrdbot.tradeProfitsController;
 import java.util.Date;
@@ -29,10 +30,12 @@ public abstract class StrategyItem {
     protected StrategyDatasetInitializer initializer = null;
     protected tradeProfitsController profitsChecker = null;
     protected StrategiesController controller = null;
+    protected StrategyConfig config = null;
     
     public StrategyItem(StrategiesController controller) {
         this.controller = controller;
         this.profitsChecker = controller.getProfitsChecker();
+        this.config = new StrategyConfig();
         StrategyName = "NoName";
     }
     
@@ -80,6 +83,13 @@ public abstract class StrategyItem {
      * @return the StrategyName
      */
     public String getStrategyName() {
-        return StrategyName;
+        return StrategyName + config.toString();
+    }
+    
+    /**
+     * @return the config
+     */
+    public StrategyConfig getConfig() {
+        return config;
     }
 }

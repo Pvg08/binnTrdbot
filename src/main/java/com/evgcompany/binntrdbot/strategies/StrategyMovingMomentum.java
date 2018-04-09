@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -29,6 +30,11 @@ public class StrategyMovingMomentum extends StrategyItem {
     public StrategyMovingMomentum(StrategiesController controller) {
         super(controller);
         StrategyName = "MovingMomentum";
+        config.Add("EMA1-TimeFrame", new StrategyConfigItem("2", "20", "1", "5"));
+        config.Add("EMA2-TimeFrame", new StrategyConfigItem("21", "76", "5", "26"));
+        config.Add("EMACD-TimeFrame", new StrategyConfigItem("8", "50", "2", "18"));
+        config.Add("STOK-TimeFrame", new StrategyConfigItem("3", "25", "1", "14"));
+        config.Add("MACD-Threshold", new StrategyConfigItem("1", "40", "1", "20"));
     }
 
     @Override
@@ -36,30 +42,37 @@ public class StrategyMovingMomentum extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int ema1_tf = config.GetIntValue("EMA1-TimeFrame");
+        int ema2_tf = config.GetIntValue("EMA2-TimeFrame");
+        int stok_tf = config.GetIntValue("STOK-TimeFrame");
+        int emacd_tf = config.GetIntValue("EMACD-TimeFrame");
+        int macd_th = config.GetIntValue("MACD-Threshold");
+        
         initializer = (tseries, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
-            EMAIndicator shortEma = new EMAIndicator(closePrice, 5);
-            EMAIndicator longEma = new EMAIndicator(closePrice, 26);
-            dataset.addSeries(buildChartTimeSeries(tseries, shortEma, "EMA 5"));
-            dataset.addSeries(buildChartTimeSeries(tseries, longEma, "EMA 26"));
+            EMAIndicator shortEma = new EMAIndicator(closePrice, ema1_tf);
+            EMAIndicator longEma = new EMAIndicator(closePrice, ema2_tf);
+            dataset.addSeries(buildChartTimeSeries(tseries, shortEma, "EMA " + ema1_tf));
+            dataset.addSeries(buildChartTimeSeries(tseries, longEma, "EMA " + ema2_tf));
         };
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         
-        EMAIndicator shortEma = new EMAIndicator(closePrice, 5);
-        EMAIndicator longEma = new EMAIndicator(closePrice, 26);
+        EMAIndicator shortEma = new EMAIndicator(closePrice, ema1_tf);
+        EMAIndicator longEma = new EMAIndicator(closePrice, ema2_tf);
 
-        StochasticOscillatorKIndicator stoK = new StochasticOscillatorKIndicator(series, 14);
+        StochasticOscillatorKIndicator stoK = new StochasticOscillatorKIndicator(series, stok_tf);
 
-        MACDIndicator macd = new MACDIndicator(closePrice, 5, 26);
-        EMAIndicator emaMacd = new EMAIndicator(macd, 18);
+        MACDIndicator macd = new MACDIndicator(closePrice, ema1_tf, ema2_tf);
+        EMAIndicator emaMacd = new EMAIndicator(macd, emacd_tf);
         
         Rule entryRule = new OverIndicatorRule(shortEma, longEma)
-                .and(new CrossedDownIndicatorRule(stoK, Decimal.valueOf(20)))
+                .and(new CrossedDownIndicatorRule(stoK, Decimal.valueOf(macd_th)))
                 .and(new OverIndicatorRule(macd, emaMacd));
         
         Rule exitRule = new UnderIndicatorRule(shortEma, longEma)
-                .and(new CrossedUpIndicatorRule(stoK, Decimal.valueOf(80)))
+                .and(new CrossedUpIndicatorRule(stoK, Decimal.valueOf(100 - macd_th)))
                 .and(new UnderIndicatorRule(macd, emaMacd));
 
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));

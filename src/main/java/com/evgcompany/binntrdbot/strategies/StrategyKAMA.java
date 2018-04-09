@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -27,6 +28,10 @@ public class StrategyKAMA extends StrategyItem {
     public StrategyKAMA(StrategiesController controller) {
         super(controller);
         StrategyName = "KAMA";
+        config.Add("KAMA-TimeFrameFast1", new StrategyConfigItem("2", "25", "1", "2"));
+        config.Add("KAMA-TimeFrameFast2", new StrategyConfigItem("2", "25", "1", "5"));
+        config.Add("KAMA-TimeFrameSlow", new StrategyConfigItem("30", "50", "5", "30"));
+        config.Add("KAMA-TimeFrameRatio", new StrategyConfigItem("5", "30", "5", "10"));
     }
 
     @Override
@@ -34,23 +39,29 @@ public class StrategyKAMA extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int kama1_tf_fast = config.GetIntValue("KAMA-TimeFrameFast1");
+        int kama2_tf_fast = config.GetIntValue("KAMA-TimeFrameFast2");
+        int kama_tf_slow = config.GetIntValue("KAMA-TimeFrameSlow");
+        int kama_tf_ratio = config.GetIntValue("KAMA-TimeFrameRatio");
+        
         initializer = (tseries, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
-            KAMAIndicator kama2 = new KAMAIndicator(closePrice, 10, 2, 30);
-            KAMAIndicator kama5 = new KAMAIndicator(closePrice, 10, 5, 30);
-            dataset.addSeries(buildChartTimeSeries(tseries, kama2, "KAMA 2"));
-            dataset.addSeries(buildChartTimeSeries(tseries, kama5, "KAMA 5"));
+            KAMAIndicator kama2 = new KAMAIndicator(closePrice, kama_tf_ratio, kama1_tf_fast, kama_tf_slow);
+            KAMAIndicator kama5 = new KAMAIndicator(closePrice, kama_tf_ratio, kama2_tf_fast, kama_tf_slow);
+            dataset.addSeries(buildChartTimeSeries(tseries, kama2, "KAMA " + kama1_tf_fast));
+            dataset.addSeries(buildChartTimeSeries(tseries, kama5, "KAMA " + kama2_tf_fast));
         };
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        KAMAIndicator kama2 = new KAMAIndicator(closePrice, 10, 2, 30);
-        KAMAIndicator kama5 = new KAMAIndicator(closePrice, 10, 5, 30);
+        KAMAIndicator kama1 = new KAMAIndicator(closePrice, kama_tf_ratio, kama1_tf_fast, kama_tf_slow);
+        KAMAIndicator kama2 = new KAMAIndicator(closePrice, kama_tf_ratio, kama2_tf_fast, kama_tf_slow);
         
-        Rule entryRule = new UnderIndicatorRule(kama5, kama2)
-                .and(new CrossedUpIndicatorRule(kama2, closePrice));
+        Rule entryRule = new UnderIndicatorRule(kama2, kama1)
+                .and(new CrossedUpIndicatorRule(kama1, closePrice));
         
-        Rule exitRule = new OverIndicatorRule(kama5, kama2)
-                .and(new CrossedDownIndicatorRule(kama2, closePrice));
+        Rule exitRule = new OverIndicatorRule(kama2, kama1)
+                .and(new CrossedDownIndicatorRule(kama1, closePrice));
         
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }

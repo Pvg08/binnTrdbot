@@ -42,8 +42,8 @@ public class CoinRatingPairLogItem {
     String last_event_date;
     long last_event_anno_millis = 0;
     long last_rating_update_millis = 0;
-    int strategies_shouldenter_cnt = 0;
-    int strategies_shouldexit_cnt = 0;
+    double strategies_shouldenter_rate = 0;
+    double strategies_shouldexit_rate = 0;
 
     float rating = 0;
     float rating_inc = 0;
@@ -67,13 +67,13 @@ public class CoinRatingPairLogItem {
         if (day_ago_price > 0 && day_ago_price < current_price) {
             rating += current_price / day_ago_price;
         }
-        if (strategies_shouldenter_cnt > strategies_shouldexit_cnt) {
+        if (strategies_shouldenter_rate > strategies_shouldexit_rate) {
             rating+=2;
         }
-        if (strategies_shouldenter_cnt > strategies_shouldexit_cnt + 4) {
+        if (strategies_shouldenter_rate > strategies_shouldexit_rate + 4) {
             rating++;
         }
-        if (strategies_shouldenter_cnt > strategies_shouldexit_cnt + 10) {
+        if (strategies_shouldenter_rate > strategies_shouldexit_rate + 10) {
             rating++;
         }
         if (hour_volume > 0.1 * day_volume) {

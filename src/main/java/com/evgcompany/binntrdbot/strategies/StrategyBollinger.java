@@ -6,6 +6,8 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
+import java.math.BigDecimal;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -48,6 +50,9 @@ public class StrategyBollinger extends StrategyItem {
             StrategyName += mode;
         }
         this.mode = mode;
+        config.Add("Bollinger-Length", new StrategyConfigItem("5", "40", "5", "20"));
+        config.Add("Bollinger-Mult", new StrategyConfigItem("1", "3", "0.25", "2"));
+        config.Add("RSI-TimeFrame", new StrategyConfigItem("1", "10", "0.5", "2")).setActive(mode == 1);
     }
 
     @Override
@@ -56,8 +61,8 @@ public class StrategyBollinger extends StrategyItem {
             throw new IllegalArgumentException("Series cannot be null");
         }
         
-        int length = 20;
-        double mult = 2.0;
+        int length = config.GetIntValue("Bollinger-Length");
+        BigDecimal mult = config.GetValue("Bollinger-Mult");
         
         initializer = (tseries, dataset) -> {
             ClosePriceIndicator indicator = new ClosePriceIndicator(tseries);
@@ -74,7 +79,6 @@ public class StrategyBollinger extends StrategyItem {
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         MinPriceIndicator minPrice = new MinPriceIndicator(series);
         MaxPriceIndicator maxPrice = new MaxPriceIndicator(series);
-        RSIIndicator rsi = new RSIIndicator(closePrice, 2);
         
         EMAIndicator basis = new EMAIndicator(closePrice, length);
         StandardDeviationIndicator dev = new StandardDeviationIndicator(closePrice, length);
@@ -88,6 +92,7 @@ public class StrategyBollinger extends StrategyItem {
 
         switch (mode) {
             case 1:
+                RSIIndicator rsi = new RSIIndicator(closePrice, config.GetIntValue("RSI-TimeFrame"));
                 entryRule = new CrossedDownIndicatorRule(BBB, minPrice)
                 .and(new InPipeRule(rsi, Decimal.valueOf(55), Decimal.valueOf(0)))
                 .and(new IsRisingRule(rsi, 2));
@@ -111,5 +116,4 @@ public class StrategyBollinger extends StrategyItem {
         
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
-    
 }

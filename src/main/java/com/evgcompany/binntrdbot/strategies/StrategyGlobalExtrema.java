@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
@@ -31,6 +32,7 @@ public class StrategyGlobalExtrema extends StrategyItem {
     public StrategyGlobalExtrema(StrategiesController controller) {
         super(controller);
         StrategyName = "GlobalExtrema";
+        config.Add("GlobalExtrema-Threshold", new StrategyConfigItem("0.001", "0.02", "0.001", "0.005"));
     }
 
     @Override
@@ -55,6 +57,8 @@ public class StrategyGlobalExtrema extends StrategyItem {
             dataset.addSeries(buildChartTimeSeries(tseries, dayMaxPrice, "day Max"));
         };
         
+        double threshold = config.GetDoubleValue("GlobalExtrema-Threshold");
+        
         long barSeconds = 60 * 60;
         if (series.getBarCount() > 0) {
             Bar first = series.getBar(series.getBeginIndex());
@@ -72,11 +76,11 @@ public class StrategyGlobalExtrema extends StrategyItem {
         LowestValueIndicator dayMinPrice = new LowestValueIndicator(minPrices, bars_per_day);
 
         // Going long if the close price goes below the min price
-        MultiplierIndicator downDay = new MultiplierIndicator(dayMinPrice, Decimal.valueOf("1.005"));
+        MultiplierIndicator downDay = new MultiplierIndicator(dayMinPrice, Decimal.valueOf(1 + threshold));
         Rule buyingRule = new UnderIndicatorRule(closePrices, downDay);
 
         // Going short if the close price goes above the max price
-        MultiplierIndicator upDay = new MultiplierIndicator(dayMaxPrice, Decimal.valueOf("0.995"));
+        MultiplierIndicator upDay = new MultiplierIndicator(dayMaxPrice, Decimal.valueOf(1 - threshold));
         Rule sellingRule = new OverIndicatorRule(closePrices, upDay);
 
         return new BaseStrategy(buyingRule, addStopLossGain(sellingRule, series));

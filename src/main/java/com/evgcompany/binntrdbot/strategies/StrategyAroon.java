@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -27,6 +28,9 @@ public class StrategyAroon extends StrategyItem {
     public StrategyAroon(StrategiesController controller) {
         super(controller);
         StrategyName = "Aroon";
+        config.Add("Aroon-TimeFrame", new StrategyConfigItem("5", "50", "5", "25"));
+        config.Add("Aroon-Threshold1", new StrategyConfigItem("1", "40", "1", "20"));
+        config.Add("Aroon-Threshold2", new StrategyConfigItem("60", "99", "1", "70"));
     }
 
     @Override
@@ -34,20 +38,21 @@ public class StrategyAroon extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        int timeFrame = config.GetIntValue("Aroon-TimeFrame");
+        int threshold1 = config.GetIntValue("Aroon-Threshold1");
+        int threshold2 = config.GetIntValue("Aroon-Threshold2");
         initializer = (tseries, dataset) -> {};
-        
         MinPriceIndicator minPrice = new MinPriceIndicator(series);
         MaxPriceIndicator maxPrice = new MaxPriceIndicator(series);
-        AroonUpIndicator aup = new AroonUpIndicator(series, maxPrice, 25);
-        AroonDownIndicator adn = new AroonDownIndicator(series, minPrice, 25);
+        AroonUpIndicator aup = new AroonUpIndicator(series, maxPrice, timeFrame);
+        AroonDownIndicator adn = new AroonDownIndicator(series, minPrice, timeFrame);
 
-        Rule entryRule = new UnderIndicatorRule(aup, Decimal.valueOf(20))
-                .and(new UnderIndicatorRule(adn, Decimal.valueOf(20)));
+        Rule entryRule = new UnderIndicatorRule(aup, Decimal.valueOf(threshold1))
+                .and(new UnderIndicatorRule(adn, Decimal.valueOf(threshold1)));
 
-        Rule exitRule = new OverIndicatorRule(aup, Decimal.valueOf(70))
-                .and(new OverIndicatorRule(adn, Decimal.valueOf(70)));
+        Rule exitRule = new OverIndicatorRule(aup, Decimal.valueOf(threshold2))
+                .and(new OverIndicatorRule(adn, Decimal.valueOf(threshold2)));
 
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
-    
 }

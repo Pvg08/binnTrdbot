@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
@@ -23,6 +24,7 @@ public class StrategySMA extends StrategyItem {
     public StrategySMA(StrategiesController controller) {
         super(controller);
         StrategyName = "SMA";
+        config.Add("SMA-TimeFrame", new StrategyConfigItem("2", "30", "1", "12"));
     }
 
     @Override
@@ -30,18 +32,17 @@ public class StrategySMA extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        int timeFrame = config.GetIntValue("SMA-TimeFrame");
         initializer = (tseries, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
-            SMAIndicator sma = new SMAIndicator(closePrice, 12);
-            dataset.addSeries(buildChartTimeSeries(tseries, sma, "SMA 12"));
+            SMAIndicator sma = new SMAIndicator(closePrice, timeFrame);
+            dataset.addSeries(buildChartTimeSeries(tseries, sma, "SMA " + timeFrame));
         };
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator sma = new SMAIndicator(closePrice, 12);
+        SMAIndicator sma = new SMAIndicator(closePrice, timeFrame);
         return new BaseStrategy(
-                new OverIndicatorRule(sma, closePrice),
-                addStopLossGain(new UnderIndicatorRule(sma, closePrice), series)
+            new OverIndicatorRule(sma, closePrice),
+            addStopLossGain(new UnderIndicatorRule(sma, closePrice), series)
         );
-        
     }
-    
 }

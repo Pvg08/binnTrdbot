@@ -6,8 +6,8 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
-import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
@@ -16,7 +16,6 @@ import org.ta4j.core.indicators.candles.BearishEngulfingIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.trading.rules.BooleanIndicatorRule;
 import org.ta4j.core.trading.rules.CrossedUpIndicatorRule;
-
 
 /**
  *
@@ -27,6 +26,8 @@ public class StrategyBearishEngulfingEMA extends StrategyItem {
     public StrategyBearishEngulfingEMA(StrategiesController controller) {
         super(controller);
         StrategyName = "Bearish Engulfing EMA";
+        config.Add("EMA1-TimeFrame", new StrategyConfigItem("2", "40", "1", "9"));
+        config.Add("EMA2-TimeFrame", new StrategyConfigItem("9", "51", "3", "21"));
     }
 
     @Override
@@ -34,17 +35,21 @@ public class StrategyBearishEngulfingEMA extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int ema1_tf = config.GetIntValue("EMA1-TimeFrame");
+        int ema2_tf = config.GetIntValue("EMA2-TimeFrame");
+        
         initializer = (tseries, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
-            EMAIndicator ema_short = new EMAIndicator(closePrice, 9);
-            EMAIndicator ema_long = new EMAIndicator(closePrice, 21);
-            dataset.addSeries(buildChartTimeSeries(tseries, ema_short, "EMA 9"));
-            dataset.addSeries(buildChartTimeSeries(tseries, ema_long, "EMA 21"));
+            EMAIndicator ema_short = new EMAIndicator(closePrice, ema1_tf);
+            EMAIndicator ema_long = new EMAIndicator(closePrice, ema2_tf);
+            dataset.addSeries(buildChartTimeSeries(tseries, ema_short, "EMA " + ema1_tf));
+            dataset.addSeries(buildChartTimeSeries(tseries, ema_long, "EMA " + ema2_tf));
         };
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        EMAIndicator ema_long = new EMAIndicator(closePrice, 21);
-        EMAIndicator ema_short = new EMAIndicator(closePrice, 9);
+        EMAIndicator ema_short = new EMAIndicator(closePrice, ema1_tf);
+        EMAIndicator ema_long = new EMAIndicator(closePrice, ema2_tf);
 
         Rule entryRule = new CrossedUpIndicatorRule(ema_short, ema_long);
         Rule exitRule = new BooleanIndicatorRule(new BearishEngulfingIndicator(series));

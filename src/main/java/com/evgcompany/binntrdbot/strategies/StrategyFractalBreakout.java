@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import com.evgcompany.binntrdbot.analysis.WhenCheckCondition;
 import com.evgcompany.binntrdbot.analysis.WhenValueIndicator;
 import org.ta4j.core.BaseStrategy;
@@ -28,6 +29,8 @@ public class StrategyFractalBreakout extends StrategyItem {
     public StrategyFractalBreakout(StrategiesController controller) {
         super(controller);
         StrategyName = "Fractal Breakout";
+        config.Add("Fractal-NTime", new StrategyConfigItem("2", "10", "1", "5"));
+        config.Add("Fractal-SMA-TimeFrame", new StrategyConfigItem("2", "5", "1", "3"));
     }
 
     /*
@@ -51,7 +54,8 @@ public class StrategyFractalBreakout extends StrategyItem {
             throw new IllegalArgumentException("Series cannot be null");
         }
         
-        int n_time = 5;
+        int n_time = config.GetIntValue("Fractal-NTime");
+        int sma_tf = config.GetIntValue("Fractal-SMA-TimeFrame");
         
         WhenCheckCondition fractalTop = (rseries, bar_index) -> {
             if ((bar_index - 4) < rseries.getBeginIndex()) {
@@ -68,13 +72,13 @@ public class StrategyFractalBreakout extends StrategyItem {
         initializer = (tseries, dataset) -> {
             MedianPriceIndicator price = new MedianPriceIndicator(tseries);
             WhenValueIndicator fractalPrice = new WhenValueIndicator(price, Decimal.ZERO, 1, fractalTop);
-            SMAIndicator fractalAverage = new SMAIndicator(fractalPrice, 3);
+            SMAIndicator fractalAverage = new SMAIndicator(fractalPrice, sma_tf);
             dataset.addSeries(buildChartTimeSeries(tseries, fractalAverage, "Fractal Average"));
         };
 
         MedianPriceIndicator price = new MedianPriceIndicator(series);
         WhenValueIndicator fractalPrice = new WhenValueIndicator(price, Decimal.ZERO, 1, fractalTop);
-        SMAIndicator fractalAverage = new SMAIndicator(fractalPrice, 3);
+        SMAIndicator fractalAverage = new SMAIndicator(fractalPrice, sma_tf);
         
         Rule entryRule = new OverIndicatorRule(new PreviousValueIndicator(fractalAverage, 1), new PreviousValueIndicator(fractalAverage, 2))
                 .and(new OverIndicatorRule(new PreviousValueIndicator(price, 1), fractalPrice));

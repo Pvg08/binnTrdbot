@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
@@ -29,6 +30,8 @@ public class StrategyVWAP extends StrategyItem {
     public StrategyVWAP(StrategiesController controller) {
         super(controller);
         StrategyName = "VWAP";
+        config.Add("VWAP-TimeFrame", new StrategyConfigItem("2", "30", "1", "10"));
+        config.Add("MVWAP-TimeFrame", new StrategyConfigItem("2", "20", "1", "3"));
     }
 
     @Override
@@ -36,18 +39,22 @@ public class StrategyVWAP extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int vwap_timeframe = config.GetIntValue("VWAP-TimeFrame");
+        int mvwap_timeframe = config.GetIntValue("MVWAP-TimeFrame");
+        
         initializer = (tseries, dataset) -> {
             OpenPriceIndicator openPrice = new OpenPriceIndicator(tseries);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
-            VWAPIndicator vwap = new VWAPIndicator(tseries, 10);
-            MVWAPIndicator mvwap = new MVWAPIndicator(vwap, 3);
-            dataset.addSeries(buildChartTimeSeries(tseries, mvwap, "MVWAP 3 10"));
+            VWAPIndicator vwap = new VWAPIndicator(tseries, vwap_timeframe);
+            MVWAPIndicator mvwap = new MVWAPIndicator(vwap, mvwap_timeframe);
+            dataset.addSeries(buildChartTimeSeries(tseries, mvwap, "MVWAP" + config.toString()));
         };
         
         OpenPriceIndicator openPrice = new OpenPriceIndicator(series);
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        VWAPIndicator vwap = new VWAPIndicator(series, 10);
-        MVWAPIndicator mvwap = new MVWAPIndicator(vwap, 3);
+        VWAPIndicator vwap = new VWAPIndicator(series, vwap_timeframe);
+        MVWAPIndicator mvwap = new MVWAPIndicator(vwap, mvwap_timeframe);
 
         Rule entryRule = new CrossedUpIndicatorRule(mvwap, closePrice)
                 .and(new OverIndicatorRule(closePrice, openPrice));

@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
@@ -19,7 +20,6 @@ import org.ta4j.core.indicators.ichimoku.IchimokuTenkanSenIndicator;
 import org.ta4j.core.trading.rules.BooleanRule;
 import org.ta4j.core.trading.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.trading.rules.CrossedUpIndicatorRule;
-
 
 /**
  *
@@ -38,6 +38,9 @@ public class StrategyIchimoku extends StrategyItem {
             StrategyName += mode;
         }
         this.mode = mode;
+        config.Add("Ichimoku-tenkanSen-TimeFrame", new StrategyConfigItem("2", "20", "1", "3")).setActive(mode == 1);
+        config.Add("Ichimoku-kijunSen-TimeFrame", new StrategyConfigItem("2", "20", "1", "5")).setActive(mode == 1 || mode == 2);
+        config.Add("Ichimoku-senkouSpan-TimeFrame", new StrategyConfigItem("2", "20", "1", "9")).setActive(mode == 3);
     }
 
     @Override
@@ -45,25 +48,30 @@ public class StrategyIchimoku extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int tenkanSen_tf = config.GetIntValue("Ichimoku-tenkanSen-TimeFrame");
+        int kijunSen_tf = config.GetIntValue("Ichimoku-kijunSen-TimeFrame");
+        int senkouSpan_tf = config.GetIntValue("Ichimoku-senkouSpan-TimeFrame");
+        
         initializer = (tseries, dataset) -> {
-            IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(tseries, 3);
-            IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(tseries, 5);
+            IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(tseries, tenkanSen_tf);
+            IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(tseries, kijunSen_tf);
             IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(tseries, tenkanSen, kijunSen);
-            IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(tseries, 9);
-            IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(tseries, 5);
-            dataset.addSeries(buildChartTimeSeries(tseries, tenkanSen, "tenkanSen"));
-            dataset.addSeries(buildChartTimeSeries(tseries, kijunSen, "kijunSen"));
+            IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(tseries, senkouSpan_tf);
+            //IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(tseries, 5);
+            dataset.addSeries(buildChartTimeSeries(tseries, tenkanSen, "tenkanSen " + tenkanSen_tf));
+            dataset.addSeries(buildChartTimeSeries(tseries, kijunSen, "kijunSen " + kijunSen_tf));
             dataset.addSeries(buildChartTimeSeries(tseries, senkouSpanA, "senkouSpanA"));
-            dataset.addSeries(buildChartTimeSeries(tseries, senkouSpanB, "senkouSpanB"));
-            dataset.addSeries(buildChartTimeSeries(tseries, chikouSpan, "chikouSpan"));
+            dataset.addSeries(buildChartTimeSeries(tseries, senkouSpanB, "senkouSpanB " + senkouSpan_tf));
+            //dataset.addSeries(buildChartTimeSeries(tseries, chikouSpan, "chikouSpan"));
         };
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, 3);
-        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, 5);
-        IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
-        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, 9);
-        IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
+        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(series, tenkanSen_tf);
+        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(series, kijunSen_tf);
+        //IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(series, tenkanSen, kijunSen);
+        IchimokuSenkouSpanBIndicator senkouSpanB = new IchimokuSenkouSpanBIndicator(series, senkouSpan_tf);
+        //IchimokuChikouSpanIndicator chikouSpan = new IchimokuChikouSpanIndicator(series, 5);
         
         Rule entryRule;
         Rule exitRule;
@@ -87,5 +95,4 @@ public class StrategyIchimoku extends StrategyItem {
         
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
-    
 }

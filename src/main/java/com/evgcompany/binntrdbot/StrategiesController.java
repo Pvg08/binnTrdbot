@@ -244,36 +244,40 @@ public class StrategiesController {
         logStatistics(true);
     }
     
-    public int getStrategiesEnterActive(int timeframe) {
-        int result = 0;
+    public double getStrategiesEnterRate(int timeframe) {
+        double result = 0;
         int start_index = series.getEndIndex() - timeframe;
         if (start_index < 0) start_index = 0;
         int end_index = series.getEndIndex();
         List<Strategy> pick_list = getAutoListStrategies();
         for (Strategy strategy : pick_list) {
-            for(int i=start_index;i<=end_index;i++) {
+            double k = 1;
+            for(int i=end_index;i>=start_index;i--) {
                 if (strategy.shouldEnter(i)) {
-                    result++;
+                    result+=k;
                     i = end_index+1;
                 }
+                k *= 0.825;
             }
         }
         return result;
     }
-    public int getStrategiesExitActive(int timeframe) {
+    public double getStrategiesExitRate(int timeframe) {
         TradingRecord tradingRecordT = new BaseTradingRecord();
         tradingRecordT.enter(0);
-        int result = 0;
+        double result = 0;
         int start_index = series.getEndIndex() - timeframe;
         if (start_index < 0) start_index = 0;
         int end_index = series.getEndIndex();
         List<Strategy> pick_list = getAutoListStrategies();
         for (Strategy strategy : pick_list) {
-            for(int i=start_index;i<=end_index;i++) {
+            double k = 1;
+            for(int i=end_index;i>=start_index;i--) {
                 if (strategy.shouldExit(i, tradingRecordT)) {
-                    result++;
+                    result+=k;
                     i = end_index+1;
                 }
+                k *= 0.825;
             }
         }
         return result;

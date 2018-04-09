@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -25,6 +26,8 @@ public class StrategyCMO extends StrategyItem {
     public StrategyCMO(StrategiesController controller) {
         super(controller);
         StrategyName = "CMO";
+        config.Add("CMO-TimeFrame", new StrategyConfigItem("10", "100", "5", "50"));
+        config.Add("CMO-Threshold", new StrategyConfigItem("5", "45", "5", "10"));
     }
 
     @Override
@@ -32,14 +35,17 @@ public class StrategyCMO extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int timeframe = config.GetIntValue("CMO-TimeFrame");
+        int threshold = config.GetIntValue("CMO-Threshold");
+        
         initializer = (tseries, dataset) -> {};
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        CMOIndicator cmo = new CMOIndicator(closePrice, 50);
+        CMOIndicator cmo = new CMOIndicator(closePrice, timeframe);
 
-        Rule entryRule = new UnderIndicatorRule(cmo, Decimal.valueOf(-10));
-        Rule exitRule = new OverIndicatorRule(cmo, Decimal.valueOf(10));
+        Rule entryRule = new UnderIndicatorRule(cmo, Decimal.valueOf(-threshold));
+        Rule exitRule = new OverIndicatorRule(cmo, Decimal.valueOf(threshold));
         return new BaseStrategy(entryRule, addStopLossGain(exitRule, series));
     }
-    
 }

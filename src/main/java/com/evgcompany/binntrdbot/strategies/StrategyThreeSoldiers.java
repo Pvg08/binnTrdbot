@@ -6,8 +6,8 @@
 package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.StrategiesController;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
-import org.ta4j.core.Decimal;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
 import org.ta4j.core.indicators.candles.ThreeBlackCrowsIndicator;
@@ -23,6 +23,10 @@ public class StrategyThreeSoldiers extends StrategyItem {
     public StrategyThreeSoldiers(StrategiesController controller) {
         super(controller);
         StrategyName = "Three Soldiers";
+        config.Add("TWS-TimeFrame", new StrategyConfigItem("1", "10", "1", "2"));
+        config.Add("TWS-Factor", new StrategyConfigItem("0.5", "10", "0.25", "5"));
+        config.Add("TBC-TimeFrame", new StrategyConfigItem("1", "10", "1", "1"));
+        config.Add("TBC-Factor", new StrategyConfigItem("0.5", "10", "0.25", "1"));
     }
 
     @Override
@@ -31,12 +35,19 @@ public class StrategyThreeSoldiers extends StrategyItem {
             throw new IllegalArgumentException("Series cannot be null");
         }
         initializer = (tseries, dataset) -> {};
-        ThreeWhiteSoldiersIndicator tws = new ThreeWhiteSoldiersIndicator(series, 2, Decimal.valueOf(5));
-        ThreeBlackCrowsIndicator tbc = new ThreeBlackCrowsIndicator(series, 1, Decimal.valueOf(1));
+        ThreeWhiteSoldiersIndicator tws = new ThreeWhiteSoldiersIndicator(
+            series,
+            config.GetIntValue("TWS-TimeFrame"),
+            config.GetNumValue("TWS-Factor")
+        );
+        ThreeBlackCrowsIndicator tbc = new ThreeBlackCrowsIndicator(
+            series,
+            config.GetIntValue("TBC-TimeFrame"),
+            config.GetNumValue("TBC-Factor")
+        );
         return new BaseStrategy(
             new BooleanIndicatorRule(tws),
             addStopLossGain(new BooleanIndicatorRule(tbc), series)
         );
     }
-    
 }

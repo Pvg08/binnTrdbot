@@ -8,6 +8,7 @@ package com.evgcompany.binntrdbot.strategies;
 import com.evgcompany.binntrdbot.StrategiesController;
 import com.evgcompany.binntrdbot.analysis.ANNIndicator;
 import com.evgcompany.binntrdbot.analysis.OHLC4Indicator;
+import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
@@ -25,6 +26,8 @@ public class StrategyANN extends StrategyItem {
     public StrategyANN(StrategiesController controller) {
         super(controller);
         StrategyName = "ANN";
+        config.Add("ANN-TimeFrameLong", new StrategyConfigItem("12", "120", "4", "96"));
+        config.Add("ANN-Threshold", new StrategyConfigItem("0.001", "0.01", "0.0002", "0.0014"));
     }
 
     @Override
@@ -34,10 +37,11 @@ public class StrategyANN extends StrategyItem {
         }
         initializer = (tseries, dataset) -> {};
         
-        double threshold = 0.0014;
+        int long_tf = config.GetIntValue("ANN-TimeFrameLong");
+        double threshold = config.GetDoubleValue("ANN-Threshold");
         
         OHLC4Indicator ohlc = new OHLC4Indicator(series);
-        ANNIndicator ann_enter = new ANNIndicator(ohlc, 96);
+        ANNIndicator ann_enter = new ANNIndicator(ohlc, long_tf);
         ANNIndicator ann_exit = new ANNIndicator(ohlc, 1);
 
         Rule entryRule = new UnderIndicatorRule(ann_enter, Decimal.valueOf(-threshold))

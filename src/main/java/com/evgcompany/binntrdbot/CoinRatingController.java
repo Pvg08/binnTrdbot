@@ -188,8 +188,8 @@ public class CoinRatingController extends Thread {
         strategiesController.resetSeries();
         client.addSeriesBars(strategiesController.getSeries(), bars_h);
         strategiesController.resetStrategies();
-        curr.strategies_shouldenter_cnt = strategiesController.getStrategiesEnterActive(6);
-        curr.strategies_shouldexit_cnt = strategiesController.getStrategiesExitActive(6);
+        curr.strategies_shouldenter_rate = strategiesController.getStrategiesEnterRate(6);
+        curr.strategies_shouldexit_rate = strategiesController.getStrategiesExitRate(6);
         curr.signal_rating = (float) signalcontroller.getPairSignalRating(curr.symbol);
         curr.calculateRating();
         curr.last_rating_update_millis = System.currentTimeMillis();
@@ -389,13 +389,13 @@ public class CoinRatingController extends Thread {
                     entry.getValue().sort = (float) entry.getValue().volatility;
                     break;
                 case CR_STRATEGIES_SHOULD_ENTER:
-                    entry.getValue().sort = (float) entry.getValue().strategies_shouldenter_cnt;
+                    entry.getValue().sort = (float) entry.getValue().strategies_shouldenter_rate;
                     break;
                 case CR_STRATEGIES_SHOULD_EXIT:
-                    entry.getValue().sort = (float) entry.getValue().strategies_shouldexit_cnt;
+                    entry.getValue().sort = (float) entry.getValue().strategies_shouldexit_rate;
                     break;
                 case CR_STRATEGIES_DIRECTION:
-                    entry.getValue().sort = (float) entry.getValue().strategies_shouldenter_cnt - entry.getValue().strategies_shouldexit_cnt;
+                    entry.getValue().sort = (float) (entry.getValue().strategies_shouldenter_rate - entry.getValue().strategies_shouldexit_rate);
                     break;
                 case CR_LAST_EVENT_ANNO_DATE:
                     entry.getValue().sort = (float) entry.getValue().last_event_anno_millis;
@@ -440,13 +440,13 @@ public class CoinRatingController extends Thread {
                         text += df3p.format(curr.volatility);
                         break;
                     case CR_STRATEGIES_SHOULD_ENTER:
-                        text += curr.strategies_shouldenter_cnt;
+                        text += curr.strategies_shouldenter_rate;
                         break;
                     case CR_STRATEGIES_SHOULD_EXIT:
-                        text += curr.strategies_shouldexit_cnt;
+                        text += curr.strategies_shouldexit_rate;
                         break;
                     case CR_STRATEGIES_DIRECTION:
-                        text += curr.strategies_shouldenter_cnt - curr.strategies_shouldexit_cnt;
+                        text += curr.strategies_shouldenter_rate - curr.strategies_shouldexit_rate;
                         break;
                     case CR_LAST_EVENT_ANNO_DATE:
                         text+=curr.last_event_date != null && !curr.last_event_date.isEmpty() ? curr.last_event_date : "Unknown date";
@@ -563,7 +563,7 @@ public class CoinRatingController extends Thread {
                         (curr.market_cap == 0 || curr.market_cap > 100000) &&
                         curr.hour_volume > curr.day_volume / 24 &&
                         (curr.rank == 9999 || curr.rank < 500) &&
-                        curr.strategies_shouldenter_cnt > curr.strategies_shouldexit_cnt
+                        curr.strategies_shouldenter_rate > curr.strategies_shouldexit_rate
                 ) {
                     if (curr.rating > maxR) {
                         pairMax = entry.getKey();
