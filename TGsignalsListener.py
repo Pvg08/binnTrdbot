@@ -14,6 +14,7 @@ from telethon.extensions import markdown
 class RegBlock(object):
     def __init__(self):
         self.name = ''
+        self.title = ''
         self.rating = 0
         self.reg_has = None
         self.reg_skip = None
@@ -25,6 +26,7 @@ class RegBlock(object):
 
 class SignalRow(object):
     def __init__(self):
+        self.title = ''
         self.coin = None
         self.coin2 = None
         self.price_from = None
@@ -48,7 +50,7 @@ class SignalRow(object):
         self.sort = self.sort + self.rating / 20.0
 
     def __repr__(self):
-        return str(self.rating) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + str(self.index)
+        return str(self.rating) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + str(self.index) + ";" + str(self.title)
 
 def enable_win_unicode_console():
     if sys.version_info >= (3, 6):
@@ -66,39 +68,49 @@ def getFirstMatch(regex, txt):
 
 def numFix(txt):
     if txt:
-        txt = txt.replace(',', '.')
+        txt = txt.replace(',', '.').strip(',.+ \n\t')
+        if txt.count('.') > 1:
+            rtxt = getFirstMatch(r'^(0\.[0-9]{2,12})', txt)
+            if not rtxt:
+                rtxt = getFirstMatch(r'^([0-9]{2,12})', txt)
+            if not rtxt:
+                rtxt = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
+                rtxt = str(rtxt).replace(',', '.')
+            txt = rtxt
     if txt and (txt.find('k')>=0 or txt.find('K')>=0):
         num = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
         num = num * 1000
         txt = str(num)
     return txt
 
-def separateCheck(txt, date, client):
+def separateCheck(txt, title, date, client):
     if (txt is None) or (txt == ''):
         return
     non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
     txt = txt.translate(non_bmp_map)
+    title = title.translate(non_bmp_map).replace(';', ' ')
     global signal_separator
     if signal_separator:
         parts = re.split(signal_separator, txt, flags = re.UNICODE | re.IGNORECASE | re.MULTILINE)
         if parts and len(parts) > 0:
             i = 0
             while i < len(parts):
-                textCheck(parts[i], date, client)
+                textCheck(parts[i], title, date, client)
                 i = i + 1
         else:
-            textCheck(txt, date, client)
+            textCheck(txt, title, date, client)
     else:
-        textCheck(txt, date, client)
+        textCheck(txt, title, date, client)
     return
 
-def textCheck(txt, date, client):
+def textCheck(txt, title, date, client):
     global signal_expr
 
     #print(txt)
     #print("_________________")
 
     stop_coin_names = [
+        'BTC', 
         'BINANCE', 
         'BITTREX', 
         'YOBIT', 
@@ -117,6 +129,13 @@ def textCheck(txt, date, client):
         'AROUND', 
         'NEAR', 
         'STOP', 
+        'EARLY', 
+        'MIDTERM', 
+        'SHORTTERM', 
+        'SHORT', 
+        'LONGTERM', 
+        'LONGTER', 
+        'CRYPTOR', 
         'PART', 
         'SOME'
     ]
@@ -135,6 +154,7 @@ def textCheck(txt, date, client):
                 price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
                 if coin and coin not in stop_coin_names and coin2 not in stop_coin_names and (price_from or price_to or price_target):
                     ri = SignalRow()
+                    ri.title = title
                     ri.coin = coin
                     ri.coin2 = coin2
                     ri.price_from = price_from
@@ -155,7 +175,7 @@ def textCheck(txt, date, client):
 
     return
 
-def checkCurchan(channame, client):
+def checkCurchan(channame, chantitle, client):
     try:
         int_chan = int(channame)
     except:
@@ -176,7 +196,7 @@ def checkCurchan(channame, client):
             print(str(e))
             return None
 
-    for msg in client.get_messages(channel_id, limit=50):
+    for msg in client.get_messages(channel_id, limit=200):
         if (msg != '') and not (msg is None):
             if not hasattr(msg, 'text'):
                 msg.text = None
@@ -184,7 +204,7 @@ def checkCurchan(channame, client):
                 msg.text = markdown.unparse(msg.message, msg.entities or [])
             if msg.text is None and msg.message:
                 msg.text = msg.message
-            separateCheck(msg.text, str(msg.date), client)
+            separateCheck(msg.text, chantitle, str(msg.date), client)
 
     return client.get_input_entity(channel_id)
 
@@ -207,6 +227,7 @@ def main():
     chancount = int(config['channels']['count'])
     signal_separator = str(config['channels']['signal_separator'])
     channames = []
+    chantitles = []
 
     chan_index = 1
     cname = ''
@@ -215,9 +236,11 @@ def main():
         if cname:
             last_cname = cname
         cname = config['channel_' + str(chan_index)]['name']
+        ctitle = config['channel_' + str(chan_index)]['title']
         expr_b = RegBlock()
         if cname:
             channames.append(cname)
+            chantitles.append(ctitle)
             expr_b.name = cname
         else:
             expr_b.name = last_cname
@@ -262,11 +285,11 @@ def main():
     chan_index = 0
     while chan_index < len(channames):
         print(channames[chan_index])
-        channames[chan_index] = checkCurchan(channames[chan_index], client)
+        channames[chan_index] = checkCurchan(channames[chan_index], chantitles[chan_index], client)
         if channames[chan_index]:
             @client.on(events.NewMessage(chats=[channames[chan_index]], incoming=True))
             def normal_handler(event):
-                separateCheck(event.text, str(event.message.date), client)
+                separateCheck(event.text, '', str(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
 

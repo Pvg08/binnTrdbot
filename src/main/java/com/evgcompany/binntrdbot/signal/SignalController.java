@@ -17,8 +17,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
@@ -34,7 +36,22 @@ import org.zeroturnaround.exec.stream.LogOutputStream;
  */
 public class SignalController extends Thread {
 
-    private final int MAX_DAYS = 4;
+    private class ChannelStat {
+        int signals_cnt = 0;
+        int ok_signals = 0;
+        int done_signals = 0;
+        int waiting_signals = 0;
+        int timeout_signals = 0;
+        int stoploss_signals = 0;
+        int stoploss_done_signals = 0;
+        long done_millis_diff_summ = 0;
+        double done_summ_percent = 0;
+        double summ_percent = 0;
+    }
+    private final HashMap<String, ChannelStat> channel_stats = new HashMap<>();
+    
+    private final int MAX_DAYS = 6;
+    private final int STOPLOSS_PERCENT = 10;
 
     private TradingAPIAbstractInterface client = null;
     private String signalsListenerFile;
@@ -140,7 +157,7 @@ public class SignalController extends Thread {
     }
     
     private Double strPrice(String str) {
-        if (str == null || str.isEmpty()) {
+        if (str == null || str.isEmpty() || Double.parseDouble(str) <= 0) {
             return null;
         }
         return Double.parseDouble(str);
@@ -155,11 +172,13 @@ public class SignalController extends Thread {
             initialSignalsIsLoaded = true;
             if (isChecking) {
                 stopSignalsProcess();
+            } else {
+                logStats();
             }
             return;
         }
         String[] parts = line.split(";");
-        if (parts.length != 8) {
+        if (parts.length != 9) {
             return;
         }
         if (!isChecking) {
@@ -171,11 +190,42 @@ public class SignalController extends Thread {
                 Double.parseDouble(parts[0]), // rating
                 strPrice(parts[4]), // price1
                 strPrice(parts[5]), // price2
-                strPrice(parts[6])  // price_target
+                strPrice(parts[6]),  // price_target
+                parts[8] // channel title
             );
         } else {
             mainApplication.getInstance().log(line);
         }
+    }
+    
+    private void logStats() {
+        for (Map.Entry<String, ChannelStat> entry : channel_stats.entrySet()) {
+            long avg_time = 0;
+            double avg_done_percent = 0;
+            double avg_percent = 0;
+            if (entry.getValue().done_signals > 0) {
+                avg_time = entry.getValue().done_millis_diff_summ / entry.getValue().done_signals;
+                avg_done_percent = entry.getValue().done_summ_percent / entry.getValue().done_signals;
+            }
+            if (entry.getValue().ok_signals > 0) {
+                avg_percent = entry.getValue().summ_percent / entry.getValue().ok_signals;
+            }
+            mainApplication.getInstance().log(
+                "Channel '" + entry.getKey() + "' Stats:\n" +
+                "Signals count: " + entry.getValue().signals_cnt + "\n" +
+                "Normal signals: " + entry.getValue().ok_signals + "\n" +
+                "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
+                "Waiting signals: " + entry.getValue().waiting_signals + "\n" + 
+                "Stoploss signals (-"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
+                "Stoploss then done signals: " + entry.getValue().stoploss_done_signals + "\n" + 
+                "Done signals: " + entry.getValue().done_signals + "\n" + 
+                "Done signals avg time: " + df8.format(avg_time / 86400000.0) + " day.\n" + 
+                "Done signals avg percent profit: " + df8.format(avg_done_percent) + "%\n" + 
+                "Channel avg signal profit: " + df8.format(avg_percent) + "%\n" + 
+                "\n"
+            );
+        }
+        mainApplication.getInstance().log("");
     }
     
     private Double alignPrice(Double price, Double current) {
@@ -195,22 +245,19 @@ public class SignalController extends Thread {
         return result;
     }
     
-    private void addSignal(String symbol1, String symbol2, LocalDateTime datetime, double rating, Double price1, Double price2, Double price_target) {
-        if (symbol1 == null || symbol1.isEmpty() || datetime == null || rating == 0 || price_target == null) {
+    private void addSignal(String symbol1, String symbol2, LocalDateTime datetime, double rating, Double price1, Double price2, Double price_target, String title) {
+        if (title != null && !title.isEmpty()) {
+            ChannelStat stat;
+            if (!channel_stats.containsKey(title)) {
+                stat = new ChannelStat();
+                channel_stats.put(title, stat);
+            } else {
+                stat = channel_stats.get(title);
+            }
+            stat.signals_cnt++;
+        }
+        if (symbol1 == null || symbol1.isEmpty() || datetime == null || rating == 0 || (price_target == null && price1 == null && price2 == null)) {
             return;
-        }
-        if (price1 == null && price2 != null) {
-            price1 = price2;
-            price2 = null;
-        }
-        if (price1 != null) {
-            if (price2 != null && price2 < price1) {
-                return;
-            }
-            if (price2 == null) {
-                price2 = price1;
-                price1 = price1 * 0.95;
-            }
         }
         if (symbol2 == null || symbol2.isEmpty()) {
             symbol2 = "BTC";
@@ -224,42 +271,90 @@ public class SignalController extends Thread {
         if (bars == null || bars.isEmpty()) {
             return;
         }
-        Double currPrice = bars.get(bars.size()-1).getClosePrice().doubleValue();
-        if (price1 != null) {
-            price1 = alignPrice(price1, currPrice);
-        }
-        if (price2 != null) {
-            price2 = alignPrice(price2, currPrice);
-        }
-        price_target = alignPrice(price_target, currPrice);
+
         if (price1 == null) {
-            price1 = getPriceForDateTime(bars, datetime);
-            if (price1 > price_target) {
-                price1 = price_target * 0.95;
+            price1 = getPriceForDateTime(bars, datetime) * 0.975;
+        }
+        if (price2 == null) {
+            price2 = price1 * 1.025;
+        }
+        if (price_target == null) {
+            price_target = price2 * 1.05;
+        }
+
+        Double currPrice = bars.get(bars.size()-1).getClosePrice().doubleValue();
+        price1 = alignPrice(price1, currPrice);
+        price2 = alignPrice(price2, currPrice);
+        price_target = alignPrice(price_target, currPrice);
+
+        if (price1 > price_target) {
+            price1 = price_target * 0.95;
+        }
+        if (price2 > price_target) {
+            price2 = price_target * 0.99;
+        }
+        if (price1 > price2) {
+            double tmp = price1;
+            price1 = price2;
+            price2 = tmp;
+        }
+
+        double enter_price = getPriceForDateTime(bars, datetime);
+        if (enter_price <= 0) enter_price = price1;
+        
+        double stop_loss = enter_price * (100-STOPLOSS_PERCENT) / 100;
+        boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
+        boolean is_done = false;
+        boolean is_stop_loss = false;
+        long millis_begin = datetime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        long millis_done = 0;
+        double done_percent = 0;
+        for(int i=0; i<bars.size() && !is_done; i++) {
+            if (bars.get(i).getEndTime().toInstant().toEpochMilli() > millis_begin) {
+                is_done = bars.get(i).getMaxPrice().doubleValue() >= price_target;
+                if (is_done) {
+                    done_percent = 100 * (bars.get(i).getMaxPrice().doubleValue() - enter_price) / enter_price;
+                    millis_done = bars.get(i).getEndTime().toInstant().toEpochMilli();
+                    break;
+                }
+                if (bars.get(i).getMinPrice().doubleValue() < stop_loss) {
+                    is_stop_loss = true;
+                }
             }
-            if (price2 == null) {
-                price2 = price1;
-                price1 = price1 * 0.95;
+        }
+        if (is_done) is_timeout = false;
+
+        if (channel_stats.containsKey(title)) {
+            ChannelStat stat = channel_stats.get(title);
+            stat.ok_signals++;
+            if (is_done) stat.done_signals++; 
+            else if (!is_timeout) stat.waiting_signals++;
+            else if (is_timeout) stat.timeout_signals++;
+            if (is_done) {
+                stat.done_millis_diff_summ += millis_done - millis_begin;
+                stat.done_summ_percent += done_percent;
+            }
+            if (is_stop_loss) stat.stoploss_signals++;
+            if (is_done && is_stop_loss) stat.stoploss_done_signals++;
+            
+            if (is_stop_loss) {
+                stat.summ_percent -= STOPLOSS_PERCENT;
+            } else if (is_done) {
+                stat.summ_percent += done_percent;
+            } else {
+                stat.summ_percent += 100 * (currPrice - enter_price) / enter_price;
             }
         }
 
-        boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
-        boolean is_done = price1 > price_target;
-        for(int i=0; i<bars.size() && !is_done; i++) {
-            if (bars.get(i).getEndTime().toInstant().toEpochMilli() > datetime.toInstant(ZoneOffset.UTC).toEpochMilli()) {
-                is_done = bars.get(i).getMaxPrice().doubleValue() > price_target;
-            }
-        }
-        
         mainApplication.getInstance().log(
-                "Signal "
-                + symbol1 + symbol2 + " from " 
-                + datetime.format(df) + " " 
-                + "rating = " + rating + "; "
-                + df8.format(price1) + " - " 
-                + df8.format(price2) + " ===> " 
-                + df8.format(price_target) + " "
-                + (is_done ? "DONE" : (is_timeout ? "TIMEOUT" : "WAITING"))
+            "Signal "
+            + symbol1 + symbol2 + " from " 
+            + datetime.format(df) + " (channel = '"+title+"') " 
+            + "rating = " + rating + "; "
+            + df8.format(price1) + " - " 
+            + df8.format(price2) + " ===> " 
+            + df8.format(price_target) + " "
+            + (is_done ? "DONE" : (is_timeout ? "TIMEOUT" : "WAITING"))
         );
 
         SignalItem s = new SignalItem();
@@ -272,6 +367,7 @@ public class SignalController extends Thread {
         s.setRating(rating);
         s.setDone(is_done || is_timeout);
         s.setTimeout(is_timeout);
+        s.setChannelName(title);
         items.add(s);
         
         if (signalEvent != null) {

@@ -16,6 +16,7 @@ import java.time.ZoneOffset;
 public class SignalItem {
     private String symbol1;
     private String symbol2;
+    private String channelName;
     private BigDecimal price_from;
     private BigDecimal price_to;
     private BigDecimal price_target;
@@ -161,5 +162,19 @@ public class SignalItem {
      */
     public void setTimeout(boolean timeout) {
         this.timeout = timeout;
+    }
+
+    /**
+     * @return the channelName
+     */
+    public String getChannelName() {
+        return channelName;
+    }
+
+    /**
+     * @param channelName the channelName to set
+     */
+    public void setChannelName(String channelName) {
+        this.channelName = channelName;
     }
 }
