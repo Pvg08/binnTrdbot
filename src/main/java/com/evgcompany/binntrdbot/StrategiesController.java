@@ -274,7 +274,7 @@ public class StrategiesController {
     public double getStrategiesEnterRate(int timeframe) {
         double result = 0;
         int start_index = series.getEndIndex() - timeframe;
-        if (start_index < 0) start_index = 0;
+        if (start_index < series.getBeginIndex()) start_index = series.getBeginIndex();
         int end_index = series.getEndIndex();
         List<Strategy> pick_list = getAutoListStrategies();
         for (Strategy strategy : pick_list) {
@@ -282,7 +282,7 @@ public class StrategiesController {
             for(int i=end_index;i>=start_index;i--) {
                 if (strategy.shouldEnter(i)) {
                     result+=k;
-                    i = end_index+1;
+                    i = start_index-1;
                 }
                 k *= 0.825;
             }
@@ -290,19 +290,19 @@ public class StrategiesController {
         return result;
     }
     public double getStrategiesExitRate(int timeframe) {
-        TradingRecord tradingRecordT = new BaseTradingRecord();
-        tradingRecordT.enter(0);
         double result = 0;
         int start_index = series.getEndIndex() - timeframe;
-        if (start_index < 0) start_index = 0;
+        if (start_index < series.getBeginIndex()) start_index = series.getBeginIndex();
         int end_index = series.getEndIndex();
         List<Strategy> pick_list = getAutoListStrategies();
+        TradingRecord tradingRecordT = new BaseTradingRecord();
+        tradingRecordT.enter(start_index);
         for (Strategy strategy : pick_list) {
             double k = 1;
             for(int i=end_index;i>=start_index;i--) {
                 if (strategy.shouldExit(i, tradingRecordT)) {
                     result+=k;
-                    i = end_index+1;
+                    i = start_index-1;
                 }
                 k *= 0.825;
             }

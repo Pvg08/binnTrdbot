@@ -1,5 +1,6 @@
 import sys
 import time
+import datetime
 import re
 import random
 import configparser
@@ -10,6 +11,13 @@ from telethon.tl.types import InputChannel, PeerChat
 from telethon.tl.functions.contacts import ResolveUsernameRequest
 from telethon.tl.functions.messages import CheckChatInviteRequest
 from telethon.extensions import markdown
+
+class ChannelBlock(object):
+    def __init__(self):
+        self.name = ''
+        self.title = ''
+        self.id = 0
+        self.entity = None
 
 class RegBlock(object):
     def __init__(self):
@@ -65,6 +73,13 @@ def getFirstMatch(regex, txt):
             for groupNum in range(0, len(match.groups())):
                 return match.group(1)
     return ''
+
+def dateFix(date):
+    ts = time.time()
+    utc_offset = (datetime.datetime.fromtimestamp(ts) - datetime.datetime.utcfromtimestamp(ts)).total_seconds()
+    datetime_obj_naive = datetime.datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S")
+    datetime_obj_naive = datetime_obj_naive + datetime.timedelta(seconds = utc_offset)
+    return str(datetime_obj_naive)
 
 def numFix(txt):
     if txt:
@@ -137,6 +152,7 @@ def textCheck(txt, title, date, client):
         'LONGTER', 
         'CRYPTOR', 
         'PART', 
+        'OK', 
         'SOME'
     ]
     best_item = None
@@ -175,10 +191,16 @@ def textCheck(txt, title, date, client):
 
     return
 
-def checkCurchan(channame, chantitle, client):
-    try:
-        int_chan = int(channame)
-    except:
+def checkCurchan(channel, client, signals_limit):
+    chantitle = channel.title
+    if not chantitle:
+        chantitle = channel.name
+    if not chantitle:
+        chantitle = str(channel.id)
+    channame = channel.name
+    if channel.id and channel.id > 0:
+        int_chan = int(channel.id)
+    else:
         int_chan = 0
 
     if int_chan != 0:
@@ -196,7 +218,7 @@ def checkCurchan(channame, chantitle, client):
             print(str(e))
             return None
 
-    for msg in client.get_messages(channel_id, limit=200):
+    for msg in client.get_messages(channel_id, limit=signals_limit):
         if (msg != '') and not (msg is None):
             if not hasattr(msg, 'text'):
                 msg.text = None
@@ -204,7 +226,7 @@ def checkCurchan(channame, chantitle, client):
                 msg.text = markdown.unparse(msg.message, msg.entities or [])
             if msg.text is None and msg.message:
                 msg.text = msg.message
-            separateCheck(msg.text, chantitle, str(msg.date), client)
+            separateCheck(msg.text, chantitle, dateFix(msg.date), client)
 
     return client.get_input_entity(channel_id)
 
@@ -217,7 +239,7 @@ def main():
     global signal_separator
     signal_expr = []
 
-    config = configparser.RawConfigParser()
+    config = configparser.RawConfigParser(allow_no_value = True)
     config.read('signals_listener.ini')
     session_name = config['main']['session_fname']
     api_id = sys.argv[1]
@@ -225,35 +247,54 @@ def main():
     phone = sys.argv[3]
 
     chancount = int(config['channels']['count'])
+    signals_preload = int(config['channels']['signals_preload'])
     signal_separator = str(config['channels']['signal_separator'])
-    channames = []
-    chantitles = []
+    channels = []
 
     chan_index = 1
     cname = ''
+    cid = 0
     last_cname = ''
+    last_cid = 0
     while chan_index <= chancount:
-        if cname:
-            last_cname = cname
-        cname = config['channel_' + str(chan_index)]['name']
-        ctitle = config['channel_' + str(chan_index)]['title']
+        channel_config = config['channel_' + str(chan_index)]
+
         expr_b = RegBlock()
-        if cname:
-            channames.append(cname)
-            chantitles.append(ctitle)
-            expr_b.name = cname
-        else:
-            expr_b.name = last_cname
-        expr_b.rating = int(config['channel_' + str(chan_index)]['signal_rating'])
-        expr_b.reg_has = config['channel_' + str(chan_index)]['signal_has']
-        expr_b.reg_skip = config['channel_' + str(chan_index)]['signal_skip']
-        expr_b.reg_coin = config['channel_' + str(chan_index)]['signal_coin']
-        expr_b.reg_coin2 = config['channel_' + str(chan_index)]['signal_coin2']
-        expr_b.reg_price_from = config['channel_' + str(chan_index)]['signal_price_from']
-        expr_b.reg_price_to = config['channel_' + str(chan_index)]['signal_price_to']
-        expr_b.reg_price_target = config['channel_' + str(chan_index)]['signal_price_target']
+        expr_b.rating = int(channel_config['signal_rating'])
+        expr_b.reg_has = channel_config['signal_has']
+        expr_b.reg_skip = channel_config['signal_skip']
+        expr_b.reg_coin = channel_config['signal_coin']
+        expr_b.reg_coin2 = channel_config['signal_coin2']
+        expr_b.reg_price_from = channel_config['signal_price_from']
+        expr_b.reg_price_to = channel_config['signal_price_to']
+        expr_b.reg_price_target = channel_config['signal_price_target']
         if not expr_b.reg_has:
             expr_b.reg_has = expr_b.reg_coin
+
+        if cname or cid:
+            last_cname = cname
+            last_cid = cid
+        try:
+            cname = channel_config['name']
+        except:
+            cname = ''
+        try:
+            cid = channel_config['id']
+        except:
+            cid = 0
+
+        if cname or cid:
+            newchan = ChannelBlock()
+            newchan.name = cname
+            newchan.id = int(cid)
+            newchan.title = channel_config['title']
+            channels.append(newchan)
+            expr_b.name = cname
+            expr_b.cid = cid
+        else:
+            expr_b.name = last_cname
+            expr_b.cid = last_cid
+
         signal_expr.append(expr_b)
         chan_index = chan_index + 1
 
@@ -283,13 +324,13 @@ def main():
     print(client.session.server_address)   # Successfull
 
     chan_index = 0
-    while chan_index < len(channames):
-        print(channames[chan_index])
-        channames[chan_index] = checkCurchan(channames[chan_index], chantitles[chan_index], client)
-        if channames[chan_index]:
-            @client.on(events.NewMessage(chats=[channames[chan_index]], incoming=True))
+    while chan_index < len(channels):
+        print(channels[chan_index].title)
+        channels[chan_index].entity = checkCurchan(channels[chan_index], client, signals_preload)
+        if channels[chan_index].entity:
+            @client.on(events.NewMessage(chats=[channels[chan_index].entity], incoming=True))
             def normal_handler(event):
-                separateCheck(event.text, '', str(event.message.date), client)
+                separateCheck(event.text, '-', dateFix(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
 

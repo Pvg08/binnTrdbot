@@ -99,6 +99,7 @@ public class CoinRatingController extends Thread {
     private int maxEnter = 3;
     private int secondsOrderEnterWait = 600;
     private float minRatingForOrder = 5;
+    private float minSignalRatingForOrder = 4;
     private JProgressBar progressBar = null;
 
     public CoinRatingController(mainApplication application, tradePairProcessController paircontroller) {
@@ -214,7 +215,7 @@ public class CoinRatingController extends Thread {
         String last_hbar_info = "";
         
         updatePair(curr);
-        
+
         List<Bar> bars = client.getBars(curr.symbol, "2h");
         
         app.log("Base = " + pair_sinfo.getBaseAsset());
@@ -546,7 +547,7 @@ public class CoinRatingController extends Thread {
 
     private void checkFastEnter() {
         checkOrderExit();
-        if (entered.size() < maxEnter && !heroesMap.isEmpty()) {
+        if (autoOrder && entered.size() < maxEnter && !heroesMap.isEmpty()) {
             String pairMax = "";
             float maxR = 0;
             for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
@@ -645,8 +646,6 @@ public class CoinRatingController extends Thread {
     @Override
     public void run() {
 
-        app.log("Coin rating thread starting...");
-
         if (analyzer) {
             loadRatingData();
         }
@@ -671,7 +670,13 @@ public class CoinRatingController extends Thread {
             if (heroesMap.containsKey(item.getPair())) {
                 heroesMap.get(item.getPair()).signal_rating = (float) rating;
                 updateList();
-                if (!item.isDone() && !item.isTimeout() && item.getMillisFromSignalStart() < 120 * 1000) {
+                if (
+                        rating > minSignalRatingForOrder && 
+                        item.getCurrentRating() > minSignalRatingForOrder/2 && 
+                        !item.isDone() && 
+                        !item.isTimeout() && 
+                        item.getMillisFromSignalStart() < 240 * 1000
+                ) {
                     signalOrderEnter(item.getPair());
                 }
             }
@@ -699,14 +704,16 @@ public class CoinRatingController extends Thread {
             }
             updateList();
 
-            if (analyzer && autoOrder && have_all_coins_info) {
+            if (analyzer && (autoOrder || autoSignalOrder) && have_all_coins_info) {
                 checkFastEnter();
+            } else if (!analyzer && autoSignalOrder && entered.size() > 0) {
+                checkOrderExit();
             }
 
             doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
         }
         
-        signalcontroller.stopSignalsProcess();
+        signalcontroller.stopSignalsProcessIfRunning();
         
         if (orderEvent != null) {
             try {
@@ -918,5 +925,19 @@ public class CoinRatingController extends Thread {
      */
     public void setMinRatingForOrder(float minRatingForOrder) {
         this.minRatingForOrder = minRatingForOrder;
+    }
+
+    /**
+     * @return the minSignalRatingForOrder
+     */
+    public float getMinSignalRatingForOrder() {
+        return minSignalRatingForOrder;
+    }
+
+    /**
+     * @param minSignalRatingForOrder the minSignalRatingForOrder to set
+     */
+    public void setMinSignalRatingForOrder(float minSignalRatingForOrder) {
+        this.minSignalRatingForOrder = minSignalRatingForOrder;
     }
 }

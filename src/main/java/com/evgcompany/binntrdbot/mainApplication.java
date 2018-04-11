@@ -14,6 +14,8 @@ import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
 import javax.swing.text.DefaultCaret;
 
@@ -101,6 +103,7 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(listBoxAutoStrategies, "auto_strategies_list");
         config.addComponent(checkBoxWalkForward, "auto_walkforward");
         config.addComponent(checkBoxAutoStrategyParams, "auto_strategyparamspick");
+        config.addComponent(spinnerSignalRatingMinForOrder, "signal_rating_min_for_order");
         config.Load();
     }
     
@@ -264,6 +267,8 @@ public class mainApplication extends javax.swing.JFrame {
         textFieldPhone = new javax.swing.JTextField();
         checkboxAutoSignalOrder = new javax.swing.JCheckBox();
         checkboxAutoSignalFastorder = new javax.swing.JCheckBox();
+        jLabel24 = new javax.swing.JLabel();
+        spinnerSignalRatingMinForOrder = new javax.swing.JSpinner();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -843,6 +848,10 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        jLabel24.setText("Min rating for order:");
+
+        spinnerSignalRatingMinForOrder.setValue(5);
+
         javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
@@ -850,10 +859,6 @@ public class mainApplication extends javax.swing.JFrame {
             .addGroup(jPanel5Layout.createSequentialGroup()
                 .addGap(10, 10, 10)
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addComponent(checkboxAutoSignalOrder)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(checkboxAutoSignalFastorder))
                     .addGroup(jPanel5Layout.createSequentialGroup()
                         .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel17)
@@ -868,7 +873,16 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addComponent(textFieldPhone, javax.swing.GroupLayout.PREFERRED_SIZE, 123, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(buttonTlgConnect))
-                            .addComponent(jLabel20))))
+                            .addComponent(jLabel20)))
+                    .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                        .addGroup(jPanel5Layout.createSequentialGroup()
+                            .addComponent(jLabel24)
+                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                            .addComponent(spinnerSignalRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGroup(jPanel5Layout.createSequentialGroup()
+                            .addComponent(checkboxAutoSignalOrder)
+                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                            .addComponent(checkboxAutoSignalFastorder))))
                 .addContainerGap(38, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
@@ -889,7 +903,11 @@ public class mainApplication extends javax.swing.JFrame {
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkboxAutoSignalOrder)
                     .addComponent(checkboxAutoSignalFastorder))
-                .addContainerGap(144, Short.MAX_VALUE))
+                .addGap(18, 18, 18)
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel24)
+                    .addComponent(spinnerSignalRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(106, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
@@ -1204,25 +1222,6 @@ public class mainApplication extends javax.swing.JFrame {
             profitsChecker.setLowHold(checkBoxLowHold.isSelected());
             profitsChecker.showTradeComissionCurrency();
 
-            /*log("ServerTime = " + client.getServerTime());
-            log("");
-            log("Balances:", true);
-            Account account = profitsChecker.getAccount();
-            List<AssetBalance> allBalances = account.getBalances();        
-            allBalances.forEach((balance)->{
-                if (Float.parseFloat(balance.getFree()) > 0 || Float.parseFloat(balance.getLocked()) > 0) {
-                    log(balance.getAsset() + " = " + balance.getFree() + " / " + balance.getLocked(), true);
-                }
-            });
-            
-            log("", true);
-            log("Limits:", true);
-            List<RateLimit> limits = client.getExchangeInfo().getRateLimits();
-            limits.forEach((limit)->{
-                log(limit.getRateLimitType().name() + " " + limit.getInterval().name() + " " + limit.getLimit(), true);
-            });*/
-
-            
             log("", true);
             setPairParams();
             pairController.initBasePairs(textFieldTradePairs.getText());
@@ -1386,6 +1385,17 @@ public class mainApplication extends javax.swing.JFrame {
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
         config.Save();
+        if (coinRatingController != null && coinRatingController.isAlive()) {
+            if (pairController != null) {
+                pairController.pausePairs(true);
+            }
+            coinRatingController.doStop();
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }//GEN-LAST:event_formWindowClosing
 
     private void checkBoxStopLossStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxStopLossStateChanged
@@ -1436,6 +1446,7 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setUpdateTime((Integer) spinnerScanRatingUpdateTime.getValue());
         coinRatingController.setMaxEnter((Integer) spinnerRatingMaxOrders.getValue());
         coinRatingController.setMinRatingForOrder((Integer) spinnerRatingMinForOrder.getValue());
+        coinRatingController.setMinSignalRatingForOrder((Integer) spinnerSignalRatingMinForOrder.getValue());
         coinRatingController.setSecondsOrderEnterWait((Integer) spinnerRatingMaxOrderWait.getValue());
         coinRatingController.setProgressBar(progressBarRatingAnalPercent);
         comboBoxRatingSortActionPerformed(null);
@@ -1611,6 +1622,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel21;
     private javax.swing.JLabel jLabel22;
     private javax.swing.JLabel jLabel23;
+    private javax.swing.JLabel jLabel24;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -1647,6 +1659,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JSpinner spinnerScanRatingDelayTime;
     private javax.swing.JSpinner spinnerScanRatingUpdateTime;
     private javax.swing.JSpinner spinnerSellStopLimited;
+    private javax.swing.JSpinner spinnerSignalRatingMinForOrder;
     private javax.swing.JSpinner spinnerStopGain;
     private javax.swing.JSpinner spinnerStopLoss;
     private javax.swing.JSpinner spinnerUpdateDelay;

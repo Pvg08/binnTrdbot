@@ -23,12 +23,49 @@ public class SignalItem {
     private boolean done;
     private boolean timeout;
     private LocalDateTime datetime;
+    private long localMillis;
     private double rating;
+    private long maxDaysAgo;
 
     public long getMillisFromSignalStart() {
-        long millis = System.currentTimeMillis() - datetime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        long millis = System.currentTimeMillis() - localMillis;
         if (millis < 0) millis = 0;
         return millis;
+    }
+
+    public void turnOffIfNeeded() {
+        if (!isTimeout() && LocalDateTime.now().minusDays(maxDaysAgo).isAfter(getDatetime())) {
+            setTimeout(true);
+            setDone(true);
+        }
+    }
+    
+    public double getCurrentRating() {
+        double millis_maxago = LocalDateTime.now().minusDays(maxDaysAgo).toInstant(ZoneOffset.UTC).toEpochMilli();
+        double millis_dtime = localMillis;
+        double millis_now = System.currentTimeMillis();
+        double koef;
+        double сrating;
+        turnOffIfNeeded();
+        if (!isTimeout()) {
+            if (!isDone()) {
+                сrating = getBaseRating() + 0.5;
+                koef = 1.0 - (millis_now - millis_dtime) / (millis_now - millis_maxago);
+                koef = koef * koef * koef;
+                if (koef > 1) {
+                    koef = 1;
+                } else if (koef < 0.025) {
+                    koef = 0.025;
+                }
+            } else {
+                сrating = getBaseRating() / 2.0;
+                koef = 0.025;
+            }
+        } else {
+            сrating = getBaseRating() / 10.0;
+            koef = 0.025;
+        }
+        return сrating * koef;
     }
     
     /**
@@ -139,14 +176,14 @@ public class SignalItem {
     /**
      * @return the rating
      */
-    public double getRating() {
+    public double getBaseRating() {
         return rating;
     }
 
     /**
      * @param rating the rating to set
      */
-    public void setRating(double rating) {
+    public void setBaseRating(double rating) {
         this.rating = rating;
     }
 
@@ -176,5 +213,33 @@ public class SignalItem {
      */
     public void setChannelName(String channelName) {
         this.channelName = channelName;
+    }
+
+    /**
+     * @return the localMillis
+     */
+    public long getLocalMillis() {
+        return localMillis;
+    }
+
+    /**
+     * @param localMillis the localMillis to set
+     */
+    public void setLocalMillis(long localMillis) {
+        this.localMillis = localMillis;
+    }
+
+    /**
+     * @return the maxDaysAgo
+     */
+    public long getMaxDaysAgo() {
+        return maxDaysAgo;
+    }
+
+    /**
+     * @param maxDaysAgo the maxDaysAgo to set
+     */
+    public void setMaxDaysAgo(long maxDaysAgo) {
+        this.maxDaysAgo = maxDaysAgo;
     }
 }
