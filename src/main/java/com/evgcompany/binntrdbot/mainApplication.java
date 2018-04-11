@@ -7,7 +7,9 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
+import com.evgcompany.binntrdbot.misc.ComponentsConfigController;
 import com.evgcompany.binntrdbot.signal.SignalController;
+import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.awt.Toolkit;
 import java.math.BigDecimal;
 import java.text.Format;

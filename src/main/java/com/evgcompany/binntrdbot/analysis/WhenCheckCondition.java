@@ -5,7 +5,6 @@
  */
 package com.evgcompany.binntrdbot.analysis;
 
-import org.jfree.data.time.TimeSeriesCollection;
 import org.ta4j.core.TimeSeries;
 
 @FunctionalInterface

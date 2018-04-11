@@ -3,9 +3,8 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.strategies;
+package com.evgcompany.binntrdbot.strategies.core;
 
-import com.evgcompany.binntrdbot.StrategiesController;
 import com.evgcompany.binntrdbot.analysis.ProfitWithoutComissionCriterion;
 import com.evgcompany.binntrdbot.analysis.StrategyConfig;
 import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;

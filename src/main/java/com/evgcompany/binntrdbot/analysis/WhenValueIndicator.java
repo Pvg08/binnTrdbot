@@ -15,10 +15,10 @@ import org.ta4j.core.indicators.CachedIndicator;
  * @author EVG_Adminer
  */
 public class WhenValueIndicator extends CachedIndicator<Decimal> {
-    private int n;
-    private Indicator<Decimal> indicator;
-    private WhenCheckCondition check;
-    private Decimal notfound;
+    private final int n;
+    private final Indicator<Decimal> indicator;
+    private final WhenCheckCondition check;
+    private final Decimal notfound;
 
     public WhenValueIndicator(Indicator<Decimal> indicator, Decimal notfound, int n, WhenCheckCondition check){
         super(indicator);
@@ -28,6 +28,7 @@ public class WhenValueIndicator extends CachedIndicator<Decimal> {
         this.notfound = notfound;
     }
 
+    @Override
     protected Decimal calculate(int index) {
         int k = 0;
         TimeSeries series = indicator.getTimeSeries();

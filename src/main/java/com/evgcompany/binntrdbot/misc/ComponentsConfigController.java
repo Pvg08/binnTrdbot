@@ -3,10 +3,10 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.misc;
 
+import com.evgcompany.binntrdbot.mainApplication;
 import java.awt.Component;
-import java.awt.Container;
 import java.awt.Window;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.prefs.Preferences;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JComponent;
 import javax.swing.JList;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;

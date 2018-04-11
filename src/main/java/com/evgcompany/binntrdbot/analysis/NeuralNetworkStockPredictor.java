@@ -6,7 +6,6 @@
 package com.evgcompany.binntrdbot.analysis;
 
 import com.evgcompany.binntrdbot.mainApplication;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -127,7 +126,7 @@ public class NeuralNetworkStockPredictor extends Thread {
     }
     
     private boolean canLoadNetwork(String _neuralNetworkModelFilePath) {
-        NeuralNetwork neuralNetwork = null;
+        NeuralNetwork neuralNetwork;
         try {
             neuralNetwork = NeuralNetwork.createFromFile(_neuralNetworkModelFilePath);
         } catch (Exception e) {
@@ -136,7 +135,7 @@ public class NeuralNetworkStockPredictor extends Thread {
         return neuralNetwork != null;
     }
     private boolean canLoadDataset() {
-        DataSet trset = null;
+        DataSet trset;
         try {
             trset = DataSet.createFromFile(neuralNetworkDataFilePath, inputVectorSize, 1, "\t", true);
         } catch (Exception e) {

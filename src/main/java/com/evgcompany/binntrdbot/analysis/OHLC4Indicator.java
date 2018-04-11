@@ -15,7 +15,7 @@ import org.ta4j.core.indicators.CachedIndicator;
  */
 public class OHLC4Indicator extends CachedIndicator<Decimal> {
 
-    private TimeSeries series;
+    private final TimeSeries series;
 
     public OHLC4Indicator(TimeSeries series) {
         super(series);

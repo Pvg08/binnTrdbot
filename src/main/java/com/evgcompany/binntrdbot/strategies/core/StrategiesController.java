@@ -3,10 +3,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.strategies.core;
 
 import com.evgcompany.binntrdbot.analysis.*;
+import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.strategies.*;
+import com.evgcompany.binntrdbot.tradeProfitsController;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -28,13 +30,6 @@ import org.ta4j.core.trading.rules.*;
  * @author EVG_adm_T
  */
 public class StrategiesController {
-    
-    public class StrategyMarker {
-        String label = "";
-        double timeStamp = 0;
-        double value = 0;
-        int typeIndex = 0;
-    }
 
     public enum StrategiesMode {
        NORMAL, BUY_DIP, SELL_UP

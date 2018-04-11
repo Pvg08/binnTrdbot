@@ -344,12 +344,12 @@ public class SignalController extends Thread {
         long millis_begin = datetime.toInstant(localOffset).toEpochMilli();
         long millis_done = 0;
         
-        System.out.println("signal "+symbol1+" datetime = " + datetime);
+        /*System.out.println("signal "+symbol1+" datetime = " + datetime);
         System.out.println("millis_signal = " + millis_begin + " === " + LocalDateTime.ofEpochSecond(millis_begin / 1000, 0, ZoneOffset.UTC));
         System.out.println("millis_lastbar_begin = " + bars.get(bars.size()-1).getBeginTime().toInstant().toEpochMilli() + " === " + LocalDateTime.ofEpochSecond(bars.get(bars.size()-1).getBeginTime().toInstant().toEpochMilli() / 1000, 0, ZoneOffset.UTC));
         System.out.println("millis_lastbar_end = " + bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli() + " === " + LocalDateTime.ofEpochSecond(bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli() / 1000, 0, ZoneOffset.UTC));
         System.out.println("millis_now = " + System.currentTimeMillis() + " === " + LocalDateTime.ofEpochSecond(System.currentTimeMillis() / 1000, 0, ZoneOffset.UTC));
-        System.out.println("");
+        System.out.println("");*/
 
         double done_percent = 0;
         for(int i=0; i<bars.size() && !is_done; i++) {

@@ -14,10 +14,12 @@ import com.binance.api.client.domain.account.Trade;
 import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.SymbolFilter;
 import com.binance.api.client.domain.general.SymbolInfo;
-import com.binance.api.client.exception.BinanceApiException;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
-import com.evgcompany.binntrdbot.strategies.StrategyItem;
+import com.evgcompany.binntrdbot.misc.CurrencyPlot;
+import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
+import com.evgcompany.binntrdbot.strategies.core.StrategyItem;
+import com.evgcompany.binntrdbot.strategies.core.StrategyMarker;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -38,14 +40,13 @@ import org.ta4j.core.TimeSeries;
  *
  * @author EVG_adm_T
  */
-public class tradePairProcess extends Thread {
+public class tradePairProcess extends PeriodicProcessThread {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     TradingAPIAbstractInterface client;
     
     NeuralNetworkStockPredictor predictor = null;
-    private List<StrategiesController.StrategyMarker> predictor_values = new ArrayList<>();
-    
+
     private final String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
@@ -53,8 +54,6 @@ public class tradePairProcess extends Thread {
     private StrategiesController strategiesController = null;
     
     private final mainApplication app;
-    private boolean need_stop = false;
-    private boolean paused = false;
     
     private boolean isTryingToSellUp = false;
     private boolean isTryingToBuyDip = false;
@@ -62,7 +61,7 @@ public class tradePairProcess extends Thread {
     private boolean sellUpAll = false;
     private boolean checkOtherStrategies = true;
     
-    private List<Long> orderToCancelOnSellUp = new ArrayList<>();
+    private final List<Long> orderToCancelOnSellUp = new ArrayList<>();
     private long last_time = 0;
     
     private long limitOrderId = 0;
@@ -75,8 +74,6 @@ public class tradePairProcess extends Thread {
     private BigDecimal sold_price = BigDecimal.ZERO;
     private BigDecimal sold_amount = BigDecimal.ZERO;
     private BigDecimal last_trade_profit = BigDecimal.ZERO;
-    
-    private long delayTime = 10;
     
     private CurrencyPlot plot = null;
     
@@ -104,12 +101,10 @@ public class tradePairProcess extends Thread {
     
     private static DecimalFormat df5 = new DecimalFormat("0.#####");
     private static DecimalFormat df8 = new DecimalFormat("0.########");
-    private int startDelayTime = 0;
     
     private boolean useBuyStopLimited = false;
     private int stopBuyLimitTimeout = 120;
     private boolean useSellStopLimited = false;
-    private boolean isInitialized = false;
     private boolean isTriedBuy = false;
     private int stopSellLimitTimeout = 1200;
     
@@ -312,19 +307,6 @@ public class tradePairProcess extends Thread {
         profitsChecker.setPairPrice(symbol, currentPrice);
     }
     
-    public void doStop() {
-        need_stop = true;
-        paused = false;
-    }
-    
-    void doSetPaused(boolean _paused) {
-        paused = _paused;
-    }
-    
-    private void doWait(long ms) {
-        try { Thread.sleep(ms);} catch(InterruptedException e) {}
-    }
-    
     private void addBar(Bar nbar) {
         addBars(Arrays.asList(nbar));
     }
@@ -473,9 +455,7 @@ public class tradePairProcess extends Thread {
         }
         
         stopSockets();
-        
-        //long ctime = SyncedTime.getInstance(-1).currentTimeMillis();
-        //List<Candlestick> bars = client.getCandlestickBars(symbol, barInterval, barQueryCount * 2, ctime - barQueryCount * barSeconds * 1000, ctime);
+
         List<Bar> bars = client.getBars(symbol, barInterval);
         if (bars.size() >= 2 && barQueryCount > 1) {
             addPreBars(barQueryCount-1, bars.size(), bars.get(0).getBeginTime().toInstant().toEpochMilli(), bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli());
@@ -542,9 +522,7 @@ public class tradePairProcess extends Thread {
     }
     
     @Override
-    public void run(){  
-        int exceptions_cnt = 0;
-        isInitialized = false;
+    protected void runStart() {
         limitOrderId = 0;
 
         if (!buyOnStart) {
@@ -553,10 +531,6 @@ public class tradePairProcess extends Thread {
 
         app.log("thread for " + symbol + " running...");
         app.log("");
-        
-        if (!buyOnStart) {
-            doWait(startDelayTime);
-        }
         
         try {
             ExchangeInfo info = client.getExchangeInfo();
@@ -623,45 +597,28 @@ public class tradePairProcess extends Thread {
             doBuy();
         }
 
-        isInitialized = true;
         app.log(symbol + " initialized. Current price = " + df8.format(currentPrice));
-        
-        while (!need_stop) {
-            if (paused) {
-                doWait(12000);
-                continue;
+    }
+    
+    @Override
+    protected void runBody() {
+        nextBars();
+        if(strategiesController.getMainStrategy().equals("Neural Network")) {
+            if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
+                Bar nbar = predictor.predictNextBar(series);
+                app.log(symbol + " NEUR prediction = " + df8.format(nbar.getClosePrice()));
             }
-            try { 
-                nextBars();
-                
-                if(strategiesController.getMainStrategy().equals("Neural Network")) {
-                    if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
-                        Bar nbar = predictor.predictNextBar(series);
-                        app.log(symbol + " NEUR prediction = " + df8.format(nbar.getClosePrice()));
-                    }
-                }
-
-                if (limitOrderId > 0) {
-                    checkOrder();
-                } else {
-                    checkStatus();
-                }
-            } catch(BinanceApiException binex) {
-                app.log("");
-                app.log("EXCEPTION: " + binex.getLocalizedMessage(), false, true);
-                exceptions_cnt++;
-                if (exceptions_cnt > 3) {
-                    break;
-                }
-                doWait(delayTime * 10000);
-                continue;
-            }
-            doWait(delayTime * 1000);
-            exceptions_cnt = 0;
         }
-        
+        if (limitOrderId > 0) {
+            checkOrder();
+        } else {
+            checkStatus();
+        }
+    }
+
+    @Override
+    protected void runFinish() {
         stopSockets();
-        
         app.log("");
         app.log("thread for " + symbol + " is stopped...");
     }
@@ -713,7 +670,11 @@ public class tradePairProcess extends Thread {
         StrategyItem item = strategiesController.getMainStrategyItem();
         plot = new CurrencyPlot(symbol, series, item != null ? item.getInitializer() : null);
         for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
-            plot.addMarker(strategiesController.getStrategyMarkers().get(i).label, strategiesController.getStrategyMarkers().get(i).timeStamp, strategiesController.getStrategyMarkers().get(i).typeIndex);
+            plot.addMarker(
+                    strategiesController.getStrategyMarkers().get(i).label, 
+                    strategiesController.getStrategyMarkers().get(i).timeStamp, 
+                    strategiesController.getStrategyMarkers().get(i).typeIndex
+            );
         }
         
         if (predictor != null && predictor.isHaveNetworkInFile()) {
@@ -846,29 +807,11 @@ public class tradePairProcess extends Thread {
         }
     }
 
-    /**
-     * @return the delayTime
-     */
-    public long getDelayTime() {
-        return delayTime;
-    }
-
-    /**
-     * @param delayTime the delayTime to set
-     */
-    public void setDelayTime(long delayTime) {
-        this.delayTime = delayTime;
-    }
-
     public void setBuyOnStart(boolean buyOnStart) {
         this.buyOnStart = buyOnStart;
     }
     public boolean isBuyOnStart() {
         return buyOnStart;
-    }
-
-    public void setStartDelay(int startDelayTime) {
-        this.startDelayTime = startDelayTime;
     }
 
     public void setCheckOtherStrategies(boolean checkOtherStrategies) {
@@ -943,13 +886,6 @@ public class tradePairProcess extends Thread {
      */
     public void setBarQueryCount(int barQueryCount) {
         this.barQueryCount = barQueryCount;        
-    }
-
-    /**
-     * @return the isInitialized
-     */
-    public boolean isInitialized() {
-        return isInitialized;
     }
     
     /**

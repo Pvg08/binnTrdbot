@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.misc;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -31,14 +31,7 @@ import org.ta4j.core.Bar;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.TimeSeries;
-import org.ta4j.core.indicators.SMAIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
-import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
-import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
-import java.awt.Stroke;
 
 /**
  *
@@ -50,8 +43,8 @@ public class CurrencyPlot extends JFrame {
     private TimeSeries tseries = null;
     private String stockSymbol;
     
-    private XYPlot mainPlot;
-    private org.jfree.data.time.TimeSeries points;
+    private final XYPlot mainPlot;
+    private final org.jfree.data.time.TimeSeries points;
     
     private double maxVolume;
     private StrategyDatasetInitializer datasetInitializer = null;

@@ -15,7 +15,7 @@ import org.ta4j.core.indicators.CachedIndicator;
  * @author EVG_Adminer
  */
 public class ANNIndicator extends CachedIndicator<Decimal> {
-    private Indicator<Decimal> indicator;
+    private final Indicator<Decimal> indicator;
     private int framescnt = 1;
 
     public ANNIndicator(Indicator<Decimal> indicator, int framescnt){
@@ -119,6 +119,7 @@ public class ANNIndicator extends CachedIndicator<Decimal> {
         return exit;
     }
     
+    @Override
     protected Decimal calculate(int index) {
         double input[] = new double[15];
         for(int i = 0; i < input.length; i++) {

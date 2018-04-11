@@ -5,14 +5,13 @@
  */
 package com.evgcompany.binntrdbot.strategies;
 
-import com.evgcompany.binntrdbot.StrategiesController;
-import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
+import com.evgcompany.binntrdbot.strategies.core.*;
+import com.evgcompany.binntrdbot.analysis.*;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.ichimoku.IchimokuChikouSpanIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuKijunSenIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanAIndicator;
 import org.ta4j.core.indicators.ichimoku.IchimokuSenkouSpanBIndicator;

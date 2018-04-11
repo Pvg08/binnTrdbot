@@ -9,7 +9,9 @@ import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.signal.SignalController;
+import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -42,7 +44,7 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  *
  * @author EVG_Adminer
  */
-public class CoinRatingController extends Thread {
+public class CoinRatingController extends PeriodicProcessThread {
 
     enum CoinRatingSort {
         CR_RANK,
@@ -83,15 +85,14 @@ public class CoinRatingController extends Thread {
     Map<String, CoinRatingPairLogItem> heroesMap = new HashMap<>();
     Map<String, JSONObject> coinRanks = new HashMap<>();
 
-    private long delayTime = 2;
     private long updateTime = 10;
     private boolean have_all_coins_info = false;
-    
+    private String coinsPattern = "";
+
     private static final DecimalFormat df3p = new DecimalFormat("0.##%");
     private static final DecimalFormat df3 = new DecimalFormat("0.##");
     private static final DecimalFormat df6 = new DecimalFormat("0.#####");
-    private boolean need_stop = false;
-    private boolean paused = false;
+
     private final DefaultListModel<String> listHeroesModel = new DefaultListModel<>();
     private final List<String> accountCoins = new ArrayList<>(0);
 
@@ -324,22 +325,6 @@ public class CoinRatingController extends Thread {
             }
         } catch (IOException | JSONException ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    public void doStop() {
-        need_stop = true;
-        paused = false;
-    }
-
-    void doSetPaused(boolean _paused) {
-        paused = _paused;
-    }
-
-    private void doWait(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
         }
     }
 
@@ -576,7 +561,7 @@ public class CoinRatingController extends Thread {
         }
     }
 
-    private void updateCurrentPrices(String coinsPattern) {
+    private void updateCurrentPrices() {
         try {
             SEMAPHORE_UPDATE.acquire();
             heroesMap.forEach((symbol, curr) -> {
@@ -644,8 +629,7 @@ public class CoinRatingController extends Thread {
     }
     
     @Override
-    public void run() {
-
+    protected void runStart() {
         if (analyzer) {
             loadRatingData();
         }
@@ -662,9 +646,9 @@ public class CoinRatingController extends Thread {
                 accountCoins.add(balance.getAsset());
             }
         });
-        String coinsPattern = String.join("|", accountCoins);
+        coinsPattern = String.join("|", accountCoins);
 
-        updateCurrentPrices(coinsPattern);
+        updateCurrentPrices();
         
         signalcontroller.setSignalEvent((item, rating) -> {
             if (heroesMap.containsKey(item.getPair())) {
@@ -690,31 +674,29 @@ public class CoinRatingController extends Thread {
             app.log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
             app.systemSound();
         });
-        
-        while (!need_stop) {
-            if (paused) {
-                doWait(delayTime * 1000);
-                continue;
-            }
+    }
+    
+    @Override
+    protected void runBody() {
+        updateCurrentPrices();
 
-            updateCurrentPrices(coinsPattern);
-            
-            if (analyzer) {
-                checkFromTop();
-            }
-            updateList();
-
-            if (analyzer && (autoOrder || autoSignalOrder) && have_all_coins_info) {
-                checkFastEnter();
-            } else if (!analyzer && autoSignalOrder && entered.size() > 0) {
-                checkOrderExit();
-            }
-
-            doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
+        if (analyzer) {
+            checkFromTop();
         }
-        
+        updateList();
+
+        if (analyzer && (autoOrder || autoSignalOrder) && have_all_coins_info) {
+            checkFastEnter();
+        } else if (!analyzer && autoSignalOrder && entered.size() > 0) {
+            checkOrderExit();
+        }
+
+        //doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
+    }
+    
+    @Override
+    protected void runFinish() {
         signalcontroller.stopSignalsProcessIfRunning();
-        
         if (orderEvent != null) {
             try {
                 orderEvent.close();
@@ -722,20 +704,6 @@ public class CoinRatingController extends Thread {
                 Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-    }
-
-    /**
-     * @return the delayTime
-     */
-    public long getDelayTime() {
-        return delayTime;
-    }
-
-    /**
-     * @param delayTime the delayTime to set
-     */
-    public void setDelayTime(long delayTime) {
-        this.delayTime = delayTime;
     }
 
     /**

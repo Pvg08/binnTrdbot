@@ -5,8 +5,8 @@
  */
 package com.evgcompany.binntrdbot.strategies;
 
-import com.evgcompany.binntrdbot.StrategiesController;
-import com.evgcompany.binntrdbot.analysis.StrategyConfigItem;
+import com.evgcompany.binntrdbot.strategies.core.*;
+import com.evgcompany.binntrdbot.analysis.*;
 import java.math.BigDecimal;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;

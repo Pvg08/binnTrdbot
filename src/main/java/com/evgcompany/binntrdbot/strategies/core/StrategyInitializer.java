@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.strategies.core;
 
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
