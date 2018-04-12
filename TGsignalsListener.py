@@ -2,6 +2,7 @@ import sys
 import time
 import datetime
 import re
+import io
 import random
 import configparser
 
@@ -68,39 +69,63 @@ def enable_win_unicode_console():
 
 def getFirstMatch(regex, txt):
     if regex:
-        matches = re.finditer(regex, txt, re.UNICODE | re.IGNORECASE | re.MULTILINE)
-        for matchNum, match in enumerate(matches):
-            for groupNum in range(0, len(match.groups())):
-                return match.group(1)
+        try:
+            matches = re.finditer(regex, txt, re.UNICODE | re.IGNORECASE | re.MULTILINE)
+            for matchNum, match in enumerate(matches):
+                for groupNum in range(0, len(match.groups())):
+                    return match.group(1)
+        except:
+            matches = []
     return ''
 
+def coinFix(txt):
+    try:
+        if txt:
+            txt = txt.replace('*', '').strip(',.+ \n\t').upper()
+    except:
+        txt = ''
+    return txt
+
 def dateFix(date):
-    ts = time.time()
-    utc_offset = (datetime.datetime.fromtimestamp(ts) - datetime.datetime.utcfromtimestamp(ts)).total_seconds()
-    datetime_obj_naive = datetime.datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S")
-    datetime_obj_naive = datetime_obj_naive + datetime.timedelta(seconds = utc_offset)
+    try:
+        ts = time.time()
+        utc_offset = (datetime.datetime.fromtimestamp(ts) - datetime.datetime.utcfromtimestamp(ts)).total_seconds()
+        datetime_obj_naive = datetime.datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S")
+        datetime_obj_naive = datetime_obj_naive + datetime.timedelta(seconds = utc_offset)
+    except:
+        datetime_obj_naive = ''
     return str(datetime_obj_naive)
 
 def numFix(txt):
-    if txt:
-        txt = txt.replace(',', '.').strip(',.+ \n\t')
-        if txt.count('.') > 1:
-            rtxt = getFirstMatch(r'^(0\.[0-9]{2,12})', txt)
-            if not rtxt:
-                rtxt = getFirstMatch(r'^([0-9]{2,12})', txt)
-            if not rtxt:
-                rtxt = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
-                rtxt = str(rtxt).replace(',', '.')
-            txt = rtxt
-    if txt and (txt.find('k')>=0 or txt.find('K')>=0):
-        num = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
-        num = num * 1000
-        txt = str(num)
+    try:
+        if txt:
+            txt = txt.replace(',', '.').strip(',.+ \n\t')
+            if txt.count('.') > 1:
+                rtxt = getFirstMatch(r'^(0\.[0-9]{2,12})', txt)
+                if not rtxt:
+                    rtxt = getFirstMatch(r'^([0-9]{2,12})', txt)
+                if not rtxt:
+                    rtxt = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
+                    rtxt = str(rtxt).replace(',', '.')
+                txt = rtxt
+        if txt and (txt.find('k')>=0 or txt.find('K')>=0):
+            num = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
+            num = num * 1000
+            txt = str(num)
+    except:
+        txt = ''
     return txt
 
 def separateCheck(txt, title, date, client):
     if (txt is None) or (txt == ''):
         return
+
+    global log
+    if log:
+        log.write("------------------------------\n")
+        log.write(txt)
+        log.write("\n------------------------------\n")
+
     non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
     txt = txt.translate(non_bmp_map)
     title = title.translate(non_bmp_map).replace(';', ' ')
@@ -120,17 +145,22 @@ def separateCheck(txt, title, date, client):
 
 def textCheck(txt, title, date, client):
     global signal_expr
+    global log
 
-    #print(txt)
-    #print("_________________")
-
-    stop_coin_names = [
-        'BTC', 
+    stop_coin2_names = [
         'BINANCE', 
         'BITTREX', 
         'YOBIT', 
         'CRYPTOPIA', 
+        'EXCHANGE', 
         'SIGNAL', 
+        'PALM', 
+        'CRYPTOL', 
+        'LEOSIGN', 
+        '2GIVE', 
+        'DIGIXDA', 
+        'NEWS', 
+        'PREMIUM', 
         'ZONE', 
         'UPDATE', 
         'PRICE', 
@@ -141,6 +171,7 @@ def textCheck(txt, title, date, client):
         'AGAIN', 
         'RESULT', 
         'RESULTS', 
+        'BELOW', 
         'AROUND', 
         'NEAR', 
         'STOP', 
@@ -151,11 +182,21 @@ def textCheck(txt, title, date, client):
         'LONGTERM', 
         'LONGTER', 
         'CRYPTOR', 
+        'TRUSTPL', 
         'PART', 
         'OK', 
         'SOME'
     ]
+    stop_coin1_names = list(stop_coin2_names)
+    stop_coin1_names = stop_coin1_names + [
+        'BTC',
+        'USD',
+        'USDT'
+    ]
     best_item = None
+
+    if log:
+        log.write("    Matching rools: ")
 
     i = 0
     while i < len(signal_expr):
@@ -163,12 +204,30 @@ def textCheck(txt, title, date, client):
             hasmatch = getFirstMatch(signal_expr[i].reg_has, txt)
             skipmatch = getFirstMatch(signal_expr[i].reg_skip, txt)
             if hasmatch and not skipmatch:
-                coin = getFirstMatch(signal_expr[i].reg_coin, txt).upper()
-                coin2 = getFirstMatch(signal_expr[i].reg_coin2, txt).upper()
+                coin = coinFix(getFirstMatch(signal_expr[i].reg_coin, txt))
+                coin2 = coinFix(getFirstMatch(signal_expr[i].reg_coin2, txt))
                 price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
                 price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
                 price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
-                if coin and coin not in stop_coin_names and coin2 not in stop_coin_names and (price_from or price_to or price_target):
+                if log:
+                    log.write(" " + str(i + 1))
+                    if coin:
+                        if coin in stop_coin1_names:
+                            log.write("[-coin]")
+                        else:
+                            log.write("[coin]")
+                    if coin2:
+                        if coin2 in stop_coin2_names:
+                            log.write("[-coin2]")
+                        else:
+                            log.write("[coin2]")
+                    if price_from:
+                        log.write("[price1]")
+                    if price_to:
+                        log.write("[price2]")
+                    if price_target:
+                        log.write("[target]")
+                if coin and (coin not in stop_coin1_names) and (coin2 not in stop_coin2_names) and (price_from or price_to or price_target):
                     ri = SignalRow()
                     ri.title = title
                     ri.coin = coin
@@ -185,9 +244,12 @@ def textCheck(txt, title, date, client):
         i = i + 1
 
     if best_item is not None:
-        #if best_item.coin == 'NANO':
-        #    print(txt)
         print(str(best_item))
+        if log:
+            log.write("\n    <--- "+str(best_item)+"\n\n")
+    else:
+        if log:
+            log.write("\n    <--- NOT A SIGNAL MESSAGE\n\n")
 
     return
 
@@ -197,8 +259,18 @@ def checkCurchan(channel, client, signals_limit):
         chantitle = channel.name
     if not chantitle:
         chantitle = str(channel.id)
+
+    global log
+    if log:
+        log.write("\n\n")
+        log.write("------------------------------\n")
+        log.write("BEGIN CHECKING CHANNEL: "+channel.title+" - " + channel.name +" - " + str(channel.id) + "\n")
+        log.write("------------------------------\n")
+        log.write("\n\n")
+
     channame = channel.name
-    if channel.id and channel.id > 0:
+
+    if not channame and channel.id != 0:
         int_chan = int(channel.id)
     else:
         int_chan = 0
@@ -230,26 +302,23 @@ def checkCurchan(channel, client, signals_limit):
 
     return client.get_input_entity(channel_id)
 
-def main():
-    if not sys.argv[1] or not sys.argv[2] or not sys.argv[3]:
-        return
-    enable_win_unicode_console()
+def getConfigValue(config, value):
+    try:
+        result = config[value]
+    except:
+        result = ''
+    return result
 
-    global signal_expr
-    global signal_separator
+def loadChanDataFromConfig(config):
+    channels = []
     signal_expr = []
 
-    config = configparser.RawConfigParser(allow_no_value = True)
-    config.read('signals_listener.ini')
-    session_name = config['main']['session_fname']
-    api_id = sys.argv[1]
-    api_hash = sys.argv[2]
-    phone = sys.argv[3]
-
     chancount = int(config['channels']['count'])
-    signals_preload = int(config['channels']['signals_preload'])
-    signal_separator = str(config['channels']['signal_separator'])
-    channels = []
+    default_price1_regex = str(config['channels']['signal_default_price1_regex'])
+    default_price2_regex = str(config['channels']['signal_default_price2_regex'])
+    default_sell_regex = str(config['channels']['signal_default_target_regex'])
+    default_stoploss_regex = str(config['channels']['signal_default_stoploss_regex'])
+    default_rating = int(config['channels']['signal_default_rating'])
 
     chan_index = 1
     cname = ''
@@ -258,35 +327,41 @@ def main():
     last_cid = 0
     while chan_index <= chancount:
         channel_config = config['channel_' + str(chan_index)]
-
         expr_b = RegBlock()
-        expr_b.rating = int(channel_config['signal_rating'])
-        expr_b.reg_has = channel_config['signal_has']
-        expr_b.reg_skip = channel_config['signal_skip']
-        expr_b.reg_coin = channel_config['signal_coin']
-        expr_b.reg_coin2 = channel_config['signal_coin2']
-        expr_b.reg_price_from = channel_config['signal_price_from']
-        expr_b.reg_price_to = channel_config['signal_price_to']
-        expr_b.reg_price_target = channel_config['signal_price_target']
+        expr_b.reg_has = getConfigValue(channel_config, 'signal_has')
+        expr_b.reg_skip = getConfigValue(channel_config, 'signal_skip')
+        expr_b.reg_coin = getConfigValue(channel_config, 'signal_coin')
+        expr_b.reg_coin2 = getConfigValue(channel_config, 'signal_coin2')
+        expr_b.reg_price_from = getConfigValue(channel_config, 'signal_price_from')
+        expr_b.reg_price_to = getConfigValue(channel_config, 'signal_price_to')
+        expr_b.reg_price_target = getConfigValue(channel_config, 'signal_price_target')
         if not expr_b.reg_has:
             expr_b.reg_has = expr_b.reg_coin
-
-        if cname or cid:
+        if expr_b.reg_has:
+            if not expr_b.reg_price_from:
+                expr_b.reg_price_from = default_price1_regex
+            if not expr_b.reg_price_to:
+                expr_b.reg_price_to = default_price2_regex
+            if not expr_b.reg_price_target:
+                expr_b.reg_price_target = default_sell_regex
+            try:
+                expr_b.rating = int(channel_config['signal_rating'])
+            except:
+                expr_b.rating = default_rating
+        if cname or cid != 0:
             last_cname = cname
             last_cid = cid
+
         try:
-            cname = channel_config['name']
-        except:
-            cname = ''
-        try:
-            cid = channel_config['id']
+            cid = int(channel_config['id'])
         except:
             cid = 0
+        cname = getConfigValue(channel_config, 'name')
 
-        if cname or cid:
+        if cname or cid != 0:
             newchan = ChannelBlock()
             newchan.name = cname
-            newchan.id = int(cid)
+            newchan.id = cid
             newchan.title = channel_config['title']
             channels.append(newchan)
             expr_b.name = cname
@@ -297,6 +372,37 @@ def main():
 
         signal_expr.append(expr_b)
         chan_index = chan_index + 1
+        
+    return channels, signal_expr
+    
+def main():
+    if not sys.argv[1] or not sys.argv[2] or not sys.argv[3]:
+        return
+    enable_win_unicode_console()
+
+    config = configparser.RawConfigParser(allow_no_value = True)
+    config.read('signals_listener.ini')
+    session_name = config['main']['session_fname']
+    api_id = sys.argv[1]
+    api_hash = sys.argv[2]
+    phone = sys.argv[3]
+
+    global signal_expr
+    global signal_separator
+    global log
+
+    signals_preload = int(config['channels']['signals_preload'])
+    signal_separator = str(config['channels']['signal_separator'])
+    debug_mode = int(config['main']['debug_mode']) > 0
+    log_file_name = str(config['main']['log_file'])
+
+    if debug_mode:
+        log = io.open('./' + log_file_name,'w+',encoding='utf8')
+        log.write("Starting log:\n")
+    else:
+        log = None
+
+    channels, signal_expr = loadChanDataFromConfig(config)
 
     client = TelegramClient(
         session_name,
@@ -333,6 +439,10 @@ def main():
                 separateCheck(event.text, '-', dateFix(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
+
+    if log:
+        log.close()
+        log = None
 
     print('------------------')
 

@@ -48,14 +48,17 @@ public class SignalController extends Thread {
         int timeout_signals = 0;
         int stoploss_signals = 0;
         int stoploss_done_signals = 0;
+        int price1_not_set = 0;
+        int price2_not_set = 0;
+        int price_target_not_set = 0;
         long done_millis_diff_summ = 0;
         double done_summ_percent = 0;
         double summ_percent = 0;
         double summ_rating = 0;
-        Set<Integer> used_signals = new HashSet<>();
+        Set<Integer> used_regexps = new HashSet<>();
     }
     private final HashMap<String, ChannelStat> channel_stats = new HashMap<>();
-    private final Set<Integer> channel_used_signals = new HashSet<>();
+    private final Set<Integer> channel_used_regexps = new HashSet<>();
     
     private final int MAX_DAYS = 6;
     private final int SKIP_DAYS = 30;
@@ -217,37 +220,42 @@ public class SignalController extends Thread {
     
     private void logStats() {
         for (Map.Entry<String, ChannelStat> entry : channel_stats.entrySet()) {
-            long avg_time = 0;
-            double avg_done_percent = 0;
-            double avg_percent = 0;
-            double avg_rating = 0;
-            if (entry.getValue().done_signals > 0) {
-                avg_time = entry.getValue().done_millis_diff_summ / entry.getValue().done_signals;
-                avg_done_percent = entry.getValue().done_summ_percent / entry.getValue().done_signals;
+            if (!entry.getKey().isEmpty() && !entry.getKey().equals("-")) {
+                long avg_time = 0;
+                double avg_done_percent = 0;
+                double avg_percent = 0;
+                double avg_rating = 0;
+                if (entry.getValue().done_signals > 0) {
+                    avg_time = entry.getValue().done_millis_diff_summ / entry.getValue().done_signals;
+                    avg_done_percent = entry.getValue().done_summ_percent / entry.getValue().done_signals;
+                }
+                if (entry.getValue().ok_signals > 0) {
+                    avg_percent = entry.getValue().summ_percent / entry.getValue().ok_signals;
+                    avg_rating = entry.getValue().summ_rating / entry.getValue().ok_signals;
+                }
+                mainApplication.getInstance().log(
+                    "Channel '" + entry.getKey() + "' Stats:\n" +
+                    "Signals count: " + entry.getValue().signals_cnt + "\n" +
+                    "Normal signals: " + entry.getValue().ok_signals + "\n" +
+                    "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
+                    "Skipped signals ("+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
+                    "Waiting signals: " + entry.getValue().waiting_signals + "\n" + 
+                    "Stoploss signals (-"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
+                    "Stoploss then done signals: " + entry.getValue().stoploss_done_signals + "\n" + 
+                    "Signals without price1: " + entry.getValue().price1_not_set + "\n" + 
+                    "Signals without price2: " + entry.getValue().price2_not_set + "\n" + 
+                    "Signals without target: " + entry.getValue().price_target_not_set + "\n" + 
+                    "Channel avg rating: " + df8.format(avg_rating) + "\n" + 
+                    "Done signals: " + entry.getValue().done_signals + "\n" + 
+                    "Done signals avg time: " + df8.format(avg_time / 86400000.0) + " day.\n" + 
+                    "Done signals avg percent profit: " + df8.format(avg_done_percent) + "%\n" + 
+                    "Channel avg signal profit: " + df8.format(avg_percent) + "%\n" + 
+                    "Channel regexp_ids: " + entry.getValue().used_regexps + "\n" + 
+                    "\n"
+                );
             }
-            if (entry.getValue().ok_signals > 0) {
-                avg_percent = entry.getValue().summ_percent / entry.getValue().ok_signals;
-                avg_rating = entry.getValue().summ_rating / entry.getValue().ok_signals;
-            }
-            mainApplication.getInstance().log(
-                "Channel '" + entry.getKey() + "' Stats:\n" +
-                "Signals count: " + entry.getValue().signals_cnt + "\n" +
-                "Normal signals: " + entry.getValue().ok_signals + "\n" +
-                "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
-                "Skipped signals ("+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
-                "Waiting signals: " + entry.getValue().waiting_signals + "\n" + 
-                "Stoploss signals (-"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
-                "Stoploss then done signals: " + entry.getValue().stoploss_done_signals + "\n" + 
-                "Channel avg rating: " + df8.format(avg_rating) + "\n" + 
-                "Done signals: " + entry.getValue().done_signals + "\n" + 
-                "Done signals avg time: " + df8.format(avg_time / 86400000.0) + " day.\n" + 
-                "Done signals avg percent profit: " + df8.format(avg_done_percent) + "%\n" + 
-                "Channel avg signal profit: " + df8.format(avg_percent) + "%\n" + 
-                "Channel regexp_ids: " + entry.getValue().used_signals + "\n" + 
-                "\n"
-            );
         }
-        mainApplication.getInstance().log("Set of all channels regexp_ids: " + channel_used_signals.toString());
+        mainApplication.getInstance().log("Set of all channels regexp_ids: " + channel_used_regexps.toString());
         mainApplication.getInstance().log("");
     }
     
@@ -278,9 +286,13 @@ public class SignalController extends Thread {
                 stat = channel_stats.get(title);
             }
             stat.signals_cnt++;
-            stat.used_signals.add(exp_id);
+            stat.used_regexps.add(exp_id);
+            
+            if (price1 == null) stat.price1_not_set++;
+            if (price2 == null) stat.price2_not_set++;
+            if (price_target == null) stat.price_target_not_set++;
         }
-        channel_used_signals.add(exp_id);
+        channel_used_regexps.add(exp_id);
         if (symbol1 == null || symbol1.isEmpty() || datetime == null || rating == 0 || (price_target == null && price1 == null && price2 == null)) {
             return;
         }
