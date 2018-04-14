@@ -8,6 +8,7 @@ package com.evgcompany.binntrdbot.strategies.core;
 import com.evgcompany.binntrdbot.analysis.ProfitWithoutComissionCriterion;
 import com.evgcompany.binntrdbot.analysis.StrategyConfig;
 import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
+import com.evgcompany.binntrdbot.analysis.TrailingStopLossRule;
 import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.tradeProfitsController;
 import java.math.BigDecimal;
@@ -93,7 +94,7 @@ public abstract class StrategyItem {
                 rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeMinProfitPercent())));
             }*/
             if (profitsChecker.getStopLossPercent() != null) {
-                rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
+                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
             }
             if (profitsChecker.getStopGainPercent() != null) {
                 rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));

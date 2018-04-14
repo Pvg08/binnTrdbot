@@ -8,6 +8,9 @@ package com.evgcompany.binntrdbot.signal;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.text.DecimalFormat;
 
 /**
  *
@@ -17,15 +20,23 @@ public class SignalItem {
     private String symbol1;
     private String symbol2;
     private String channelName;
+    private String hash;
     private BigDecimal price_from;
     private BigDecimal price_to;
     private BigDecimal price_target;
+    private BigDecimal price_stoploss;
+    private boolean price_from_auto;
+    private boolean price_to_auto;
+    private boolean price_target_auto;
+    private boolean price_stoploss_auto;
     private boolean done;
     private boolean timeout;
     private LocalDateTime datetime;
     private long localMillis;
     private double rating;
     private long maxDaysAgo;
+    
+    private static final DecimalFormat df8 = new DecimalFormat("0.#######");
 
     public long getMillisFromSignalStart() {
         long millis = System.currentTimeMillis() - localMillis;
@@ -188,6 +199,17 @@ public class SignalItem {
     }
 
     /**
+     * @param rating the rating to set
+     */
+    public void mergeBaseRating(double rating) {
+        if (this.rating > rating) {
+            this.rating += rating / 2;
+        } else {
+            this.rating = rating + this.rating / 2;
+        }
+    }
+
+    /**
      * @return the timeout
      */
     public boolean isTimeout() {
@@ -241,5 +263,102 @@ public class SignalItem {
      */
     public void setMaxDaysAgo(long maxDaysAgo) {
         this.maxDaysAgo = maxDaysAgo;
+    }
+
+    /**
+     * @return the price_stoploss
+     */
+    public BigDecimal getPriceStoploss() {
+        return price_stoploss;
+    }
+
+    /**
+     * @param price_stoploss the price_stoploss to set
+     */
+    public void setPriceStoploss(BigDecimal price_stoploss) {
+        this.price_stoploss = price_stoploss;
+    }
+
+    /**
+     * @return the price_from_auto
+     */
+    public boolean isPriceFromAuto() {
+        return price_from_auto;
+    }
+
+    /**
+     * @param price_from_auto the price_from_auto to set
+     */
+    public void setPriceFromAuto(boolean price_from_auto) {
+        this.price_from_auto = price_from_auto;
+    }
+
+    /**
+     * @return the price_to_auto
+     */
+    public boolean isPriceToAuto() {
+        return price_to_auto;
+    }
+
+    /**
+     * @param price_to_auto the price_to_auto to set
+     */
+    public void setPriceToAuto(boolean price_to_auto) {
+        this.price_to_auto = price_to_auto;
+    }
+
+    /**
+     * @return the price_target_auto
+     */
+    public boolean isPriceTargetAuto() {
+        return price_target_auto;
+    }
+
+    /**
+     * @param price_target_auto the price_target_auto to set
+     */
+    public void setPriceTargetAuto(boolean price_target_auto) {
+        this.price_target_auto = price_target_auto;
+    }
+
+    /**
+     * @return the price_stoploss_auto
+     */
+    public boolean isPriceStoplossAuto() {
+        return price_stoploss_auto;
+    }
+
+    /**
+     * @param price_stoploss_auto the price_stoploss_auto to set
+     */
+    public void setPriceStoplossAuto(boolean price_stoploss_auto) {
+        this.price_stoploss_auto = price_stoploss_auto;
+    }
+
+    /**
+     * @return the hash
+     */
+    public String getHash() {
+        return hash;
+    }
+
+    public void updateHash() {
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            messageDigest.update(toString().getBytes());
+            hash = new String(messageDigest.digest());
+        } catch (NoSuchAlgorithmException ex) {
+            hash = toString();
+        }
+    }
+    
+    @Override
+    public String toString() {
+        return symbol1+"_"
+                +symbol2+"_"
+                +df8.format(price_from)+"_"
+                +df8.format(price_to)+"_"
+                +df8.format(price_target)+"_"
+                +df8.format(price_stoploss)+"_";
     }
 }

@@ -23,9 +23,11 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import javax.swing.JOptionPane;
 import org.ta4j.core.Bar;
 import org.zeroturnaround.exec.InvalidExitValueException;
@@ -51,11 +53,14 @@ public class SignalController extends Thread {
         int price1_not_set = 0;
         int price2_not_set = 0;
         int price_target_not_set = 0;
+        int copy_signals = 0;
         long done_millis_diff_summ = 0;
+        long copy_millis_diff_summ = 0;
         double done_summ_percent = 0;
         double summ_percent = 0;
         double summ_rating = 0;
         Set<Integer> used_regexps = new HashSet<>();
+        Set<String> copy_sources = new HashSet<>();
     }
     private final HashMap<String, ChannelStat> channel_stats = new HashMap<>();
     private final Set<Integer> channel_used_regexps = new HashSet<>();
@@ -72,7 +77,7 @@ public class SignalController extends Thread {
     private StartedProcess signalsProcess = null;
     private boolean isChecking = false;
     private final LinkedList<String> newlines = new LinkedList<>();
-    private final List<SignalItem> items = new ArrayList<>(0);
+    private List<SignalItem> items = new ArrayList<>(0);
     
     private SignalEvent signalEvent = null;
     private boolean initialSignalsIsLoaded = false;
@@ -197,7 +202,7 @@ public class SignalController extends Thread {
             return;
         }
         String[] parts = line.split(";");
-        if (parts.length != 9) {
+        if (parts.length != 10) {
             return;
         }
         if (!isChecking) {
@@ -210,8 +215,9 @@ public class SignalController extends Thread {
                 strPrice(parts[4]), // price1
                 strPrice(parts[5]), // price2
                 strPrice(parts[6]),  // price_target
-                Integer.parseInt(parts[7]),
-                parts[8] // channel title
+                strPrice(parts[7]),  // price_stoploss
+                Integer.parseInt(parts[8]),
+                parts[9] // channel title
             );
         } else {
             mainApplication.getInstance().log(line);
@@ -219,12 +225,16 @@ public class SignalController extends Thread {
     }
     
     private void logStats() {
+        checkSignalItems();
+        mainApplication.getInstance().log("");
+        mainApplication.getInstance().log("Channel stats:\n");
         for (Map.Entry<String, ChannelStat> entry : channel_stats.entrySet()) {
             if (!entry.getKey().isEmpty() && !entry.getKey().equals("-")) {
                 long avg_time = 0;
                 double avg_done_percent = 0;
                 double avg_percent = 0;
                 double avg_rating = 0;
+                double avg_copy_diff = 0;
                 if (entry.getValue().done_signals > 0) {
                     avg_time = entry.getValue().done_millis_diff_summ / entry.getValue().done_signals;
                     avg_done_percent = entry.getValue().done_summ_percent / entry.getValue().done_signals;
@@ -233,14 +243,17 @@ public class SignalController extends Thread {
                     avg_percent = entry.getValue().summ_percent / entry.getValue().ok_signals;
                     avg_rating = entry.getValue().summ_rating / entry.getValue().ok_signals;
                 }
+                if (entry.getValue().copy_signals > 0) {
+                    avg_copy_diff = entry.getValue().copy_millis_diff_summ / entry.getValue().copy_signals;
+                }
                 mainApplication.getInstance().log(
                     "Channel '" + entry.getKey() + "' Stats:\n" +
                     "Signals count: " + entry.getValue().signals_cnt + "\n" +
                     "Normal signals: " + entry.getValue().ok_signals + "\n" +
                     "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
-                    "Skipped signals ("+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
+                    "Skipped signals (default: "+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
                     "Waiting signals: " + entry.getValue().waiting_signals + "\n" + 
-                    "Stoploss signals (-"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
+                    "Stoploss signals (default: -"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
                     "Stoploss then done signals: " + entry.getValue().stoploss_done_signals + "\n" + 
                     "Signals without price1: " + entry.getValue().price1_not_set + "\n" + 
                     "Signals without price2: " + entry.getValue().price2_not_set + "\n" + 
@@ -250,6 +263,9 @@ public class SignalController extends Thread {
                     "Done signals avg time: " + df8.format(avg_time / 86400000.0) + " day.\n" + 
                     "Done signals avg percent profit: " + df8.format(avg_done_percent) + "%\n" + 
                     "Channel avg signal profit: " + df8.format(avg_percent) + "%\n" + 
+                    "Copy signals: " + entry.getValue().copy_signals + "\n" + 
+                    "Channel copy sources: " + entry.getValue().copy_sources + "\n" + 
+                    "Channel copy avg interval: " + df8.format(avg_copy_diff / 60000) + " min.\n" + 
                     "Channel regexp_ids: " + entry.getValue().used_regexps + "\n" + 
                     "\n"
                 );
@@ -267,16 +283,23 @@ public class SignalController extends Thread {
     }
     
     private double getPriceForDateTime(List<Bar> bars, LocalDateTime datetime) {
-        double result = bars.get(bars.size()-1).getClosePrice().doubleValue();
+        double result = bars.get(0).getClosePrice().doubleValue();
         for(int i = 0; i < bars.size(); i++) {
-            if (bars.get(i).getBeginTime().toLocalDateTime().isBefore(datetime) && bars.get(i).getEndTime().toLocalDateTime().isAfter(datetime)) {
+            if (
+                    (
+                        bars.get(i).getBeginTime().toLocalDateTime().isBefore(datetime) ||
+                        bars.get(i).getBeginTime().toLocalDateTime().isEqual(datetime)
+                    ) && 
+                    bars.get(i).getEndTime().toLocalDateTime().isAfter(datetime)
+            ) {
                 result = bars.get(i).getClosePrice().doubleValue();
+                break;
             }
         }
         return result;
     }
     
-    private void addSignal(String symbol1, String symbol2, LocalDateTime datetime, double rating, Double price1, Double price2, Double price_target, int exp_id, String title) {
+    private void addSignal(String symbol1, String symbol2, LocalDateTime datetime, double rating, Double price1, Double price2, Double price_target, Double price_stoploss, int exp_id, String title) {
         if (title != null && !title.isEmpty()) {
             ChannelStat stat;
             if (!channel_stats.containsKey(title)) {
@@ -309,31 +332,53 @@ public class SignalController extends Thread {
             return;
         }
 
+        boolean price1_a = false;
+        boolean price2_a = false;
+        boolean priceT_a = false;
+        boolean priceS_a = false;
+        
         if (price1 == null) {
             price1 = getPriceForDateTime(bars, datetime) * 0.975;
+            price1_a = true;
         }
-        if (price2 == null) {
+        if (price2 == null || Objects.equals(price2, price1)) {
             price2 = price1 * 1.025;
+            price2_a = true;
         }
         if (price_target == null) {
             price_target = price2 * 1.05;
+            priceT_a = true;
+        }
+        if (price_stoploss == null) {
+            price_stoploss = price1 * (100-STOPLOSS_PERCENT) / 100;
+            priceS_a = true;
         }
 
         Double currPrice = bars.get(bars.size()-1).getClosePrice().doubleValue();
         price1 = alignPrice(price1, currPrice);
         price2 = alignPrice(price2, currPrice);
         price_target = alignPrice(price_target, currPrice);
+        price_stoploss = alignPrice(price_stoploss, currPrice);
 
         if (price1 > price_target) {
             price1 = price_target * 0.95;
+            price1_a = true;
         }
         if (price2 > price_target) {
             price2 = price_target * 0.99;
+            price2_a = true;
         }
         if (price1 > price2) {
             double tmp = price1;
             price1 = price2;
             price2 = tmp;
+            boolean tmpB = price1_a;
+            price1_a = price2_a;
+            price2_a = tmpB;
+        }
+        if (price_stoploss > price1) {
+            price_stoploss = price1 * (100-STOPLOSS_PERCENT) / 100;
+            priceS_a = true;
         }
 
         boolean is_skipped = LocalDateTime.now().minusDays(SKIP_DAYS).isAfter(datetime) || datetime.isBefore(bars.get(0).getBeginTime().toLocalDateTime());
@@ -345,8 +390,6 @@ public class SignalController extends Thread {
 
         double enter_price = getPriceForDateTime(bars, datetime);
         if (enter_price <= 0) enter_price = price1;
-        
-        double stop_loss = enter_price * (100-STOPLOSS_PERCENT) / 100;
         boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
         
         ZoneOffset localOffset = OffsetDateTime.now().getOffset();
@@ -375,13 +418,34 @@ public class SignalController extends Thread {
                     if (millis_done < millis_begin) millis_done = bar_end_millis;
                     break;
                 }
-                if (bars.get(i).getMinPrice().doubleValue() < stop_loss) {
+                if (bars.get(i).getMinPrice().doubleValue() <= price_stoploss) {
                     is_stop_loss = true;
                 }
             }
         }
         if (is_done) is_timeout = false;
-
+        
+        SignalItem s = new SignalItem();
+        s.setMaxDaysAgo(MAX_DAYS);
+        s.setDatetime(datetime);
+        s.setLocalMillis(millis_begin);
+        s.setSymbol1(symbol1);
+        s.setSymbol2(symbol2);
+        s.setPriceFrom(new BigDecimal(price1));
+        s.setPriceTo(new BigDecimal(price2));
+        s.setPriceTarget(new BigDecimal(price_target));
+        s.setPriceStoploss(new BigDecimal(price_stoploss));
+        s.setPriceFromAuto(price1_a);
+        s.setPriceToAuto(price2_a);
+        s.setPriceTargetAuto(priceT_a);
+        s.setPriceStoplossAuto(priceS_a);
+        s.setBaseRating(rating);
+        s.setDone(is_done || is_timeout);
+        s.setTimeout(is_timeout);
+        s.setChannelName(title);
+        s.updateHash();
+        items.add(s);
+        
         if (channel_stats.containsKey(title)) {
             ChannelStat stat = channel_stats.get(title);
             stat.ok_signals++;
@@ -406,6 +470,12 @@ public class SignalController extends Thread {
             stat.summ_rating += rating;
         }
 
+        if (initialSignalsIsLoaded) {
+            checkSignalItems();
+        }
+
+        boolean is_copy = !items.contains(s);
+        
         mainApplication.getInstance().log(
             "Signal "
             + symbol1 + symbol2 + " from " 
@@ -413,30 +483,54 @@ public class SignalController extends Thread {
             + "rating = " + rating + "; "
             + df8.format(price1) + " - " 
             + df8.format(price2) + " ===> " 
-            + df8.format(price_target) + " "
-            + (is_done ? "DONE" : (is_timeout ? "TIMEOUT" : "WAITING"))
+            + df8.format(price_target)
+            + "; Stoploss: " + df8.format(price_stoploss) + " : "
+            + (is_done ? "DONE" : (is_timeout ? "TIMEOUT" : "WAITING")) + " "
+            + (is_copy ? "COPY" : "")
         );
         
-        SignalItem s = new SignalItem();
-        s.setMaxDaysAgo(MAX_DAYS);
-        s.setDatetime(datetime);
-        s.setLocalMillis(millis_begin);
-        s.setSymbol1(symbol1);
-        s.setSymbol2(symbol2);
-        s.setPriceFrom(new BigDecimal(price1));
-        s.setPriceTo(new BigDecimal(price2));
-        s.setPriceTarget(new BigDecimal(price_target));
-        s.setBaseRating(rating);
-        s.setDone(is_done || is_timeout);
-        s.setTimeout(is_timeout);
-        s.setChannelName(title);
-        items.add(s);
-        
-        if (signalEvent != null) {
+        if (signalEvent != null && !is_copy) {
             signalEvent.onUpdate(s, getPairSignalRating(s.getPair()));
         }
     }
 
+    private void checkSignalItems() {
+        List<SignalItem> to_remove = new ArrayList<>(0);
+        for(int i=0; i < items.size(); i++) {
+            if (!to_remove.contains(items.get(i))) {
+                for(int j=0; j < items.size(); j++) {
+                    if (i != j && !to_remove.contains(items.get(j))) {
+                        if (items.get(i).getHash().equals(items.get(j).getHash())) {
+                            if (items.get(i).getDatetime().isAfter(items.get(j).getDatetime())) {
+                                if ((items.get(i).getLocalMillis() - items.get(j).getLocalMillis()) < MAX_DAYS * 24 * 60 * 60 * 1000) {
+                                    to_remove.add(items.get(i));
+                                    items.get(j).mergeBaseRating(items.get(i).getBaseRating());
+                                    if (channel_stats.containsKey(items.get(i).getChannelName())) {
+                                        channel_stats.get(items.get(i).getChannelName()).copy_signals++;
+                                        channel_stats.get(items.get(i).getChannelName()).copy_sources.add(items.get(j).getChannelName());
+                                        channel_stats.get(items.get(i).getChannelName()).copy_millis_diff_summ += items.get(i).getLocalMillis() - items.get(j).getLocalMillis();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        items = items.stream()
+            .filter(p -> !to_remove.contains(p))
+            .collect(Collectors.toList());
+    }
+    
+    private SignalItem getItemByHash(String hash) {
+        for(int i=0; i < items.size(); i++) {
+            if (items.get(i).getHash().equals(hash) && !items.get(i).isTimeout()) {
+                return items.get(i);
+            }
+        }
+        return null;
+    }
+    
     public double getPairSignalRating(String symbol) {
         double result = 0;
         for(int i=0; i< items.size(); i++) {

@@ -32,6 +32,7 @@ class RegBlock(object):
         self.reg_price_from = None
         self.reg_price_to = None
         self.reg_price_target = None
+        self.reg_price_stoploss = None
 
 class SignalRow(object):
     def __init__(self):
@@ -41,6 +42,7 @@ class SignalRow(object):
         self.price_from = None
         self.price_to = None
         self.price_target = None
+        self.price_stoploss = None
         self.rating = None
         self.date = None
         self.index = None
@@ -59,7 +61,7 @@ class SignalRow(object):
         self.sort = self.sort + self.rating / 20.0
 
     def __repr__(self):
-        return str(self.rating) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + str(self.index) + ";" + str(self.title)
+        return str(self.rating) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + self.price_stoploss + ';' + str(self.index) + ";" + str(self.title)
 
 def enable_win_unicode_console():
     if sys.version_info >= (3, 6):
@@ -96,6 +98,22 @@ def dateFix(date):
         datetime_obj_naive = ''
     return str(datetime_obj_naive)
 
+def percentFix(txt, price):
+    if txt and txt.count('%') > 0:
+        if price:
+            txt = txt.replace('%', '')
+            txt = numFix(txt)
+            if txt:
+                numtxt = float(txt)
+                nump = float(price)
+                numtxt = nump * 0.01 * (100-numtxt)
+                txt = str(numtxt).replace(',', '.')
+        else:
+            txt = ''
+    else:
+        txt = numFix(txt)
+    return txt
+
 def numFix(txt):
     try:
         if txt:
@@ -111,7 +129,7 @@ def numFix(txt):
         if txt and (txt.find('k')>=0 or txt.find('K')>=0):
             num = float(getFirstMatch(r'^([0-9.]{2,12})', txt))
             num = num * 1000
-            txt = str(num)
+            txt = str(num).replace(',', '.')
     except:
         txt = ''
     return txt
@@ -155,6 +173,8 @@ def textCheck(txt, title, date, client):
         'EXCHANGE', 
         'SIGNAL', 
         'PALM', 
+        'BUY', 
+        'SELL', 
         'CRYPTOL', 
         'LEOSIGN', 
         '2GIVE', 
@@ -209,6 +229,7 @@ def textCheck(txt, title, date, client):
                 price_from = numFix(getFirstMatch(signal_expr[i].reg_price_from, txt))
                 price_to = numFix(getFirstMatch(signal_expr[i].reg_price_to, txt))
                 price_target = numFix(getFirstMatch(signal_expr[i].reg_price_target, txt))
+                price_stoploss = percentFix(getFirstMatch(signal_expr[i].reg_price_stoploss, txt), price_from)
                 if log:
                     log.write(" " + str(i + 1))
                     if coin:
@@ -227,6 +248,8 @@ def textCheck(txt, title, date, client):
                         log.write("[price2]")
                     if price_target:
                         log.write("[target]")
+                    if price_stoploss:
+                        log.write("[stop]")
                 if coin and (coin not in stop_coin1_names) and (coin2 not in stop_coin2_names) and (price_from or price_to or price_target):
                     ri = SignalRow()
                     ri.title = title
@@ -235,6 +258,7 @@ def textCheck(txt, title, date, client):
                     ri.price_from = price_from
                     ri.price_to = price_to
                     ri.price_target = price_target
+                    ri.price_stoploss = price_stoploss
                     ri.rating = signal_expr[i].rating
                     ri.date = date
                     ri.index = i + 1
@@ -252,6 +276,26 @@ def textCheck(txt, title, date, client):
             log.write("\n    <--- NOT A SIGNAL MESSAGE\n\n")
 
     return
+
+def getChannelTitleForEvent(channels, event):
+    try:
+        title = ''
+        channel_id = event.message.to_id.channel_id
+        if channel_id > 0:
+            i = 0
+            while i < len(channels):
+                if channels[i].entity and channels[i].entity.channel_id and channels[i].entity.channel_id == channel_id:
+                    title = channels[i].title
+                    if not title:
+                        title = channels[i].name
+                    if not title:
+                        title = str(channels[i].id)
+                i = i + 1
+    except:
+        title = ''
+    if not title:
+        title = '-'
+    return title
 
 def checkCurchan(channel, client, signals_limit):
     chantitle = channel.title
@@ -335,6 +379,7 @@ def loadChanDataFromConfig(config):
         expr_b.reg_price_from = getConfigValue(channel_config, 'signal_price_from')
         expr_b.reg_price_to = getConfigValue(channel_config, 'signal_price_to')
         expr_b.reg_price_target = getConfigValue(channel_config, 'signal_price_target')
+        expr_b.reg_price_stoploss = getConfigValue(channel_config, 'signal_stoploss')
         if not expr_b.reg_has:
             expr_b.reg_has = expr_b.reg_coin
         if expr_b.reg_has:
@@ -344,6 +389,8 @@ def loadChanDataFromConfig(config):
                 expr_b.reg_price_to = default_price2_regex
             if not expr_b.reg_price_target:
                 expr_b.reg_price_target = default_sell_regex
+            if not expr_b.reg_price_stoploss:
+                expr_b.reg_price_stoploss = default_stoploss_regex
             try:
                 expr_b.rating = int(channel_config['signal_rating'])
             except:
@@ -395,6 +442,7 @@ def main():
     signal_separator = str(config['channels']['signal_separator'])
     debug_mode = int(config['main']['debug_mode']) > 0
     log_file_name = str(config['main']['log_file'])
+    log_run_file_name = str(config['main']['log_run_file'])
 
     if debug_mode:
         log = io.open('./' + log_file_name,'w+',encoding='utf8')
@@ -436,13 +484,24 @@ def main():
         if channels[chan_index].entity:
             @client.on(events.NewMessage(chats=[channels[chan_index].entity], incoming=True))
             def normal_handler(event):
-                separateCheck(event.text, '-', dateFix(event.message.date), client)
+                if log:
+                    log.write(">>>\n")
+                    log.write(str(event))
+                    log.write("<<<\n")
+                separateCheck(event.text, getChannelTitleForEvent(channels, event), dateFix(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
 
     if log:
+        chan_index = 0
+        while chan_index < len(channels):
+            log.write("\n")
+            log.write(str(channels[chan_index].entity))
+            chan_index = chan_index + 1
         log.close()
         log = None
+        log = io.open('./' + log_run_file_name,'w+',encoding='utf8')
+        log.write("Runtime log:\n")
 
     print('------------------')
 
