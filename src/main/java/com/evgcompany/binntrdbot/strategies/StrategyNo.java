@@ -28,7 +28,7 @@ public class StrategyNo extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
-        initializer = (tseries, dataset) -> {};
+        initializer = (tseries, trecord, dataset) -> {};
         return new BaseStrategy(
             new BooleanRule(false),
             new BooleanRule(false)

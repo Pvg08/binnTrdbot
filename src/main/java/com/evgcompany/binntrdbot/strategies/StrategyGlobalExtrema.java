@@ -40,7 +40,7 @@ public class StrategyGlobalExtrema extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             long barSeconds = 60 * 60;
             if (tseries.getBarCount() > 0) {
                 Bar first = tseries.getBar(tseries.getBeginIndex());

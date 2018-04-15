@@ -28,19 +28,17 @@ import org.jfree.data.xy.DefaultHighLowDataset;
 import org.jfree.data.xy.OHLCDataset;
 import org.jfree.data.xy.XYDataset;
 import org.ta4j.core.Bar;
-import org.ta4j.core.Decimal;
-import org.ta4j.core.Indicator;
 import org.ta4j.core.TimeSeries;
 import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
+import org.ta4j.core.TradingRecord;
 
 /**
  *
  * @author EVG_Adminer
  */
 public class CurrencyPlot extends JFrame {
-    private static final int SLIDER_INITIAL_VALUE = 100;
-    
     private TimeSeries tseries = null;
+    private TradingRecord tradingRecord = null;
     private String stockSymbol;
     
     private final XYPlot mainPlot;
@@ -48,22 +46,6 @@ public class CurrencyPlot extends JFrame {
     
     private double maxVolume;
     private StrategyDatasetInitializer datasetInitializer = null;
-    
-    /**
-     * Builds a JFreeChart time series from a Ta4j time series and an indicator.
-     * @param barseries the ta4j time series
-     * @param indicator the indicator
-     * @param name the name of the chart time series
-     * @return the JFreeChart time series
-     */
-    private static org.jfree.data.time.TimeSeries buildChartTimeSeries(TimeSeries barseries, Indicator<Decimal> indicator, String name) {
-        org.jfree.data.time.TimeSeries chartTimeSeries = new org.jfree.data.time.TimeSeries(name);
-        for (int i = 0; i < barseries.getBarCount(); i++) {
-            Bar bar = barseries.getBar(i);
-            chartTimeSeries.add(new Second(Date.from(bar.getEndTime().toInstant())), indicator.getValue(i).doubleValue());
-        }
-        return chartTimeSeries;
-    }
     
     /**
      * Builds a JFreeChart OHLC dataset from a ta4j time series.
@@ -100,13 +82,10 @@ public class CurrencyPlot extends JFrame {
      * @return an additional dataset
      */
     private TimeSeriesCollection createAdditionalDataset(TimeSeries series) {
-        
         TimeSeriesCollection dataset = new TimeSeriesCollection();
-        
         if (datasetInitializer != null) {
-            datasetInitializer.onInit(series, dataset);
+            datasetInitializer.onInit(series, tradingRecord, dataset);
         }
-
         return dataset;
     }
 
@@ -126,11 +105,12 @@ public class CurrencyPlot extends JFrame {
         setVisible(true);
     }
     
-    public CurrencyPlot(String _stockSymbol, TimeSeries _tseries, StrategyDatasetInitializer datasetInitializer) {
+    public CurrencyPlot(String _stockSymbol, TimeSeries _tseries, TradingRecord _tradingRecord, StrategyDatasetInitializer datasetInitializer) {
         super(_stockSymbol + " candlestick");
         setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 
         tseries = _tseries;
+        tradingRecord = _tradingRecord;
         stockSymbol = _stockSymbol;
         this.datasetInitializer = datasetInitializer;
 

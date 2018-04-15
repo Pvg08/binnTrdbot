@@ -41,7 +41,7 @@ public class StrategyAroon extends StrategyItem {
         int timeFrame = config.GetIntValue("Aroon-TimeFrame");
         int threshold1 = config.GetIntValue("Aroon-Threshold1");
         int threshold2 = config.GetIntValue("Aroon-Threshold2");
-        initializer = (tseries, dataset) -> {};
+        initializer = (tseries, trecord, dataset) -> {};
         MinPriceIndicator minPrice = new MinPriceIndicator(series);
         MaxPriceIndicator maxPrice = new MaxPriceIndicator(series);
         AroonUpIndicator aup = new AroonUpIndicator(series, maxPrice, timeFrame);

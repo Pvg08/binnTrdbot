@@ -22,13 +22,17 @@ public class TrailingStopLossRule extends AbstractRule {
     /** The loss ratio threshold (e.g. 0.97 for 3%) */
     private final Decimal lossRatioThreshold;
 
+    private final Decimal minPrice;
+
     /**
      * Constructor.
      * @param closePrice the close price indicator
      * @param lossPercentage the loss percentage
+     * @param minPrice the minimal stoploss price
      */
-    public TrailingStopLossRule(ClosePriceIndicator closePrice, Decimal lossPercentage) {
+    public TrailingStopLossRule(ClosePriceIndicator closePrice, Decimal lossPercentage, Decimal minPrice) {
         this.closePrice = closePrice;
+        this.minPrice = minPrice;
         this.lossRatioThreshold = Decimal.HUNDRED.minus(lossPercentage).dividedBy(Decimal.HUNDRED);
     }
 
@@ -51,7 +55,7 @@ public class TrailingStopLossRule extends AbstractRule {
             if (currentTrade.isOpened()) {
                 Decimal maxPrice = getMaxPrice(currentTrade.getEntry().getIndex(), index);
                 Decimal currentPrice = closePrice.getValue(index);
-                Decimal threshold = maxPrice.multipliedBy(lossRatioThreshold);
+                Decimal threshold = maxPrice.multipliedBy(lossRatioThreshold).max(minPrice);
                 if (currentTrade.getEntry().isBuy()) {
                     satisfied = currentPrice.isLessThanOrEqual(threshold);
                 } else {

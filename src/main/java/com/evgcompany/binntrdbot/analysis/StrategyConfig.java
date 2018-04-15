@@ -74,6 +74,12 @@ public class StrategyConfig {
         }
     }
 
+    public void setParam(String pname, BigDecimal pvalue) {
+        if (this.params.containsKey(pname)) {
+            this.params.get(pname).setValue(pvalue);
+        }
+    }
+
     public void resetParams() {
         for (Map.Entry<String, StrategyConfigItem> entry : params.entrySet()) {
             entry.getValue().resetValue();

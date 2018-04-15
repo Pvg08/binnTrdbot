@@ -15,6 +15,7 @@ abstract public class PeriodicProcessThread extends Thread {
     protected boolean paused = false;
     protected long delayTime = 10;
     protected int startDelayTime = 0;
+    protected int maxExceptionsToStop = 4;
     protected boolean isInitialized = false;
 
     protected void doWait(long ms) {
@@ -74,10 +75,11 @@ abstract public class PeriodicProcessThread extends Thread {
             try { 
                 runBody();
             } catch(Exception exx) {
+                exx.printStackTrace(System.out);
                 mainApplication.getInstance().log("");
-                mainApplication.getInstance().log("EXCEPTION: " + exx.getLocalizedMessage(), false, true);
+                mainApplication.getInstance().log("EXCEPTION in " + getClass() + " - " + exx.getClass() + ": " + exx.getLocalizedMessage(), false, true);
                 exceptions_cnt++;
-                if (exceptions_cnt > 3) {
+                if (exceptions_cnt >= maxExceptionsToStop) {
                     break;
                 }
                 doWait(delayTime * 10000);

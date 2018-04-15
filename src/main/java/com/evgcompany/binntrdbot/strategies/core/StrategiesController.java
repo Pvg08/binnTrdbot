@@ -7,8 +7,10 @@ package com.evgcompany.binntrdbot.strategies.core;
 
 import com.evgcompany.binntrdbot.analysis.*;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.*;
 import com.evgcompany.binntrdbot.tradeProfitsController;
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -46,7 +48,7 @@ public class StrategiesController {
     
     private List<String> strategy_auto = new ArrayList<>();
     private boolean autoWalkForward = false;
-    
+
     private String mainStrategy = "Auto";
     private int strategyItemIndex = -1;
     private int barSeconds;
@@ -150,21 +152,6 @@ public class StrategiesController {
         return series;
     }
     
-    private Rule addStopLossGain(Rule rule, TimeSeries series) {
-        if (profitsChecker != null) {
-            /*if (profitsChecker.isLowHold()) {
-                rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeMinProfitPercent())));
-            }*/
-            if (profitsChecker.getStopLossPercent() != null) {
-                rule = rule.or(new StopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
-            }
-            if (profitsChecker.getStopGainPercent() != null) {
-                rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));
-            }
-        }
-        return rule;
-    }
-    
     public void logStatistics(boolean init_marks) {
         
         if (app == null) return;
@@ -215,7 +202,35 @@ public class StrategiesController {
         app.log("");app.log("");
     }
     
+    public void startSignal(SignalItem item) {
+        mainStrategy = "Signal";
+        markers.clear();
+        strategies.clear();
+        strategy_auto.clear();
+        autoWalkForward = false;
+        StrategyItem entry = new StrategySignal(this);
+        entry.getConfig().setParam("Price1", item.getPriceFrom());
+        entry.getConfig().setParam("Price2", item.getPriceTo());
+        entry.getConfig().setParam("PriceTarget", item.getPriceTarget());
+        entry.getConfig().setParam("PriceStop", item.getPriceStoploss());
+        entry.getConfig().setParam("SignalTimeStamp", BigDecimal.valueOf(item.getLocalMillis()));
+        strategy_items.clear();
+        strategy_items.add(entry);
+        Strategy nstrategy = entry.buildStrategy(series);
+        strategies.put(entry.getStrategyName(), nstrategy);
+        strategyItemIndex = 0;
+
+        StrategyMarker newm = new StrategyMarker();
+        newm.label = "Signal";
+        newm.timeStamp = item.getLocalMillis();
+        newm.typeIndex = 0;
+        markers.add(newm);
+    }
+    
     public void resetStrategies() {
+        if (mainStrategy.equals("Signal")) {
+            return;
+        }
         boolean need_main_optimize = false;
         markers.clear();
         strategies.clear();

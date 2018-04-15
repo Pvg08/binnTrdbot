@@ -45,7 +45,7 @@ public class StrategyChaikinMoneyFlow extends StrategyItem {
         int rsi_tf = config.GetIntValue("RSI-TimeFrame");
         double cmf_ts = config.GetDoubleValue("CMF-Threshold");
         
-        initializer = (tseries, dataset) -> {};
+        initializer = (tseries, trecord, dataset) -> {};
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         ChaikinMoneyFlowIndicator cmf = new ChaikinMoneyFlowIndicator(series, cmf_tf);

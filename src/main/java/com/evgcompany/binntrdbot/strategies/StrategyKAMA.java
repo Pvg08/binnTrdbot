@@ -44,7 +44,7 @@ public class StrategyKAMA extends StrategyItem {
         int kama_tf_slow = config.GetIntValue("KAMA-TimeFrameSlow");
         int kama_tf_ratio = config.GetIntValue("KAMA-TimeFrameRatio");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             KAMAIndicator kama2 = new KAMAIndicator(closePrice, kama_tf_ratio, kama1_tf_fast, kama_tf_slow);
             KAMAIndicator kama5 = new KAMAIndicator(closePrice, kama_tf_ratio, kama2_tf_fast, kama_tf_slow);

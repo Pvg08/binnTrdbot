@@ -64,7 +64,7 @@ public class StrategyBollinger extends StrategyItem {
         int length = config.GetIntValue("Bollinger-Length");
         BigDecimal mult = config.GetValue("Bollinger-Mult");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator indicator = new ClosePriceIndicator(tseries);
             EMAIndicator basis = new EMAIndicator(indicator, length);
             StandardDeviationIndicator dev = new StandardDeviationIndicator(indicator, length);

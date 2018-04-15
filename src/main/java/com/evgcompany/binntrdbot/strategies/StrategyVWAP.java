@@ -43,7 +43,7 @@ public class StrategyVWAP extends StrategyItem {
         int vwap_timeframe = config.GetIntValue("VWAP-TimeFrame");
         int mvwap_timeframe = config.GetIntValue("MVWAP-TimeFrame");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             OpenPriceIndicator openPrice = new OpenPriceIndicator(tseries);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             VWAPIndicator vwap = new VWAPIndicator(tseries, vwap_timeframe);

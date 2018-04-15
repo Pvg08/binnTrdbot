@@ -44,7 +44,7 @@ public class StrategyParabolicSAR extends StrategyItem {
         BigDecimal maxA = config.GetValue("PSAR-maxA");
         BigDecimal incr = config.GetValue("PSAR-incr");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ParabolicSarIndicator psar = new ParabolicSarIndicator(series, Decimal.valueOf(aF), Decimal.valueOf(maxA), Decimal.valueOf(incr));
             dataset.addSeries(buildChartTimeSeries(tseries, psar, "Parabolic SAR" + config.toString()));
         };

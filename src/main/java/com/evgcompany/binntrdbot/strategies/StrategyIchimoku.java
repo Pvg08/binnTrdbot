@@ -52,7 +52,7 @@ public class StrategyIchimoku extends StrategyItem {
         int kijunSen_tf = config.GetIntValue("Ichimoku-kijunSen-TimeFrame");
         int senkouSpan_tf = config.GetIntValue("Ichimoku-senkouSpan-TimeFrame");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(tseries, tenkanSen_tf);
             IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(tseries, kijunSen_tf);
             IchimokuSenkouSpanAIndicator senkouSpanA = new IchimokuSenkouSpanAIndicator(tseries, tenkanSen, kijunSen);

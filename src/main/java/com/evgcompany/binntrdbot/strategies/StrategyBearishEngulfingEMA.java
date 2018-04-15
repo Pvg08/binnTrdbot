@@ -39,7 +39,7 @@ public class StrategyBearishEngulfingEMA extends StrategyItem {
         int ema1_tf = config.GetIntValue("EMA1-TimeFrame");
         int ema2_tf = config.GetIntValue("EMA2-TimeFrame");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             EMAIndicator ema_short = new EMAIndicator(closePrice, ema1_tf);
             EMAIndicator ema_long = new EMAIndicator(closePrice, ema2_tf);

@@ -67,7 +67,7 @@ public class StrategyFractalBreakout extends StrategyItem {
             return ((high_2 > high_3) && (high_2 > high_4) && (high_2 > high_1) && (high_2 > high_0));
         };
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             MedianPriceIndicator price = new MedianPriceIndicator(tseries);
             WhenValueIndicator fractalPrice = new WhenValueIndicator(price, Decimal.ZERO, 1, fractalTop);
             SMAIndicator fractalAverage = new SMAIndicator(fractalPrice, sma_tf);

@@ -38,7 +38,7 @@ public class StrategyCCICorrection extends StrategyItem {
         int short_tf = config.GetIntValue("CCI1-TimeFrame");
         int long_tf = config.GetIntValue("CCI2-TimeFrame");
         
-        initializer = (tseries, dataset) -> {};
+        initializer = (tseries, trecord, dataset) -> {};
         
         CCIIndicator shortCci = new CCIIndicator(series, short_tf);
         CCIIndicator longCci = new CCIIndicator(series, long_tf);

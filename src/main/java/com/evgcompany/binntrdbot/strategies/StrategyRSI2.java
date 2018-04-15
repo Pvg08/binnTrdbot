@@ -46,7 +46,7 @@ public class StrategyRSI2 extends StrategyItem {
         int rsi_timeFrame = config.GetIntValue("RSI-TimeFrame");
         int rsi_threshold = config.GetIntValue("RSI-Threshold");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             SMAIndicator shortSma = new SMAIndicator(closePrice, sma1_timeFrame);
             SMAIndicator longSma = new SMAIndicator(closePrice, sma2_timeFrame);

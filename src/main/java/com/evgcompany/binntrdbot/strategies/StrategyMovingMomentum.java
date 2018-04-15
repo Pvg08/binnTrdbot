@@ -49,7 +49,7 @@ public class StrategyMovingMomentum extends StrategyItem {
         int emacd_tf = config.GetIntValue("EMACD-TimeFrame");
         int macd_th = config.GetIntValue("MACD-Threshold");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             EMAIndicator shortEma = new EMAIndicator(closePrice, ema1_tf);
             EMAIndicator longEma = new EMAIndicator(closePrice, ema2_tf);

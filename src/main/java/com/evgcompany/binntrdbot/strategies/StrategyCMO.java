@@ -39,7 +39,7 @@ public class StrategyCMO extends StrategyItem {
         int timeframe = config.GetIntValue("CMO-TimeFrame");
         int threshold = config.GetIntValue("CMO-Threshold");
         
-        initializer = (tseries, dataset) -> {};
+        initializer = (tseries, trecord, dataset) -> {};
 
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         CMOIndicator cmo = new CMOIndicator(closePrice, timeframe);

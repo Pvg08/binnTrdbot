@@ -1392,10 +1392,13 @@ public class mainApplication extends javax.swing.JFrame {
                 pairController.pausePairs(true);
             }
             coinRatingController.doStop();
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
+            coinRatingController.getSignalOrderController().doStop();
+            while (coinRatingController.isAlive() || coinRatingController.getSignalOrderController().isAlive()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }
     }//GEN-LAST:event_formWindowClosing
@@ -1441,21 +1444,21 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setLowHold(checkBoxLowHold.isSelected());
         coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
         coinRatingController.setAutoFastOrder(checkboxAutoFastorder.isSelected());
-        coinRatingController.setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
-        coinRatingController.setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
+        coinRatingController.getSignalOrderController().setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
+        coinRatingController.getSignalOrderController().setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
         coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
         coinRatingController.setDelayTime((Integer) spinnerScanRatingDelayTime.getValue());
         coinRatingController.setUpdateTime((Integer) spinnerScanRatingUpdateTime.getValue());
         coinRatingController.setMaxEnter((Integer) spinnerRatingMaxOrders.getValue());
         coinRatingController.setMinRatingForOrder((Integer) spinnerRatingMinForOrder.getValue());
-        coinRatingController.setMinSignalRatingForOrder((Integer) spinnerSignalRatingMinForOrder.getValue());
+        coinRatingController.getSignalOrderController().setMinSignalRatingForOrder((Integer) spinnerSignalRatingMinForOrder.getValue());
         coinRatingController.setSecondsOrderEnterWait((Integer) spinnerRatingMaxOrderWait.getValue());
         coinRatingController.setProgressBar(progressBarRatingAnalPercent);
         comboBoxRatingSortActionPerformed(null);
         comboBoxRatingSortbyActionPerformed(null);
-        coinRatingController.getSignalController().setApiId(textFieldAPIID.getText());
-        coinRatingController.getSignalController().setApiHash(textFieldAPIHash.getText());
-        coinRatingController.getSignalController().setApiPhone(textFieldPhone.getText());
+        coinRatingController.getSignalOrderController().getSignalController().setApiId(textFieldAPIID.getText());
+        coinRatingController.getSignalOrderController().getSignalController().setApiHash(textFieldAPIHash.getText());
+        coinRatingController.getSignalOrderController().getSignalController().setApiPhone(textFieldPhone.getText());
         coinRatingController.start();
         buttonRatingStart.setEnabled(false);
         buttonRatingCheck.setEnabled(true);
@@ -1517,11 +1520,11 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonTlgConnectActionPerformed
 
     private void checkboxAutoSignalOrderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoSignalOrderActionPerformed
-        coinRatingController.setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
+        coinRatingController.getSignalOrderController().setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
     }//GEN-LAST:event_checkboxAutoSignalOrderActionPerformed
 
     private void checkboxAutoSignalFastorderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoSignalFastorderActionPerformed
-        coinRatingController.setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
+        coinRatingController.getSignalOrderController().setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
     }//GEN-LAST:event_checkboxAutoSignalFastorderActionPerformed
 
     private void checkBoxWalkForwardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxWalkForwardActionPerformed

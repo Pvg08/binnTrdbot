@@ -40,7 +40,7 @@ public class StrategyAdvancedEMA extends StrategyItem {
         int ema_tf3 = (int) Math.round(ema_tf1 * 21/8);
         int ema_tf4 = (int) Math.round(ema_tf1 * 55/8);
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             EMAIndicator ema_y = new EMAIndicator(closePrice, ema_tf4);
             EMAIndicator ema_1 = new EMAIndicator(closePrice, ema_tf3);

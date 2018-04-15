@@ -49,7 +49,7 @@ public class StrategyKeltnerChannel extends StrategyItem {
         int timeframe = config.GetIntValue("Keltner-TimeFrame");
         Decimal ratio = config.GetNumValue("Keltner-Ratio");
         
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             KeltnerChannelMiddleIndicator keltnerM = new KeltnerChannelMiddleIndicator(closePrice, timeframe);
             KeltnerChannelLowerIndicator keltnerL = new KeltnerChannelLowerIndicator(keltnerM, ratio, timeframe);

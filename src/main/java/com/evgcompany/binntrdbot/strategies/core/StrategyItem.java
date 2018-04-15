@@ -94,7 +94,7 @@ public abstract class StrategyItem {
                 rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeMinProfitPercent())));
             }*/
             if (profitsChecker.getStopLossPercent() != null) {
-                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent())));
+                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent()), Decimal.ZERO));
             }
             if (profitsChecker.getStopGainPercent() != null) {
                 rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));

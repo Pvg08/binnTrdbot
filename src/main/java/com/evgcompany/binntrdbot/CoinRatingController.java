@@ -10,7 +10,6 @@ import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.JsonReader;
-import com.evgcompany.binntrdbot.signal.SignalController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.io.Closeable;
 import java.io.IOException;
@@ -62,21 +61,17 @@ public class CoinRatingController extends PeriodicProcessThread {
         CR_CALCULATED_RATING
     }
     
-    private final mainApplication app;
     private final tradePairProcessController paircontroller;
-    private SignalController signalcontroller = null;
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
     
     private static final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
     
     private StrategiesController strategiesController = null;
+    private SignalOrderController signalOrderController = null;
     private boolean lowHold = true;
     private boolean autoOrder = true;
     private boolean autoFastOrder = false;
-
-    private boolean autoSignalOrder = false;
-    private boolean autoSignalFastOrder = false;
 
     private boolean analyzer = false;
     private CoinRatingSort sortby = CoinRatingSort.CR_RANK;
@@ -100,17 +95,25 @@ public class CoinRatingController extends PeriodicProcessThread {
     private int maxEnter = 3;
     private int secondsOrderEnterWait = 600;
     private float minRatingForOrder = 5;
-    private float minSignalRatingForOrder = 4;
     private JProgressBar progressBar = null;
 
     public CoinRatingController(mainApplication application, tradePairProcessController paircontroller) {
-        app = application;
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
         strategiesController.setMainStrategy("No strategy");
-        signalcontroller = new SignalController();
+        signalOrderController = new SignalOrderController(this, paircontroller);
+        signalOrderController.setDelayTime(2);
     }
 
+    public boolean setPairSignalRating(String pair, float rating) {
+        if (heroesMap.containsKey(pair)) {
+            heroesMap.get(pair).signal_rating = rating;
+            updateList();
+            return true;
+        }
+        return false;
+    }
+    
     private void checkFromTop() {
         int non_zero_count = 0;
         int min_counter = -1;
@@ -192,7 +195,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         strategiesController.resetStrategies();
         curr.strategies_shouldenter_rate = strategiesController.getStrategiesEnterRate(6);
         curr.strategies_shouldexit_rate = strategiesController.getStrategiesExitRate(6);
-        curr.signal_rating = (float) signalcontroller.getPairSignalRating(curr.symbol);
+        curr.signal_rating = (float) signalOrderController.getSignalController().getPairSignalRating(curr.symbol);
         curr.calculateRating();
         curr.last_rating_update_millis = System.currentTimeMillis();
     }
@@ -200,8 +203,8 @@ public class CoinRatingController extends PeriodicProcessThread {
     private void checkPair(CoinRatingPairLogItem curr) {
         curr.update_counter++;
         
-        app.log("-----------------------------------");
-        app.log("Analyzing pair " + curr.symbol + ":");
+        mainApplication.getInstance().log("-----------------------------------");
+        mainApplication.getInstance().log("Analyzing pair " + curr.symbol + ":");
         SymbolInfo pair_sinfo = client.getSymbolInfo(curr.symbol);
         
         int dips_50p = 0;
@@ -219,18 +222,18 @@ public class CoinRatingController extends PeriodicProcessThread {
 
         List<Bar> bars = client.getBars(curr.symbol, "2h");
         
-        app.log("Base = " + pair_sinfo.getBaseAsset());
-        app.log("Base name = " + curr.fullname);
-        app.log("Base rank = " + curr.rank);
-        app.log("Base marketcap = " + df3.format(curr.market_cap) + " USD");
-        app.log("Quote = " + pair_sinfo.getQuoteAsset());
-        app.log("Current volatility = " + df6.format(curr.volatility));
+        mainApplication.getInstance().log("Base = " + pair_sinfo.getBaseAsset());
+        mainApplication.getInstance().log("Base name = " + curr.fullname);
+        mainApplication.getInstance().log("Base rank = " + curr.rank);
+        mainApplication.getInstance().log("Base marketcap = " + df3.format(curr.market_cap) + " USD");
+        mainApplication.getInstance().log("Quote = " + pair_sinfo.getQuoteAsset());
+        mainApplication.getInstance().log("Current volatility = " + df6.format(curr.volatility));
         
         if (bars.size() > 0) {
-            app.log("Price = " + bars.get(bars.size()-1).getClosePrice());
+            mainApplication.getInstance().log("Price = " + bars.get(bars.size()-1).getClosePrice());
             String timeframe = df3.format(2.0*bars.size()/24) + "d";
-            app.log("");
-            app.log("Timeframe = " + timeframe);
+            mainApplication.getInstance().log("");
+            mainApplication.getInstance().log("Timeframe = " + timeframe);
         }
 
         for(int i=0; i<bars.size(); i++) {
@@ -260,36 +263,36 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
         
         if (peaks_10p > 0) {
-            app.log("Peaks 10% = " + peaks_10p);
+            mainApplication.getInstance().log("Peaks 10% = " + peaks_10p);
         }
         if (peaks_25p > 0) {
-            app.log("Peaks 25% = " + peaks_25p);
+            mainApplication.getInstance().log("Peaks 25% = " + peaks_25p);
         }
         if (peaks_50p > 0) {
-            app.log("Peaks 50% = " + peaks_50p);
+            mainApplication.getInstance().log("Peaks 50% = " + peaks_50p);
         }
         if (dips_10p > 0) {
-            app.log("Dips 10% = " + dips_10p);
+            mainApplication.getInstance().log("Dips 10% = " + dips_10p);
         }
         if (dips_25p > 0) {
-            app.log("Dips 25% = " + dips_25p);
+            mainApplication.getInstance().log("Dips 25% = " + dips_25p);
         }
         if (dips_50p > 0) {
-            app.log("Dips 50% = " + dips_50p);
+            mainApplication.getInstance().log("Dips 50% = " + dips_50p);
         }
         if (h_bars > 0) {
-            app.log("H BARS = " + h_bars + " last = " + last_hbar_info);
+            mainApplication.getInstance().log("H BARS = " + h_bars + " last = " + last_hbar_info);
         }
         
         try {
             JSONObject obj = JsonReader.readJsonFromUrl("https://coindar.org/api/v1/coinEvents?name=" + pair_sinfo.getBaseAsset().toLowerCase());
             JSONArray events = obj.getJSONArray("DATA");
-            app.log("");
-            app.log("Events count: " + events.length());
+            mainApplication.getInstance().log("");
+            mainApplication.getInstance().log("Events count: " + events.length());
             curr.events_count = events.length();
             if (events.length() > 0) {
-                app.log("Last event: " + events.getJSONObject(0).optString("caption_ru", "-"));
-                app.log("Last event date: " + events.getJSONObject(0).optString("start_date", "-"));
+                mainApplication.getInstance().log("Last event: " + events.getJSONObject(0).optString("caption_ru", "-"));
+                mainApplication.getInstance().log("Last event date: " + events.getJSONObject(0).optString("start_date", "-"));
                 curr.last_event_date = events.getJSONObject(0).optString("start_date", "");
                 String last_anno = events.getJSONObject(0).optString("public_date", "");
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-M-dd HH:mm");
@@ -302,13 +305,13 @@ public class CoinRatingController extends PeriodicProcessThread {
         
         curr.calculateRating();
         
-        app.log("Volatility = " + df3p.format(curr.volatility));
-        app.log("Hour volume = " + df3.format(curr.hour_volume));
-        app.log("Day volume = " + df3.format(curr.day_volume));
-        app.log("Hour change percent = " + df3p.format(curr.percent_hour));
-        app.log("Day change percent = " + df3p.format(curr.percent_day));
+        mainApplication.getInstance().log("Volatility = " + df3p.format(curr.volatility));
+        mainApplication.getInstance().log("Hour volume = " + df3.format(curr.hour_volume));
+        mainApplication.getInstance().log("Day volume = " + df3.format(curr.day_volume));
+        mainApplication.getInstance().log("Hour change percent = " + df3p.format(curr.percent_hour));
+        mainApplication.getInstance().log("Day change percent = " + df3p.format(curr.percent_day));
         
-        app.log("-----------------------------------");
+        mainApplication.getInstance().log("-----------------------------------");
     }
     
     private void loadRatingData() {
@@ -454,36 +457,23 @@ public class CoinRatingController extends PeriodicProcessThread {
             listHeroesModel.remove(index);
         }
     }
-
-    private void signalOrderEnter(String pair) {
-        if (autoSignalOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()) {
-            if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
-                CoinRatingPairLogItem toenter = heroesMap.get(pair);
-                if (toenter != null) {
-                    if (autoSignalFastOrder) {
-                        app.log("Trying to auto fast-enter signal with pair: " + pair, true, true);
-                        toenter.pair = paircontroller.addPairFastRun(pair);
-                    } else {
-                        app.log("Trying to auto enter signal with pair: " + pair, true, true);
-                        toenter.pair = paircontroller.addPair(pair);
-                    }
-                    entered.put(pair, toenter);
-                    doWait(1000);
-                }
-            }
-        }
-    }
     
     private void baseOrderEnter(String pair) {
-        if (autoOrder && entered.size() < maxEnter && !entered.containsKey(pair) && !heroesMap.isEmpty()) {
+        if (
+            autoOrder && 
+            entered.size() < maxEnter && 
+            !signalOrderController.getEntered().containsKey(pair) && 
+            !entered.containsKey(pair) && 
+            !heroesMap.isEmpty()
+        ) {
             if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
                 CoinRatingPairLogItem toenter = heroesMap.get(pair);
                 if (toenter != null) {
                     if (autoFastOrder) {
-                        app.log("Trying to auto fast-enter with pair: " + pair, true, true);
+                        mainApplication.getInstance().log("Trying to auto fast-enter with pair: " + pair, true, true);
                         toenter.pair = paircontroller.addPairFastRun(pair);
                     } else {
-                        app.log("Trying to auto enter with pair: " + pair, true, true);
+                        mainApplication.getInstance().log("Trying to auto enter with pair: " + pair, true, true);
                         toenter.pair = paircontroller.addPair(pair);
                     }
                     entered.put(pair, toenter);
@@ -510,7 +500,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                                 !rentered.pair.isAlive()
                             )
                     ) {
-                        app.log("Exit from order: " + rentered.pair.getSymbol(), true, true);
+                        mainApplication.getInstance().log("Exit from order: " + rentered.pair.getSymbol(), true, true);
                         paircontroller.removePair(rentered.pair.getSymbol());
                         if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0 || !rentered.pair.isTriedBuy()) {
                             //rentered.fastbuy_skip = true;
@@ -569,8 +559,8 @@ public class CoinRatingController extends PeriodicProcessThread {
             });
             List<TickerPrice> allPrices = client.getAllPrices();
             if (heroesMap.isEmpty()) {
-                app.log("Found " + allPrices.size() + " prices...");
-                app.log("Checking them using pattern: " + coinsPattern);
+                mainApplication.getInstance().log("Found " + allPrices.size() + " prices...");
+                mainApplication.getInstance().log("Checking them using pattern: " + coinsPattern);
             }
             allPrices.forEach((price) -> {
                 if (price != null && !price.getSymbol().isEmpty() && !price.getSymbol().contains("1") && !price.getPrice().isEmpty()) {
@@ -630,6 +620,9 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
+        
+        mainApplication.getInstance().log("CoinRatingController starting...");
+        
         if (analyzer) {
             loadRatingData();
         }
@@ -637,6 +630,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         need_stop = false;
         paused = false;
         have_all_coins_info = false;
+        signalOrderController.start();
 
         doWait(1000);
 
@@ -650,29 +644,13 @@ public class CoinRatingController extends PeriodicProcessThread {
 
         updateCurrentPrices();
         
-        signalcontroller.setSignalEvent((item, rating) -> {
-            if (heroesMap.containsKey(item.getPair())) {
-                heroesMap.get(item.getPair()).signal_rating = (float) rating;
-                updateList();
-                if (
-                        rating > minSignalRatingForOrder && 
-                        item.getCurrentRating() > minSignalRatingForOrder/2 && 
-                        !item.isDone() && 
-                        !item.isTimeout() && 
-                        item.getMillisFromSignalStart() < 240 * 1000
-                ) {
-                    signalOrderEnter(item.getPair());
-                }
-            }
-        });
-        signalcontroller.startSignalsProcess();
-        while (!need_stop && !signalcontroller.isInitialSignalsLoaded()) {
+        while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
             doWait(1000);
         }
         
         orderEvent = client.OnOrderEvent(null, event -> {
-            app.log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
-            app.systemSound();
+            mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
+            mainApplication.getInstance().systemSound();
         });
     }
     
@@ -685,9 +663,9 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
         updateList();
 
-        if (analyzer && (autoOrder || autoSignalOrder) && have_all_coins_info) {
+        if (analyzer && autoOrder && have_all_coins_info) {
             checkFastEnter();
-        } else if (!analyzer && autoSignalOrder && entered.size() > 0) {
+        } else if (!analyzer && entered.size() > 0) {
             checkOrderExit();
         }
 
@@ -696,7 +674,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runFinish() {
-        signalcontroller.stopSignalsProcessIfRunning();
+        signalOrderController.doStop();
         if (orderEvent != null) {
             try {
                 orderEvent.close();
@@ -704,6 +682,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                 Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        mainApplication.getInstance().log("CoinRatingController finished.");
     }
 
     /**
@@ -713,16 +692,9 @@ public class CoinRatingController extends PeriodicProcessThread {
         return listHeroesModel;
     }
 
-    void setClient(TradingAPIAbstractInterface _client) {
+    public void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
-        signalcontroller.setClient(client);
-    }
-
-    /**
-     * @return the signalcontroller
-     */
-    public SignalController getSignalController() {
-        return signalcontroller;
+        signalOrderController.setClient(client);
     }
     
     /**
@@ -833,34 +805,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     /**
-     * @return the autoSignalOrder
-     */
-    public boolean isAutoSignalOrder() {
-        return autoSignalOrder;
-    }
-
-    /**
-     * @param autoSignalOrder the autoSignalOrder to set
-     */
-    public void setAutoSignalOrder(boolean autoSignalOrder) {
-        this.autoSignalOrder = autoSignalOrder;
-    }
-
-    /**
-     * @return the autoSignalFastOrder
-     */
-    public boolean isAutoSignalFastOrder() {
-        return autoSignalFastOrder;
-    }
-
-    /**
-     * @param autoSignalFastOrder the autoSignalFastOrder to set
-     */
-    public void setAutoSignalFastOrder(boolean autoSignalFastOrder) {
-        this.autoSignalFastOrder = autoSignalFastOrder;
-    }
-
-    /**
      * @param maxEnter the maxEnter to set
      */
     public void setMaxEnter(int maxEnter) {
@@ -894,18 +838,16 @@ public class CoinRatingController extends PeriodicProcessThread {
     public void setMinRatingForOrder(float minRatingForOrder) {
         this.minRatingForOrder = minRatingForOrder;
     }
-
-    /**
-     * @return the minSignalRatingForOrder
-     */
-    public float getMinSignalRatingForOrder() {
-        return minSignalRatingForOrder;
+    
+    public Map<String, CoinRatingPairLogItem> getCoinRatingMap() {
+        return heroesMap;
     }
-
-    /**
-     * @param minSignalRatingForOrder the minSignalRatingForOrder to set
-     */
-    public void setMinSignalRatingForOrder(float minSignalRatingForOrder) {
-        this.minSignalRatingForOrder = minSignalRatingForOrder;
+    
+    public Map<String, CoinRatingPairLogItem> getEntered() {
+        return entered;
+    }
+    
+    public SignalOrderController getSignalOrderController() {
+        return signalOrderController;
     }
 }

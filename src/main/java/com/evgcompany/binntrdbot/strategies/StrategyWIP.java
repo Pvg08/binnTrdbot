@@ -104,7 +104,7 @@ public class StrategyWIP extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
 
         };
 

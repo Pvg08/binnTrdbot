@@ -33,7 +33,7 @@ public class StrategySMA extends StrategyItem {
             throw new IllegalArgumentException("Series cannot be null");
         }
         int timeFrame = config.GetIntValue("SMA-TimeFrame");
-        initializer = (tseries, dataset) -> {
+        initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
             SMAIndicator sma = new SMAIndicator(closePrice, timeFrame);
             dataset.addSeries(buildChartTimeSeries(tseries, sma, "SMA " + timeFrame));

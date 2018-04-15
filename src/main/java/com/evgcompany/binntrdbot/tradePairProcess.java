@@ -17,9 +17,9 @@ import com.binance.api.client.domain.general.SymbolInfo;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
+import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import com.evgcompany.binntrdbot.strategies.core.StrategyItem;
-import com.evgcompany.binntrdbot.strategies.core.StrategyMarker;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -106,6 +106,7 @@ public class tradePairProcess extends PeriodicProcessThread {
     private int stopBuyLimitTimeout = 120;
     private boolean useSellStopLimited = false;
     private boolean isTriedBuy = false;
+    private int fullOrdersCount = 0;
     private int stopSellLimitTimeout = 1200;
     
     private long lastOrderMillis = 0;
@@ -113,6 +114,8 @@ public class tradePairProcess extends PeriodicProcessThread {
     private long startMillis = 0;
     private BigDecimal currentPrice = BigDecimal.ZERO;
     private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
+    
+    SignalItem init_signal = null;
     
     public tradePairProcess(mainApplication application, TradingAPIAbstractInterface rclient, tradeProfitsController rprofitsChecker, String pair) {
         app = application;
@@ -130,6 +133,10 @@ public class tradePairProcess extends PeriodicProcessThread {
             socket.close();
         }
         super.finalize();
+    }
+    
+    public void setSignalOrder(SignalItem item) {
+        init_signal = item;
     }
     
     private void doEnter(BigDecimal curPrice) {
@@ -198,6 +205,7 @@ public class tradePairProcess extends PeriodicProcessThread {
                     lastOrderMillis = System.currentTimeMillis();
                     if (limitOrderId == 0) {
                         strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
+                        fullOrdersCount++;
                         if (stopAfterSell) {
                             doStop();
                         }
@@ -262,6 +270,7 @@ public class tradePairProcess extends PeriodicProcessThread {
                         strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
                     } else {
                         strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
+                        fullOrdersCount++;
                     }
                 }
                 profitsChecker.finishOrder(symbol, order.getStatus() == OrderStatus.FILLED, new BigDecimal(order.getPrice()));
@@ -491,6 +500,10 @@ public class tradePairProcess extends PeriodicProcessThread {
         List<Bar> bars = null;
         if (need_bar_reset) {
             resetSeries();
+            if (init_signal != null) {
+                setMainStrategy("Signal");
+                strategiesController.startSignal(init_signal);
+            }
             strategiesController.resetStrategies();
         } else {
             bars = client.getBars(symbol, barInterval, 500, last_time, last_time + barSeconds * 2000);
@@ -585,6 +598,10 @@ public class tradePairProcess extends PeriodicProcessThread {
         }
         
         resetSeries();
+        if (init_signal != null) {
+            setMainStrategy("Signal");
+            strategiesController.startSignal(init_signal);
+        }
         strategiesController.resetStrategies();
         
         if (isTryingToSellUp) {
@@ -668,12 +685,12 @@ public class tradePairProcess extends PeriodicProcessThread {
     
     public void doShowPlot() {
         StrategyItem item = strategiesController.getMainStrategyItem();
-        plot = new CurrencyPlot(symbol, series, item != null ? item.getInitializer() : null);
+        plot = new CurrencyPlot(symbol, series, strategiesController.getTradingRecord(), item != null ? item.getInitializer() : null);
         for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
             plot.addMarker(
-                    strategiesController.getStrategyMarkers().get(i).label, 
-                    strategiesController.getStrategyMarkers().get(i).timeStamp, 
-                    strategiesController.getStrategyMarkers().get(i).typeIndex
+                strategiesController.getStrategyMarkers().get(i).label, 
+                strategiesController.getStrategyMarkers().get(i).timeStamp, 
+                strategiesController.getStrategyMarkers().get(i).typeIndex
             );
         }
         
@@ -772,13 +789,18 @@ public class tradePairProcess extends PeriodicProcessThread {
      * @param mainStrategy the mainStrategy to set
      */
     public void setMainStrategy(String mainStrategy) {
+        if (init_signal != null) {
+            mainStrategy = "Signal";
+        }
         strategiesController.setMainStrategy(mainStrategy);
-        need_bar_reset = true;
-        if (predictor != null) {
-            if (predictor.getLearningRule() != null) {
-                predictor.getLearningRule().stopLearning();
+        if (!mainStrategy.equals("Signal")) {
+            need_bar_reset = true;
+            if (predictor != null) {
+                if (predictor.getLearningRule() != null) {
+                    predictor.getLearningRule().stopLearning();
+                }
+                predictor = null;
             }
-            predictor = null;
         }
     }
     
@@ -911,5 +933,12 @@ public class tradePairProcess extends PeriodicProcessThread {
      */
     public long getStartMillis() {
         return startMillis;
+    }
+
+    /**
+     * @return the fullOrdersCount
+     */
+    public int getFullOrdersCount() {
+        return fullOrdersCount;
     }
 }

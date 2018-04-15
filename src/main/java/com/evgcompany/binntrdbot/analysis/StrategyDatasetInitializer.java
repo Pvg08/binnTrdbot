@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot.analysis;
 
 import org.jfree.data.time.TimeSeriesCollection;
 import org.ta4j.core.TimeSeries;
+import org.ta4j.core.TradingRecord;
 
 /**
  *
@@ -14,5 +15,5 @@ import org.ta4j.core.TimeSeries;
  */
 @FunctionalInterface
 public interface StrategyDatasetInitializer {
-    void onInit(TimeSeries series, TimeSeriesCollection dataset);
+    void onInit(TimeSeries series, TradingRecord tradingRecord, TimeSeriesCollection dataset);
 }
