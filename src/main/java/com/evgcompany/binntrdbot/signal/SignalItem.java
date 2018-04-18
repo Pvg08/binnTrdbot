@@ -50,7 +50,16 @@ public class SignalItem {
             setDone(true);
         }
     }
-    
+
+    public double getMedianProfitPercent() {
+        double median_price = price_from.add(price_to).divide(BigDecimal.valueOf(2)).doubleValue();
+        double target_price = price_target.doubleValue();
+        if (target_price <= 0) {
+            target_price = median_price;
+        }
+        return (target_price - median_price) / target_price;
+    }
+
     public double getCurrentRating() {
         double millis_maxago = LocalDateTime.now().minusDays(maxDaysAgo).toInstant(ZoneOffset.UTC).toEpochMilli();
         double millis_dtime = localMillis;
@@ -65,16 +74,16 @@ public class SignalItem {
                 koef = koef * koef * koef;
                 if (koef > 1) {
                     koef = 1;
-                } else if (koef < 0.025) {
-                    koef = 0.025;
+                } else if (koef < 0.0025) {
+                    koef = 0.0025;
                 }
             } else {
                 сrating = getBaseRating() / 2.0;
-                koef = 0.025;
+                koef = 0.0025;
             }
         } else {
             сrating = getBaseRating() / 10.0;
-            koef = 0.025;
+            koef = 0.0025;
         }
         return сrating * koef;
     }

@@ -31,7 +31,7 @@ public class TrailingStopLossIndicator extends CachedIndicator<Decimal> {
     }
 
     private Decimal getMaxPrice(int entry_index, int last_index) {
-        Decimal maxval = closePrice.getValue(last_index);
+        Decimal maxval = minPrice;
         for(int i = last_index - 1; i >= entry_index; i--) {
             if (closePrice.getValue(i).compareTo(maxval) > 0) {
                 maxval = closePrice.getValue(i);

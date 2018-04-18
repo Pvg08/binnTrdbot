@@ -3,6 +3,7 @@ import time
 import datetime
 import re
 import io
+import socks
 import random
 import configparser
 
@@ -192,8 +193,10 @@ def textCheck(txt, title, date, client):
         'RESULT', 
         'RESULTS', 
         'BELOW', 
+        'BETWEEN', 
         'AROUND', 
         'NEAR', 
+        'AREA', 
         'STOP', 
         'EARLY', 
         'MIDTERM', 
@@ -203,6 +206,7 @@ def textCheck(txt, title, date, client):
         'LONGTER', 
         'CRYPTOR', 
         'TRUSTPL', 
+        'CRYPTOW', 
         'PART', 
         'OK', 
         'SOME'
@@ -334,15 +338,16 @@ def checkCurchan(channel, client, signals_limit):
             print(str(e))
             return None
 
-    for msg in client.get_messages(channel_id, limit=signals_limit):
-        if (msg != '') and not (msg is None):
-            if not hasattr(msg, 'text'):
-                msg.text = None
-            if msg.text is None and hasattr(msg, 'entities'):
-                msg.text = markdown.unparse(msg.message, msg.entities or [])
-            if msg.text is None and msg.message:
-                msg.text = msg.message
-            separateCheck(msg.text, chantitle, dateFix(msg.date), client)
+    if signals_limit > 0:
+        for msg in client.get_messages(channel_id, limit=signals_limit):
+            if (msg != '') and not (msg is None):
+                if not hasattr(msg, 'text'):
+                    msg.text = None
+                if msg.text is None and hasattr(msg, 'entities'):
+                    msg.text = markdown.unparse(msg.message, msg.entities or [])
+                if msg.text is None and msg.message:
+                    msg.text = msg.message
+                separateCheck(msg.text, chantitle, dateFix(msg.date), client)
 
     return client.get_input_entity(channel_id)
 
@@ -352,6 +357,12 @@ def getConfigValue(config, value):
     except:
         result = ''
     return result
+
+def fixRegex(txt):
+    global signal_coin2_variants
+    if txt is not None and txt and signal_coin2_variants:
+        txt = txt.replace('__COIN2_VARIANTS__', signal_coin2_variants)
+    return txt
 
 def loadChanDataFromConfig(config):
     channels = []
@@ -372,14 +383,14 @@ def loadChanDataFromConfig(config):
     while chan_index <= chancount:
         channel_config = config['channel_' + str(chan_index)]
         expr_b = RegBlock()
-        expr_b.reg_has = getConfigValue(channel_config, 'signal_has')
-        expr_b.reg_skip = getConfigValue(channel_config, 'signal_skip')
-        expr_b.reg_coin = getConfigValue(channel_config, 'signal_coin')
-        expr_b.reg_coin2 = getConfigValue(channel_config, 'signal_coin2')
-        expr_b.reg_price_from = getConfigValue(channel_config, 'signal_price_from')
-        expr_b.reg_price_to = getConfigValue(channel_config, 'signal_price_to')
-        expr_b.reg_price_target = getConfigValue(channel_config, 'signal_price_target')
-        expr_b.reg_price_stoploss = getConfigValue(channel_config, 'signal_stoploss')
+        expr_b.reg_has = fixRegex(getConfigValue(channel_config, 'signal_has'))
+        expr_b.reg_skip = fixRegex(getConfigValue(channel_config, 'signal_skip'))
+        expr_b.reg_coin = fixRegex(getConfigValue(channel_config, 'signal_coin'))
+        expr_b.reg_coin2 = fixRegex(getConfigValue(channel_config, 'signal_coin2'))
+        expr_b.reg_price_from = fixRegex(getConfigValue(channel_config, 'signal_price_from'))
+        expr_b.reg_price_to = fixRegex(getConfigValue(channel_config, 'signal_price_to'))
+        expr_b.reg_price_target = fixRegex(getConfigValue(channel_config, 'signal_price_target'))
+        expr_b.reg_price_stoploss = fixRegex(getConfigValue(channel_config, 'signal_stoploss'))
         if not expr_b.reg_has:
             expr_b.reg_has = expr_b.reg_coin
         if expr_b.reg_has:
@@ -433,16 +444,34 @@ def main():
     api_id = sys.argv[1]
     api_hash = sys.argv[2]
     phone = sys.argv[3]
+    try:
+        signals_preload = sys.argv[4]
+        if signals_preload is not None and signals_preload != '':
+            signals_preload = int(signals_preload)
+        else:
+            signals_preload = -1
+    except:
+        signals_preload = -1
 
     global signal_expr
     global signal_separator
+    global signal_coin2_variants
     global log
 
-    signals_preload = int(config['channels']['signals_preload'])
+    if signals_preload < 0:
+        signals_preload = int(config['channels']['signals_preload_default'])
     signal_separator = str(config['channels']['signal_separator'])
+    signal_coin2_variants = str(config['channels']['signal_coin2_variants'])
     debug_mode = int(config['main']['debug_mode']) > 0
     log_file_name = str(config['main']['log_file'])
     log_run_file_name = str(config['main']['log_run_file'])
+
+    proxy_use = int(config['main']['use_proxy'])
+    proxy_type = str(config['main']['proxy_type'])
+    proxy_host = str(config['main']['proxy_host'])
+    proxy_port = str(config['main']['proxy_port'])
+    if proxy_port:
+        proxy_port = int(proxy_port)
 
     if debug_mode:
         log = io.open('./' + log_file_name,'w+',encoding='utf8')
@@ -452,22 +481,40 @@ def main():
 
     channels, signal_expr = loadChanDataFromConfig(config)
 
+    if proxy_use > 0 and proxy_host and proxy_port > 0:
+        if not proxy_type:
+            proxy_type = 'SOCKS5'
+        print('Using '+proxy_type+' proxy: ' + proxy_host + ':' + str(proxy_port))
+        if proxy_type == 'SOCKS4':
+            proxy_type = socks.SOCKS4
+        elif proxy_type == 'HTTP':
+            proxy_type = socks.HTTP
+        else:
+            proxy_type = socks.SOCKS5
+        proxy = (proxy_type, proxy_host, proxy_port)
+    else:
+        proxy = None
+
     client = TelegramClient(
         session_name,
         api_id=api_id,
         api_hash=api_hash,
         connection_mode=ConnectionMode.TCP_ABRIDGED,
-        proxy=None,
+        proxy=proxy,
         update_workers=1,
         spawn_read_thread=True
     )
 
     print('Connecting to Telegram servers...')
-    if not client.connect():
-        print('Initial connection failed. Retrying...')
+    try:
         if not client.connect():
-            print('Could not connect to Telegram servers.')
-            return
+            print('Initial connection failed. Retrying...')
+            if not client.connect():
+                print('Could not connect to Telegram servers.')
+                return
+    except:
+        print('Could not connect to Telegram servers.')
+        return
 
     if not client.is_user_authorized():
         client.send_code_request(phone)

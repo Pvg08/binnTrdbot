@@ -37,7 +37,7 @@ public class TrailingStopLossRule extends AbstractRule {
     }
 
     private Decimal getMaxPrice(int entry_index, int last_index) {
-        Decimal maxval = closePrice.getValue(last_index);
+        Decimal maxval = minPrice;
         for(int i = last_index - 1; i >= entry_index; i--) {
             if (closePrice.getValue(i).compareTo(maxval) > 0) {
                 maxval = closePrice.getValue(i);
@@ -52,7 +52,7 @@ public class TrailingStopLossRule extends AbstractRule {
         // No trading history or no trade opened, no loss
         if (tradingRecord != null) {
             Trade currentTrade = tradingRecord.getCurrentTrade();
-            if (currentTrade.isOpened()) {
+            if (currentTrade.isOpened() && currentTrade.getEntry().getIndex() < index) {
                 Decimal maxPrice = getMaxPrice(currentTrade.getEntry().getIndex(), index);
                 Decimal currentPrice = closePrice.getValue(index);
                 Decimal threshold = maxPrice.multipliedBy(lossRatioThreshold).max(minPrice);

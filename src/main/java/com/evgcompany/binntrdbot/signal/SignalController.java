@@ -48,6 +48,7 @@ public class SignalController extends Thread {
         int skipped_signals = 0;
         int waiting_signals = 0;
         int timeout_signals = 0;
+        int too_high_price_at_start = 0;
         int stoploss_signals = 0;
         int stoploss_done_signals = 0;
         int price1_not_set = 0;
@@ -68,6 +69,7 @@ public class SignalController extends Thread {
     private final int MAX_DAYS = 6;
     private final int SKIP_DAYS = 30;
     private int STOPLOSS_PERCENT = 10;
+    private final int NO_SIGNAL_MINUTES_TO_RESTART = 360;
 
     private TradingAPIAbstractInterface client = null;
     private String signalsListenerFile;
@@ -81,12 +83,17 @@ public class SignalController extends Thread {
     
     private SignalEvent signalEvent = null;
     private boolean initialSignalsIsLoaded = false;
+    
+    private long lastProcessActivityMillis;
 
+    private int preload_count = 200;
+    
     private static final DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DecimalFormat df8 = new DecimalFormat("0.#######");
 
     public SignalController() {
         signalsListenerFile = "TGsignalsListener.py";
+        lastProcessActivityMillis = System.currentTimeMillis();
     }
     
     @Override
@@ -120,6 +127,8 @@ public class SignalController extends Thread {
             doWait(500);
             if (!newlines.isEmpty()) {
                 onSignalNewLine(newlines.removeFirst());
+            } else if ((System.currentTimeMillis() - lastProcessActivityMillis) > (NO_SIGNAL_MINUTES_TO_RESTART * 60000)) {
+                restartSignalsProcess();
             }
         }
         if (signalsProcess != null) {
@@ -128,37 +137,49 @@ public class SignalController extends Thread {
         initialSignalsIsLoaded = true;
     }
     
-    public void startSignalsProcess(boolean isChecking) {
+    private void initMainProcess(int signals_preload_count) throws IOException {
+        lastProcessActivityMillis = System.currentTimeMillis();
+        signalsProcess = new ProcessExecutor()
+            .command("python", "-u", signalsListenerFile, apiId, apiHash, apiPhone, String.valueOf(signals_preload_count))
+            .redirectOutput(new LogOutputStream() {
+                @Override
+                protected void processLine(String line) {
+                    System.out.println(line);
+                    newlines.addLast(line);
+                    lastProcessActivityMillis = System.currentTimeMillis();
+                }
+            })
+            .redirectError(new LogOutputStream() {
+                @Override
+                protected void processLine(String line) {
+                    System.out.println(line);
+                    mainApplication.getInstance().log("Error: " + line);
+                }
+            })
+            .redirectInput(System.in)
+            .start();
+    }
+    
+    public void startSignalsProcess(boolean isChecking, int signals_preload_count) {
+        if (signalsProcess != null || isAlive()) {
+            return;
+        }
         try {
             initialSignalsIsLoaded = false;
             mainApplication.getInstance().log("Starting process: " + signalsListenerFile);
             this.isChecking = isChecking;
-            signalsProcess = new ProcessExecutor()
-                .command("python", "-u", signalsListenerFile, apiId, apiHash, apiPhone)
-                .redirectOutput(new LogOutputStream() {
-                    @Override
-                    protected void processLine(String line) {
-                        System.out.println(line);
-                        newlines.addLast(line);
-                    }
-                })
-                .redirectError(new LogOutputStream() {
-                    @Override
-                    protected void processLine(String line) {
-                        System.out.println(line);
-                        mainApplication.getInstance().log("Error: " + line);
-                    }
-                })
-                .redirectInput(System.in)
-                .start();
+            initMainProcess(signals_preload_count);
             start();
         } catch (IOException | InvalidExitValueException ex) {
             mainApplication.getInstance().log(ex.getMessage());
             initialSignalsIsLoaded = true;
         }
     }
+    public void startSignalsProcess(boolean isChecking) {
+        startSignalsProcess(isChecking, preload_count);
+    }
     public void startSignalsProcess() {
-        startSignalsProcess(false);
+        startSignalsProcess(false, preload_count);
     }
     
     public void stopSignalsProcess() {
@@ -168,6 +189,20 @@ public class SignalController extends Thread {
         mainApplication.getInstance().log("Stopping process: " + signalsListenerFile);
     }
 
+    public void restartSignalsProcess() {
+        if (isChecking || !initialSignalsIsLoaded || signalsProcess == null || !isAlive()) {
+            return;
+        }
+        mainApplication.getInstance().log("Restarting process: " + signalsListenerFile);
+        signalsProcess.getProcess().destroy();
+        try {
+            doWait(500);
+            initMainProcess(0);
+        } catch (IOException | InvalidExitValueException ex) {
+            mainApplication.getInstance().log(ex.getMessage());
+        }
+    }
+    
     public void inputStr(String str) {
         try {
             OutputStream stdin = signalsProcess.getProcess().getOutputStream();
@@ -193,11 +228,13 @@ public class SignalController extends Thread {
             return;
         }
         if (line.startsWith("-----------------")) {
-            initialSignalsIsLoaded = true;
-            if (isChecking) {
-                stopSignalsProcess();
-            } else {
-                logStats();
+            if (!initialSignalsIsLoaded) {
+                initialSignalsIsLoaded = true;
+                if (isChecking) {
+                    stopSignalsProcess();
+                } else {
+                    logStats();
+                }
             }
             return;
         }
@@ -250,6 +287,7 @@ public class SignalController extends Thread {
                     "Channel '" + entry.getKey() + "' Stats:\n" +
                     "Signals count: " + entry.getValue().signals_cnt + "\n" +
                     "Normal signals: " + entry.getValue().ok_signals + "\n" +
+                    "Signals with price > price2 at start: " + entry.getValue().too_high_price_at_start + "\n" +
                     "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
                     "Skipped signals (default: "+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
                     "Waiting signals: " + entry.getValue().waiting_signals + "\n" + 
@@ -336,36 +374,47 @@ public class SignalController extends Thread {
         boolean price2_a = false;
         boolean priceT_a = false;
         boolean priceS_a = false;
-        
+
+        if (price2 == null && price_target != null) {
+            price2 = price_target * 0.95;
+        } else if (price1 != null && price2 == null) {
+            price2 = price1;
+            price1 = price2 * 0.95;
+            price2_a = true;
+        } else if (price1 == null && price2 != null) {
+            price1 = price2 * 0.95;
+            price1_a = true;
+        }
         if (price1 == null) {
-            price1 = getPriceForDateTime(bars, datetime) * 0.975;
+            price1 = getPriceForDateTime(bars, datetime) * 0.95;
             price1_a = true;
         }
         if (price2 == null || Objects.equals(price2, price1)) {
-            price2 = price1 * 1.025;
+            price2 = price1 * 1.05;
             price2_a = true;
         }
         if (price_target == null) {
             price_target = price2 * 1.05;
             priceT_a = true;
         }
-        if (price_stoploss == null) {
-            price_stoploss = price1 * (100-STOPLOSS_PERCENT) / 100;
-            priceS_a = true;
-        }
 
         Double currPrice = bars.get(bars.size()-1).getClosePrice().doubleValue();
         price1 = alignPrice(price1, currPrice);
         price2 = alignPrice(price2, currPrice);
         price_target = alignPrice(price_target, currPrice);
+        
+        if (price_stoploss == null) {
+            price_stoploss = Math.min(price1, currPrice) * (100-STOPLOSS_PERCENT) / 100;
+            priceS_a = true;
+        }
         price_stoploss = alignPrice(price_stoploss, currPrice);
 
         if (price1 > price_target) {
-            price1 = price_target * 0.95;
+            price1 = price_target * 0.9;
             price1_a = true;
         }
         if (price2 > price_target) {
-            price2 = price_target * 0.99;
+            price2 = price_target * 0.95;
             price2_a = true;
         }
         if (price1 > price2) {
@@ -379,6 +428,9 @@ public class SignalController extends Thread {
         if (price_stoploss > price1) {
             price_stoploss = price1 * (100-STOPLOSS_PERCENT) / 100;
             priceS_a = true;
+        } else if (price_stoploss < price1 * 0.75) {
+            price_stoploss = price1 * 0.75;
+            priceS_a = true;
         }
 
         boolean is_skipped = LocalDateTime.now().minusDays(SKIP_DAYS).isAfter(datetime) || datetime.isBefore(bars.get(0).getBeginTime().toLocalDateTime());
@@ -389,14 +441,17 @@ public class SignalController extends Thread {
         }
 
         double enter_price = getPriceForDateTime(bars, datetime);
-        if (enter_price <= 0) enter_price = price1;
+        if (enter_price <= 0) enter_price = 0.5 * (price1 + price2);
         boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
         
         ZoneOffset localOffset = OffsetDateTime.now().getOffset();
         
+        double max_order_price = (price2*90+price_target*10)/100;
+        
         boolean is_done = false;
         boolean is_stop_loss = false;
-        long millis_begin = datetime.toInstant(localOffset).toEpochMilli();
+        boolean is_price_too_high = enter_price >= max_order_price;
+        long millis_signal = datetime.toInstant(localOffset).toEpochMilli();
         long millis_done = 0;
         
         /*System.out.println("signal "+symbol1+" datetime = " + datetime);
@@ -407,18 +462,32 @@ public class SignalController extends Thread {
         System.out.println("");*/
 
         double done_percent = 0;
+        int signal_fast_index = 0;
+        int signal_normal_index = 0;
         for(int i=0; i<bars.size() && !is_done; i++) {
-            long bar_begin_millis = bars.get(i).getBeginTime().toInstant().toEpochMilli();
-            long bar_end_millis = bars.get(i).getEndTime().toInstant().toEpochMilli();
-            if (bar_end_millis > millis_begin) {
-                is_done = bars.get(i).getMaxPrice().doubleValue() >= price_target;
+            Bar bar = bars.get(i);
+            long bar_begin_millis = bar.getBeginTime().toInstant().toEpochMilli();
+            long bar_end_millis = bar.getEndTime().toInstant().toEpochMilli();
+            if (
+                bar_begin_millis <= millis_signal && 
+                bar_end_millis >= millis_signal
+            ) {
+                if (signal_fast_index == 0) signal_fast_index = i;
+                if (signal_normal_index == 0) {
+                    if (((bar.getMinPrice().doubleValue() + bar.getClosePrice().doubleValue() + bar.getMaxPrice().doubleValue()) / 3) < max_order_price) {
+                        signal_normal_index = i;
+                    }
+                }
+            }
+            if (signal_fast_index > 0) {
+                is_done = bar.getMaxPrice().doubleValue() >= price_target;
                 if (is_done) {
-                    done_percent = 100 * (bars.get(i).getMaxPrice().doubleValue() - enter_price) / enter_price;
+                    done_percent = 100 * (bar.getMaxPrice().doubleValue() - enter_price) / enter_price;
                     millis_done = (bar_end_millis + bar_begin_millis) / 2;
-                    if (millis_done < millis_begin) millis_done = bar_end_millis;
+                    if (millis_done < millis_signal) millis_done = bar_end_millis;
                     break;
                 }
-                if (bars.get(i).getMinPrice().doubleValue() <= price_stoploss) {
+                if (bar.getMinPrice().doubleValue() <= price_stoploss) {
                     is_stop_loss = true;
                 }
             }
@@ -428,7 +497,7 @@ public class SignalController extends Thread {
         SignalItem s = new SignalItem();
         s.setMaxDaysAgo(MAX_DAYS);
         s.setDatetime(datetime);
-        s.setLocalMillis(millis_begin);
+        s.setLocalMillis(millis_signal);
         s.setSymbol1(symbol1);
         s.setSymbol2(symbol2);
         s.setPriceFrom(new BigDecimal(price1));
@@ -453,7 +522,7 @@ public class SignalController extends Thread {
             else if (!is_timeout) stat.waiting_signals++;
             else if (is_timeout) stat.timeout_signals++;
             if (is_done) {
-                stat.done_millis_diff_summ += millis_done - millis_begin;
+                stat.done_millis_diff_summ += millis_done - millis_signal;
                 stat.done_summ_percent += done_percent;
             }
             if (is_stop_loss) stat.stoploss_signals++;
@@ -466,7 +535,9 @@ public class SignalController extends Thread {
             } else {
                 stat.summ_percent += 100 * (currPrice - enter_price) / enter_price;
             }
-            
+            if (is_price_too_high) {
+                stat.too_high_price_at_start++;
+            }
             stat.summ_rating += rating;
         }
 
@@ -520,15 +591,6 @@ public class SignalController extends Thread {
         items = items.stream()
             .filter(p -> !to_remove.contains(p))
             .collect(Collectors.toList());
-    }
-    
-    private SignalItem getItemByHash(String hash) {
-        for(int i=0; i < items.size(); i++) {
-            if (items.get(i).getHash().equals(hash) && !items.get(i).isTimeout()) {
-                return items.get(i);
-            }
-        }
-        return null;
     }
     
     public double getPairSignalRating(String symbol) {
@@ -632,5 +694,19 @@ public class SignalController extends Thread {
      */
     public boolean isInitialSignalsLoaded() {
         return initialSignalsIsLoaded;
+    }
+
+    /**
+     * @return the preload_count
+     */
+    public int getPreloadCount() {
+        return preload_count;
+    }
+
+    /**
+     * @param preload_count the preload_count to set
+     */
+    public void setPreloadCount(int preload_count) {
+        this.preload_count = preload_count;
     }
 }

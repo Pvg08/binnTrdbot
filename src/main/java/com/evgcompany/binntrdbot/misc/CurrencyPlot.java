@@ -165,14 +165,18 @@ public class CurrencyPlot extends JFrame {
         XYLineAndShapeRenderer renderer2 = new XYLineAndShapeRenderer(true, false);
         renderer2.setSeriesPaint(0, Color.BLUE);
         renderer2.setSeriesPaint(1, Color.MAGENTA);
-        renderer2.setSeriesPaint(2, Color.BLACK);
+        renderer2.setSeriesPaint(2, Color.ORANGE);
         renderer2.setSeriesPaint(3, Color.CYAN);
-        renderer2.setSeriesPaint(4, Color.ORANGE);
+        renderer2.setSeriesPaint(4, Color.decode("#217300"));
+        renderer2.setSeriesPaint(5, Color.decode("#852cbb"));
+        renderer2.setSeriesPaint(6, Color.decode("#a09dff"));
         renderer2.setSeriesStroke(0, new BasicStroke(2));
         renderer2.setSeriesStroke(1, new BasicStroke(2));
         renderer2.setSeriesStroke(2, new BasicStroke(2));
         renderer2.setSeriesStroke(3, new BasicStroke(2));
         renderer2.setSeriesStroke(4, new BasicStroke(2));
+        renderer2.setSeriesStroke(5, new BasicStroke(2));
+        renderer2.setSeriesStroke(6, new BasicStroke(2));
         mainPlot.setRenderer(1, renderer2);
 
         points = new org.jfree.data.time.TimeSeries("Points");

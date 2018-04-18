@@ -7,18 +7,17 @@ package com.evgcompany.binntrdbot.strategies;
 
 import com.evgcompany.binntrdbot.strategies.core.*;
 import com.evgcompany.binntrdbot.analysis.*;
+import java.math.BigDecimal;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Decimal;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
+import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
-import org.ta4j.core.trading.rules.IsFallingRule;
-import org.ta4j.core.trading.rules.IsRisingRule;
 import org.ta4j.core.trading.rules.NotRule;
 import org.ta4j.core.trading.rules.OverIndicatorRule;
-import org.ta4j.core.trading.rules.StopLossRule;
 import org.ta4j.core.trading.rules.UnderIndicatorRule;
 
 /**
@@ -57,34 +56,43 @@ public class StrategySignal extends StrategyItem {
         Decimal priceT = config.GetNumValue("PriceTarget");
         Decimal priceS = config.GetNumValue("PriceStop");
         Decimal price2u = price2.multipliedBy(90).plus(priceT.multipliedBy(10)).dividedBy(100);
-        Decimal loss_percent = getLossPercent(price1, priceS);
+        Decimal loss_percent;
+        if (profitsChecker!= null && profitsChecker.getStopLossPercent() != null && profitsChecker.getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
+            loss_percent = Decimal.valueOf(profitsChecker.getStopLossPercent());
+        } else {
+            loss_percent = getLossPercent(price1, priceS);
+        }
         
         initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
+            EMAIndicator ema = new EMAIndicator(closePrice, 12);
             TrailingStopLossIndicator stoploss = new TrailingStopLossIndicator(closePrice, loss_percent, priceS, trecord);
             ConstantIndicator p1 = new ConstantIndicator(price1);
             ConstantIndicator p2 = new ConstantIndicator(price2);
             ConstantIndicator pT = new ConstantIndicator(priceT);
-            ConstantIndicator pS = new ConstantIndicator(priceS);
+            //ConstantIndicator pS = new ConstantIndicator(priceS);
             dataset.addSeries(buildChartTimeSeries(tseries, p1, "Price1"));
             dataset.addSeries(buildChartTimeSeries(tseries, p2, "Price2"));
             dataset.addSeries(buildChartTimeSeries(tseries, pT, "Price target"));
-            dataset.addSeries(buildChartTimeSeries(tseries, pS, "Price stoploss"));
+            //dataset.addSeries(buildChartTimeSeries(tseries, pS, "Price stoploss"));
             dataset.addSeries(buildChartTimeSeries(tseries, stoploss, "Trailing stoploss"));
+            dataset.addSeries(buildChartTimeSeries(tseries, ema, "EMA 12"));
         };
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        EMAIndicator ema = new EMAIndicator(closePrice, 12);
         
         Rule entryRule = new UnderIndicatorRule(closePrice, price2u)
                 .and(new OverIndicatorRule(closePrice, priceS))
-                .and(new IsRisingRule(closePrice, 1))
-                .and(new NotRule(new HasOpenedOrderRule()));
+                .and(new OverIndicatorRule(ema, closePrice));
+                //.and(new NotRule(new HasOpenedOrderRule()));
         
         Rule exitRule = new OverIndicatorRule(closePrice, priceT)
-                .and(new IsFallingRule(closePrice, 2))
-                //.or(new TrailingStopLossRule(closePrice, loss_percent, priceS))
-                .or(new StopLossRule(closePrice, priceS));
-        
+                .and(new UnderIndicatorRule(ema, closePrice))
+                .or(new TrailingStopLossRule(closePrice, loss_percent, priceS));
+                //.or(new UnderIndicatorRule(closePrice, priceS));
+                //.and(new HasOpenedOrderRule());
+
         return new BaseStrategy(entryRule, exitRule);
     }
 }

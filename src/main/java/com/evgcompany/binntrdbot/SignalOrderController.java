@@ -45,15 +45,18 @@ public class SignalOrderController extends PeriodicProcessThread {
             entered.size() < maxEnter && 
             !coinRatingController.getEntered().containsKey(pair) && 
             !entered.containsKey(pair) && 
-            !coinRatingController.getCoinRatingMap().isEmpty()
+            !coinRatingController.getCoinRatingMap().isEmpty() &&
+            item.getMedianProfitPercent() > 4
         ) {
-            if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
+            if (
+                !pair.isEmpty() && 
+                !paircontroller.hasPair(pair)
+            ) {
                 CoinRatingPairLogItem toenter = coinRatingController.getCoinRatingMap().get(pair);
                 if (toenter != null) {
                     if (autoSignalFastOrder) {
                         mainApplication.getInstance().log("Trying to auto fast-enter signal with pair: " + pair, true, true);
                         toenter.pair = paircontroller.addPairFastRun(pair);
-                        
                     } else {
                         mainApplication.getInstance().log("Trying to auto enter signal with pair: " + pair, true, true);
                         toenter.pair = paircontroller.addPair(pair);
@@ -75,6 +78,12 @@ public class SignalOrderController extends PeriodicProcessThread {
                     if (    (
                                 !rentered.pair.isTriedBuy() && 
                                 (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
+                            ) || (
+                                !rentered.pair.isTriedBuy() && 
+                                rentered.pair.getLastPrice() != null &&
+                                rentered.pair.getLastPrice().compareTo(BigDecimal.ZERO) > 0 &&
+                                rentered.pair.getSignalItem() != null &&
+                                rentered.pair.getSignalItem().getPriceTarget().compareTo(rentered.pair.getLastPrice()) < 0
                             ) || (
                                 !rentered.pair.isHodling() && 
                                 !rentered.pair.isInLimitOrder() &&

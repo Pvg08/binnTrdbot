@@ -135,10 +135,6 @@ public class tradePairProcess extends PeriodicProcessThread {
         super.finalize();
     }
     
-    public void setSignalOrder(SignalItem item) {
-        init_signal = item;
-    }
-    
     private void doEnter(BigDecimal curPrice) {
         isTriedBuy = true;
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
@@ -184,6 +180,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         if (
                 skip_check || 
                 !profitsChecker.isLowHold() || 
+                init_signal != null ||
                 incomeWithoutComissionPercent.compareTo(profitsChecker.getTradeMinProfitPercent()) > 0 ||
                 (
                     profitsChecker.getStopLossPercent() != null &&
@@ -940,5 +937,17 @@ public class tradePairProcess extends PeriodicProcessThread {
      */
     public int getFullOrdersCount() {
         return fullOrdersCount;
+    }
+    
+    public BigDecimal getLastPrice() {
+        return currentPrice;
+    }
+    
+    public SignalItem getSignalItem() {
+        return init_signal;
+    }
+    
+    public void setSignalOrder(SignalItem item) {
+        init_signal = item;
     }
 }
