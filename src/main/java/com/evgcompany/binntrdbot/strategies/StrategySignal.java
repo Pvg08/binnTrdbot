@@ -16,6 +16,7 @@ import org.ta4j.core.TimeSeries;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
+import org.ta4j.core.trading.rules.JustOnceRule;
 import org.ta4j.core.trading.rules.NotRule;
 import org.ta4j.core.trading.rules.OverIndicatorRule;
 import org.ta4j.core.trading.rules.UnderIndicatorRule;
@@ -33,6 +34,8 @@ public class StrategySignal extends StrategyItem {
         config.Add("Price2", new StrategyConfigItem("0", "100000000", "0.000000001", "0")).setActive(false);
         config.Add("PriceTarget", new StrategyConfigItem("0", "100000000", "0.000000001", "0")).setActive(false);
         config.Add("PriceStop", new StrategyConfigItem("0", "100000000", "0.000000001", "0")).setActive(false);
+        config.Add("FastOrder", new StrategyConfigItem("0", "1", "1", "0")).setActive(false);
+        config.Add("OrderOnce", new StrategyConfigItem("0", "1", "1", "0")).setActive(false);
     }
 
     private Decimal getLossPercent(Decimal priceC, Decimal priceS) {
@@ -51,16 +54,22 @@ public class StrategySignal extends StrategyItem {
             throw new IllegalArgumentException("Series cannot be null");
         }
         
+        boolean is_fast = config.GetIntValue("FastOrder") > 0;
+        boolean is_once = config.GetIntValue("OrderOnce") > 0;
         Decimal price1 = config.GetNumValue("Price1");
         Decimal price2 = config.GetNumValue("Price2");
         Decimal priceT = config.GetNumValue("PriceTarget");
         Decimal priceS = config.GetNumValue("PriceStop");
         Decimal price2u = price2.multipliedBy(90).plus(priceT.multipliedBy(10)).dividedBy(100);
         Decimal loss_percent;
-        if (profitsChecker!= null && profitsChecker.getStopLossPercent() != null && profitsChecker.getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
-            loss_percent = Decimal.valueOf(profitsChecker.getStopLossPercent());
+        if (!priceS.isZero()) {
+            if (profitsChecker!= null && profitsChecker.getStopLossPercent() != null && profitsChecker.getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
+                loss_percent = Decimal.valueOf(profitsChecker.getStopLossPercent());
+            } else {
+                loss_percent = getLossPercent(price1, priceS);
+            }
         } else {
-            loss_percent = getLossPercent(price1, priceS);
+            loss_percent = Decimal.valueOf(1000);
         }
         
         initializer = (tseries, trecord, dataset) -> {
@@ -82,11 +91,21 @@ public class StrategySignal extends StrategyItem {
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         EMAIndicator ema = new EMAIndicator(closePrice, 12);
         
-        Rule entryRule = new UnderIndicatorRule(closePrice, price2u)
+        Rule entryRule;
+        
+        if (!is_fast) {
+            entryRule = new UnderIndicatorRule(closePrice, price2u)
                 .and(new OverIndicatorRule(closePrice, priceS))
                 .and(new OverIndicatorRule(ema, closePrice));
-                //.and(new NotRule(new HasOpenedOrderRule()));
-        
+        } else {
+            entryRule = new JustOnceRule();
+        }
+        if (is_once) {
+            entryRule = entryRule
+                    .and(new NotRule(new HasOpenedOrderRule()))
+                    .and(new JustOnceRule());
+        }
+
         Rule exitRule = new OverIndicatorRule(closePrice, priceT)
                 .and(new UnderIndicatorRule(ema, closePrice))
                 .or(new TrailingStopLossRule(closePrice, loss_percent, priceS));

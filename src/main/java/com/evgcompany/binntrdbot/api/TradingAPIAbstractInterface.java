@@ -96,7 +96,7 @@ public abstract class TradingAPIAbstractInterface {
         return newSeconds;
     }
     
-    public void addSeriesBars(TimeSeries series, List<Bar> bars) {
+    public static void addSeriesBars(TimeSeries series, List<Bar> bars) {
         if (bars != null && !bars.isEmpty()) {
             for(int i=0; i<bars.size(); i++) {
                 series.addBar(bars.get(i));

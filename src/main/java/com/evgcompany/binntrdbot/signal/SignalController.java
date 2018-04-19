@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot.signal;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.strategies.StrategySignal;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -15,7 +16,6 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +30,15 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.swing.JOptionPane;
 import org.ta4j.core.Bar;
+import org.ta4j.core.BaseTimeSeries;
+import org.ta4j.core.Decimal;
+import org.ta4j.core.Order;
+import org.ta4j.core.Strategy;
+import org.ta4j.core.TimeSeries;
+import org.ta4j.core.TimeSeriesManager;
+import org.ta4j.core.TradingRecord;
+import org.ta4j.core.analysis.criteria.NumberOfBarsCriterion;
+import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
 import org.zeroturnaround.exec.InvalidExitValueException;
 import org.zeroturnaround.exec.ProcessExecutor;
 import org.zeroturnaround.exec.StartedProcess;
@@ -42,19 +51,20 @@ import org.zeroturnaround.exec.stream.LogOutputStream;
 public class SignalController extends Thread {
 
     private class ChannelStat {
-        int signals_cnt = 0;
-        int ok_signals = 0;
-        int done_signals = 0;
-        int skipped_signals = 0;
-        int waiting_signals = 0;
-        int timeout_signals = 0;
-        int too_high_price_at_start = 0;
-        int stoploss_signals = 0;
-        int stoploss_done_signals = 0;
+        int signals_cnt = 0;                // all signals for channel (even with wrong symbols)
+        int ok_signals = 0;                 // signals with aceptable params
+        int skipped_signals = 0;            // too old (>SKIP_DAYS) or > 1000 bars
+        int done_signals = 0;               // signals that reached target from price1-2
+        int waiting_exit_signals = 0;       // not too old, target not reached, stoploss not reached
+        int waiting_enter_signals = 0;      // not too old, not entered
+        int timeout_signals = 0;            // waiting which are old (>MAX_DAYS)
+        int too_high_price_at_start = 0;    // start price > price2 or even target
+        int stoploss_signals = 0;           // (trailing) stoploss reached
+        int stoploss_done_signals = 0;      // (trailing) stoploss reached then done
         int price1_not_set = 0;
         int price2_not_set = 0;
         int price_target_not_set = 0;
-        int copy_signals = 0;
+        int copy_signals = 0;               // count copies from other channels
         long done_millis_diff_summ = 0;
         long copy_millis_diff_summ = 0;
         double done_summ_percent = 0;
@@ -287,10 +297,11 @@ public class SignalController extends Thread {
                     "Channel '" + entry.getKey() + "' Stats:\n" +
                     "Signals count: " + entry.getValue().signals_cnt + "\n" +
                     "Normal signals: " + entry.getValue().ok_signals + "\n" +
+                    "Skipped signals (default: "+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
                     "Signals with price > price2 at start: " + entry.getValue().too_high_price_at_start + "\n" +
                     "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
-                    "Skipped signals (default: "+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
-                    "Waiting signals: " + entry.getValue().waiting_signals + "\n" + 
+                    "Waiting for enter signals: " + entry.getValue().waiting_enter_signals + "\n" + 
+                    "Waiting for exit signals: " + entry.getValue().waiting_exit_signals + "\n" + 
                     "Stoploss signals (default: -"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
                     "Stoploss then done signals: " + entry.getValue().stoploss_done_signals + "\n" + 
                     "Signals without price1: " + entry.getValue().price1_not_set + "\n" + 
@@ -320,20 +331,25 @@ public class SignalController extends Thread {
         return price;
     }
     
-    private double getPriceForDateTime(List<Bar> bars, LocalDateTime datetime) {
-        double result = bars.get(0).getClosePrice().doubleValue();
-        for(int i = 0; i < bars.size(); i++) {
-            if (
-                    (
-                        bars.get(i).getBeginTime().toLocalDateTime().isBefore(datetime) ||
-                        bars.get(i).getBeginTime().toLocalDateTime().isEqual(datetime)
-                    ) && 
-                    bars.get(i).getEndTime().toLocalDateTime().isAfter(datetime)
-            ) {
-                result = bars.get(i).getClosePrice().doubleValue();
-                break;
-            }
+    private int getMillisIndex(List<Bar> bars, long millisFrom) {
+        if (bars.get(0).getBeginTime().toInstant().toEpochMilli() > millisFrom) {
+            return -1;
         }
+        int i;
+        for(i = 0; i < bars.size() && bars.get(i).getEndTime().toInstant().toEpochMilli() < millisFrom; i++){}
+        return i;
+    }
+    
+    private Strategy getSignalStrategy(TimeSeries series, boolean is_fast, BigDecimal price1, BigDecimal price2, BigDecimal price_target, BigDecimal price_stop) {
+        StrategySignal sig = new StrategySignal(null);
+        sig.setProfitsChecker(mainApplication.getInstance().getProfitsChecker());
+        sig.getConfig().setParam("Price1", price1);
+        sig.getConfig().setParam("Price2", price2);
+        sig.getConfig().setParam("PriceTarget", price_target);
+        sig.getConfig().setParam("PriceStop", price_stop);
+        sig.getConfig().setParam("FastOrder", BigDecimal.valueOf(is_fast ? 1 : 0));
+        sig.getConfig().setParam("OrderOnce", BigDecimal.valueOf(1));
+        Strategy result = sig.buildStrategy(series);
         return result;
     }
     
@@ -370,10 +386,28 @@ public class SignalController extends Thread {
             return;
         }
 
+        ChannelStat stat = channel_stats.get(title);
+        
+        boolean is_skipped = LocalDateTime.now().minusDays(SKIP_DAYS).isAfter(datetime) || datetime.isBefore(bars.get(0).getBeginTime().toLocalDateTime());
+        if (is_skipped && stat != null) {
+            stat.skipped_signals++;
+            return;
+        }
+
         boolean price1_a = false;
         boolean price2_a = false;
         boolean priceT_a = false;
         boolean priceS_a = false;
+        long millis_signal = datetime.toInstant(OffsetDateTime.now().getOffset()).toEpochMilli();
+        int millis_index = getMillisIndex(bars, millis_signal);
+        double enter_price;
+        if (millis_index >= 0 && millis_index < bars.size()) {
+            enter_price = bars.get(millis_index).getClosePrice().doubleValue();
+        } else if (millis_index >= bars.size()) {
+            enter_price = bars.get(bars.size()-1).getClosePrice().doubleValue();
+        } else {
+            enter_price = bars.get(0).getClosePrice().doubleValue();
+        }
 
         if (price2 == null && price_target != null) {
             price2 = price_target * 0.95;
@@ -386,7 +420,7 @@ public class SignalController extends Thread {
             price1_a = true;
         }
         if (price1 == null) {
-            price1 = getPriceForDateTime(bars, datetime) * 0.95;
+            price1 = enter_price * 0.95;
             price1_a = true;
         }
         if (price2 == null || Objects.equals(price2, price1)) {
@@ -433,66 +467,90 @@ public class SignalController extends Thread {
             priceS_a = true;
         }
 
-        boolean is_skipped = LocalDateTime.now().minusDays(SKIP_DAYS).isAfter(datetime) || datetime.isBefore(bars.get(0).getBeginTime().toLocalDateTime());
-        if (is_skipped && channel_stats.containsKey(title)) {
-            ChannelStat stat = channel_stats.get(title);
-            stat.skipped_signals++;
-            return;
-        }
-
-        double enter_price = getPriceForDateTime(bars, datetime);
-        if (enter_price <= 0) enter_price = 0.5 * (price1 + price2);
-        boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
-        
-        ZoneOffset localOffset = OffsetDateTime.now().getOffset();
-        
         double max_order_price = (price2*90+price_target*10)/100;
         
         boolean is_done = false;
+        boolean is_waiting_exit = false;
+        boolean is_waiting_enter = false;
         boolean is_stop_loss = false;
+        boolean is_stop_loss_done = false;
         boolean is_price_too_high = enter_price >= max_order_price;
-        long millis_signal = datetime.toInstant(localOffset).toEpochMilli();
-        long millis_done = 0;
+        boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
         
-        /*System.out.println("signal "+symbol1+" datetime = " + datetime);
-        System.out.println("millis_signal = " + millis_begin + " === " + LocalDateTime.ofEpochSecond(millis_begin / 1000, 0, ZoneOffset.UTC));
-        System.out.println("millis_lastbar_begin = " + bars.get(bars.size()-1).getBeginTime().toInstant().toEpochMilli() + " === " + LocalDateTime.ofEpochSecond(bars.get(bars.size()-1).getBeginTime().toInstant().toEpochMilli() / 1000, 0, ZoneOffset.UTC));
-        System.out.println("millis_lastbar_end = " + bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli() + " === " + LocalDateTime.ofEpochSecond(bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli() / 1000, 0, ZoneOffset.UTC));
-        System.out.println("millis_now = " + System.currentTimeMillis() + " === " + LocalDateTime.ofEpochSecond(System.currentTimeMillis() / 1000, 0, ZoneOffset.UTC));
-        System.out.println("");*/
+        if (millis_index  >= 0 && millis_index < bars.size()) {
+            TimeSeries series = new BaseTimeSeries("STAT_SERIES");
+            TradingAPIAbstractInterface.addSeriesBars(series, bars);
+            TotalProfitCriterion profitCriterion = new TotalProfitCriterion();
+            NumberOfBarsCriterion barsCountCriterion = new NumberOfBarsCriterion();
 
-        double done_percent = 0;
-        int signal_fast_index = 0;
-        int signal_normal_index = 0;
-        for(int i=0; i<bars.size() && !is_done; i++) {
-            Bar bar = bars.get(i);
-            long bar_begin_millis = bar.getBeginTime().toInstant().toEpochMilli();
-            long bar_end_millis = bar.getEndTime().toInstant().toEpochMilli();
-            if (
-                bar_begin_millis <= millis_signal && 
-                bar_end_millis >= millis_signal
-            ) {
-                if (signal_fast_index == 0) signal_fast_index = i;
-                if (signal_normal_index == 0) {
-                    if (((bar.getMinPrice().doubleValue() + bar.getClosePrice().doubleValue() + bar.getMaxPrice().doubleValue()) / 3) < max_order_price) {
-                        signal_normal_index = i;
-                    }
-                }
+            Strategy strategy_main = getSignalStrategy(series, false, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
+            Strategy strategy_fast = getSignalStrategy(series, true, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
+            Strategy strategy_fast_nostop = getSignalStrategy(series, true, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), BigDecimal.ZERO);
+            TimeSeriesManager seriesManager = new TimeSeriesManager(series);
+            TradingRecord tradingRecordMain = seriesManager.run(strategy_main, Order.OrderType.BUY, millis_index, series.getEndIndex());
+            TradingRecord tradingRecordFast = seriesManager.run(strategy_fast, Order.OrderType.BUY, millis_index, series.getEndIndex());
+            TradingRecord tradingRecordFastNS = seriesManager.run(strategy_fast_nostop, Order.OrderType.BUY, millis_index, series.getEndIndex());
+
+            System.out.println();
+            System.out.println(symbol1+symbol2+" " + datetime + " " + df8.format(price1)+" " + df8.format(price2)+" " + df8.format(price_target)+" " + df8.format(price_stoploss) + "    " + millis_index + "/" + bars.size() + " -- " + bars.get(millis_index).getBeginTime());
+            
+            if (tradingRecordMain.getLastEntry() != null && tradingRecordMain.getLastExit() == null) {
+                tradingRecordMain.exit(series.getEndIndex(), series.getLastBar().getClosePrice(), Decimal.NaN);
+                System.out.println("Close main order on last index.");
+                is_waiting_exit = true;
             }
-            if (signal_fast_index > 0) {
-                is_done = bar.getMaxPrice().doubleValue() >= price_target;
+            if (tradingRecordFast.getLastEntry() != null && tradingRecordFast.getLastExit() == null) {
+                tradingRecordFast.exit(series.getEndIndex(), series.getLastBar().getClosePrice(), Decimal.NaN);
+                System.out.println("Close fast order on last index.");
+            }
+            if (tradingRecordFastNS.getLastEntry() != null && tradingRecordFastNS.getLastExit() == null) {
+                tradingRecordFastNS.exit(series.getEndIndex(), series.getLastBar().getClosePrice(), Decimal.NaN);
+                System.out.println("Close fast NS order on last index.");
+            }
+            
+            double profit_main = profitCriterion.calculate(series, tradingRecordMain);
+            double profit_fast = profitCriterion.calculate(series, tradingRecordFast);
+            double profit_fastNS = profitCriterion.calculate(series, tradingRecordFastNS);
+            double barscnt_main = barsCountCriterion.calculate(series, tradingRecordMain);
+            double barscnt_fast = barsCountCriterion.calculate(series, tradingRecordFast);
+            double barscnt_fastNS = barsCountCriterion.calculate(series, tradingRecordFastNS);
+            
+            System.out.println(tradingRecordMain.getTrades());
+            System.out.println("M  Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount());
+            System.out.println(tradingRecordFast.getTrades());
+            System.out.println("F  Profit:" + profit_fast + "   Bars:" + barscnt_fast + "   Trades:" + tradingRecordFast.getTradeCount());
+            System.out.println(tradingRecordFastNS.getTrades());
+            System.out.println("NS Profit:" + profit_fastNS + "   Bars:" + barscnt_fastNS + "   Trades:" + tradingRecordFastNS.getTradeCount());
+            System.out.println();
+            
+            is_waiting_enter = tradingRecordMain.getTradeCount() == 0;
+            is_done = !is_price_too_high && !is_waiting_enter && !is_waiting_exit && profit_main > 1;
+            is_stop_loss = !is_price_too_high && !is_waiting_enter && !is_waiting_exit && profit_main < 1;
+            is_stop_loss_done = !is_price_too_high && !is_waiting_enter && !is_waiting_exit && barscnt_fast < 1 && profit_fastNS > 1;
+
+            if (stat != null) {
+                stat.ok_signals++;
+                if (is_done) stat.done_signals++;
+                if (is_stop_loss) stat.stoploss_signals++;
+                if (is_price_too_high) stat.too_high_price_at_start++;
+                if (is_timeout) stat.timeout_signals++;
+                if (is_waiting_exit) stat.waiting_exit_signals++;
+                if (is_waiting_enter) stat.waiting_enter_signals++;
+                if (is_stop_loss_done) stat.stoploss_done_signals++;
                 if (is_done) {
-                    done_percent = 100 * (bar.getMaxPrice().doubleValue() - enter_price) / enter_price;
-                    millis_done = (bar_end_millis + bar_begin_millis) / 2;
-                    if (millis_done < millis_signal) millis_done = bar_end_millis;
-                    break;
+                    stat.done_millis_diff_summ += barscnt_main * 15 * 60 * 1000;
+                    stat.done_summ_percent += 100*(profit_main-1);
                 }
-                if (bar.getMinPrice().doubleValue() <= price_stoploss) {
-                    is_stop_loss = true;
-                }
+                stat.summ_percent += 100*(profit_main-1);
+                stat.summ_rating += rating;
             }
+            
+        } else {
+            System.out.println();
+            System.out.println(millis_index);
+            System.out.println();
+            if (stat != null) stat.skipped_signals++;
         }
-        if (is_done) is_timeout = false;
         
         SignalItem s = new SignalItem();
         s.setMaxDaysAgo(MAX_DAYS);
@@ -509,37 +567,11 @@ public class SignalController extends Thread {
         s.setPriceTargetAuto(priceT_a);
         s.setPriceStoplossAuto(priceS_a);
         s.setBaseRating(rating);
-        s.setDone(is_done || is_timeout);
+        s.setDone(is_done);
         s.setTimeout(is_timeout);
         s.setChannelName(title);
         s.updateHash();
         items.add(s);
-        
-        if (channel_stats.containsKey(title)) {
-            ChannelStat stat = channel_stats.get(title);
-            stat.ok_signals++;
-            if (is_done) stat.done_signals++; 
-            else if (!is_timeout) stat.waiting_signals++;
-            else if (is_timeout) stat.timeout_signals++;
-            if (is_done) {
-                stat.done_millis_diff_summ += millis_done - millis_signal;
-                stat.done_summ_percent += done_percent;
-            }
-            if (is_stop_loss) stat.stoploss_signals++;
-            if (is_done && is_stop_loss) stat.stoploss_done_signals++;
-            
-            if (is_stop_loss) {
-                stat.summ_percent -= STOPLOSS_PERCENT;
-            } else if (is_done) {
-                stat.summ_percent += done_percent;
-            } else {
-                stat.summ_percent += 100 * (currPrice - enter_price) / enter_price;
-            }
-            if (is_price_too_high) {
-                stat.too_high_price_at_start++;
-            }
-            stat.summ_rating += rating;
-        }
 
         if (initialSignalsIsLoaded) {
             checkSignalItems();
@@ -560,7 +592,7 @@ public class SignalController extends Thread {
             + (is_copy ? "COPY" : "")
         );
         
-        if (signalEvent != null && !is_copy) {
+        if (signalEvent != null && !is_copy && initialSignalsIsLoaded) {
             signalEvent.onUpdate(s, getPairSignalRating(s.getPair()));
         }
     }
@@ -595,7 +627,7 @@ public class SignalController extends Thread {
     
     public double getPairSignalRating(String symbol) {
         double result = 0;
-        for(int i=0; i< items.size(); i++) {
+        for(int i = 0; i < items.size(); i++) {
             if (items.get(i).getPair().equals(symbol) || items.get(i).getSymbol1().equals(symbol)) {
                 result = result + items.get(i).getCurrentRating();
             }

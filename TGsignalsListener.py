@@ -201,6 +201,7 @@ def textCheck(txt, title, date, client):
         'EARLY', 
         'MIDTERM', 
         'SHORTTERM', 
+        'SHORTTE', 
         'SHORT', 
         'LONGTERM', 
         'LONGTER', 

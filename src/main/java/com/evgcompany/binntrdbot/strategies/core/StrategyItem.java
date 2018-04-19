@@ -46,7 +46,7 @@ public abstract class StrategyItem {
     
     public StrategyItem(StrategiesController controller) {
         this.controller = controller;
-        this.profitsChecker = controller.getProfitsChecker();
+        this.profitsChecker = controller != null ? controller.getProfitsChecker() : null;
         this.config = new StrategyConfig();
         StrategyName = "NoName";
     }
@@ -138,5 +138,12 @@ public abstract class StrategyItem {
      */
     public StrategyConfig getConfig() {
         return config;
+    }
+
+    /**
+     * @param profitsChecker the profitsChecker to set
+     */
+    public void setProfitsChecker(tradeProfitsController profitsChecker) {
+        this.profitsChecker = profitsChecker;
     }
 }
