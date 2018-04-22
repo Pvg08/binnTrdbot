@@ -3,7 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.coinrating;
+
+import com.evgcompany.binntrdbot.tradePairProcess;
 
 /**
  *

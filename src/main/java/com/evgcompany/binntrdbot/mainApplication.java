@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
+import com.evgcompany.binntrdbot.coinrating.*;
 import com.evgcompany.binntrdbot.misc.ComponentsConfigController;
 import com.evgcompany.binntrdbot.signal.SignalController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
@@ -1520,8 +1521,8 @@ public class mainApplication extends javax.swing.JFrame {
     private void comboBoxRatingSortbyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxRatingSortbyActionPerformed
         int sindex = comboBoxRatingSortby.getSelectedIndex();
         if (sindex < 0) sindex = 0;
-        else if (sindex > CoinRatingController.CoinRatingSort.values().length-1) sindex = CoinRatingController.CoinRatingSort.values().length-1;
-        coinRatingController.setSortby(CoinRatingController.CoinRatingSort.values()[sindex]);
+        else if (sindex > CoinRatingSort.values().length-1) sindex = CoinRatingSort.values().length-1;
+        coinRatingController.setSortby(CoinRatingSort.values()[sindex]);
     }//GEN-LAST:event_comboBoxRatingSortbyActionPerformed
 
     private void spinnerScanRatingDelayTimeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_spinnerScanRatingDelayTimeStateChanged

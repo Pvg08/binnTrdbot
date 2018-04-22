@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot.signal;
 
 import com.evgcompany.binntrdbot.*;
+import com.evgcompany.binntrdbot.coinrating.*;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.math.BigDecimal;
 import java.util.ArrayList;

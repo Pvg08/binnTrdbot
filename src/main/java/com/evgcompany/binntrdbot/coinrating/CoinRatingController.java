@@ -3,11 +3,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.coinrating;
 
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
+import com.evgcompany.binntrdbot.*;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
@@ -46,22 +47,6 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  */
 public class CoinRatingController extends PeriodicProcessThread {
 
-    enum CoinRatingSort {
-        CR_RANK,
-        CR_MARKET_CAP,
-        CR_PROGSTART_PRICEUP,
-        CR_LAST_HOUR_PRICEUP,
-        CR_24HR_PRICEUP,
-        CR_EVENTS_COUNT,
-        CR_LAST_EVENT_ANNO_DATE,
-        CR_VOLATILITY,
-        CR_STRATEGIES_SHOULD_ENTER,
-        CR_STRATEGIES_SHOULD_EXIT,
-        CR_STRATEGIES_DIRECTION,
-        CR_SIGNALS_RATING,
-        CR_CALCULATED_RATING
-    }
-    
     private final tradePairProcessController paircontroller;
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;

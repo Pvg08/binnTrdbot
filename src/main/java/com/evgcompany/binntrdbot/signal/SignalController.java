@@ -5,10 +5,10 @@
  */
 package com.evgcompany.binntrdbot.signal;
 
-import com.evgcompany.binntrdbot.CoinRatingController;
 import com.evgcompany.binntrdbot.analysis.OHLC4Indicator;
 import com.evgcompany.binntrdbot.analysis.TimeSeriesManagerForIndicator;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.strategies.StrategySignal;
 import java.io.BufferedWriter;
