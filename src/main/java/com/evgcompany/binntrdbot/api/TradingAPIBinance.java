@@ -108,15 +108,11 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
     
     @Override
     public List<Bar> getBars(String pair, String bar_interval) {
-        CandlestickInterval interval = getCandlestickIntervalByString(bar_interval);
-        List<Candlestick> nbars = client.getCandlestickBars(pair, interval);
-        List<Bar> result = new ArrayList<>(0);
-        addBarsToList(nbars, result, bar_interval);
-        return result;
+        return getBars(pair, bar_interval, null, null, null);
     }
 
     @Override
-    public List<Bar> getBars(String pair, String bar_interval, int bar_count, long millis_from, long millis_to) {
+    public List<Bar> getBars(String pair, String bar_interval, Integer bar_count, Long millis_from, Long millis_to) {
         CandlestickInterval interval = getCandlestickIntervalByString(bar_interval);
         List<Candlestick> nbars = client.getCandlestickBars(pair, interval, bar_count, millis_from, millis_to);
         List<Bar> result = new ArrayList<>(0);

@@ -65,8 +65,11 @@ public class CoinRatingController extends PeriodicProcessThread {
 
     Map<String, CoinRatingPairLogItem> heroesMap = new HashMap<>();
     Map<String, JSONObject> coinRanks = new HashMap<>();
+    private GlobalTrendUpdateEvent trendUpdateEvent = null;
 
     private long updateTime = 10;
+    private final long updateTrendTime = 450;
+    private long updateTrendMillis = 0;
     private boolean have_all_coins_info = false;
     private String coinsPattern = "";
 
@@ -81,7 +84,12 @@ public class CoinRatingController extends PeriodicProcessThread {
     private int maxEnter = 3;
     private int secondsOrderEnterWait = 600;
     private float minRatingForOrder = 5;
+    private final int globalTrendMaxRank = 40;
     private JProgressBar progressBar = null;
+    
+    private double upTrendPercent = 0;
+    private double downTrendPercent = 0;
+    private boolean noAutoBuysOnDowntrend = false;
 
     public CoinRatingController(mainApplication application, tradePairProcessController paircontroller) {
         this.paircontroller = paircontroller;
@@ -91,6 +99,91 @@ public class CoinRatingController extends PeriodicProcessThread {
         signalOrderController.setDelayTime(2);
     }
 
+    public void updateGlobalTrendData() {
+        List<String> rankPairs = new ArrayList<>(0);
+        double upval = 0;
+        double dnval = 0;
+        double upcnt = 0;
+        double dncnt = 0;
+        for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
+            if (entry.getValue().rank <= globalTrendMaxRank) {
+                rankPairs.add(entry.getKey());
+            }
+        }
+        for (String pair : rankPairs) {
+            List<Bar> bars_h = client.getBars(pair, "1h", 13, null, null);
+            if (bars_h != null && bars_h.size() >= 2) {
+                double lastPrice = bars_h.get(bars_h.size()-1).getClosePrice().doubleValue();
+                double preLastPrice = bars_h.get(bars_h.size()-2).getClosePrice().doubleValue();
+                double percent = 100 * (lastPrice - preLastPrice) / lastPrice;
+                if (percent > 0.1) {
+                    upval+=0.45*Math.pow(Math.abs(percent), 0.25);
+                    upcnt+=0.45;
+                } else if (percent < -0.1) {
+                    dnval+=0.45*Math.pow(Math.abs(percent), 0.25);
+                    dncnt+=0.45;
+                }
+            }
+            if (bars_h != null && bars_h.size() >= 3) {
+                double lastPrice = bars_h.get(bars_h.size()-1).getClosePrice().doubleValue();
+                double preLastPrice = bars_h.get(bars_h.size()-3).getClosePrice().doubleValue();
+                double percent = 100 * (lastPrice - preLastPrice) / lastPrice;
+                if (percent > 0.1) {
+                    upval+=0.25*Math.pow(Math.abs(percent), 0.25);
+                    upcnt+=0.25;
+                } else if (percent < -0.1) {
+                    dnval+=0.25*Math.pow(Math.abs(percent), 0.25);
+                    dncnt+=0.25;
+                }
+            }
+            if (bars_h != null && bars_h.size() >= 5) {
+                double lastPrice = bars_h.get(bars_h.size()-1).getClosePrice().doubleValue();
+                double preLastPrice = bars_h.get(bars_h.size()-5).getClosePrice().doubleValue();
+                double percent = 100 * (lastPrice - preLastPrice) / lastPrice;
+                if (percent > 0.1) {
+                    upval+=0.13*Math.pow(Math.abs(percent), 0.25);
+                    upcnt+=0.13;
+                } else if (percent < -0.1) {
+                    dnval+=0.13*Math.pow(Math.abs(percent), 0.25);
+                    dncnt+=0.13;
+                }
+            }
+            if (bars_h != null && bars_h.size() >= 9) {
+                double lastPrice = bars_h.get(bars_h.size()-1).getClosePrice().doubleValue();
+                double preLastPrice = bars_h.get(bars_h.size()-9).getClosePrice().doubleValue();
+                double percent = 100 * (lastPrice - preLastPrice) / lastPrice;
+                if (percent > 0.1) {
+                    upval+=0.1*Math.pow(Math.abs(percent), 0.25);
+                    upcnt+=0.1;
+                } else if (percent < -0.1) {
+                    dnval+=0.1*Math.pow(Math.abs(percent), 0.25);
+                    dncnt+=0.1;
+                }
+            }
+            if (bars_h != null && bars_h.size() >= 13) {
+                double lastPrice = bars_h.get(bars_h.size()-1).getClosePrice().doubleValue();
+                double preLastPrice = bars_h.get(bars_h.size()-13).getClosePrice().doubleValue();
+                double percent = 100 * (lastPrice - preLastPrice) / lastPrice;
+                if (percent > 0.1) {
+                    upval+=0.07*Math.pow(Math.abs(percent), 0.25);
+                    upcnt+=0.07;
+                } else if (percent < -0.1) {
+                    dnval+=0.07*Math.pow(Math.abs(percent), 0.25);
+                    dncnt+=0.07;
+                }
+            }
+        }
+        upTrendPercent = (upval > 0 && dnval > 0) ? 100 * upval / (upval+dnval) : 0;
+        downTrendPercent = (upval > 0 && dnval > 0) ? 100 * dnval / (upval+dnval) : 0;
+        if (rankPairs.size() > 0) {
+            upTrendPercent *= (upcnt+dncnt) / rankPairs.size();
+            downTrendPercent *= (upcnt+dncnt) / rankPairs.size();
+        }
+        if (trendUpdateEvent != null) {
+            trendUpdateEvent.onUpdate(upTrendPercent, downTrendPercent);
+        }
+    }
+    
     public boolean setPairSignalRating(String pair, float rating) {
         if (heroesMap.containsKey(pair)) {
             heroesMap.get(pair).signal_rating = rating;
@@ -609,9 +702,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         
         mainApplication.getInstance().log("CoinRatingController starting...");
         
-        if (analyzer) {
-            loadRatingData();
-        }
+        loadRatingData();
         
         need_stop = false;
         paused = false;
@@ -628,16 +719,19 @@ public class CoinRatingController extends PeriodicProcessThread {
         coinsPattern = String.join("|", accountCoins);
 
         updateCurrentPrices();
+        updateGlobalTrendData();
         signalOrderController.start();
         
         while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
             doWait(1000);
         }
         
-        orderEvent = client.OnOrderEvent(null, event -> {
-            mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
-            mainApplication.getInstance().systemSound();
-        });
+        if (paircontroller != null && paircontroller.getProfitsChecker() != null && !paircontroller.getProfitsChecker().isTestMode()) {
+            orderEvent = client.OnOrderEvent(null, event -> {
+                mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
+                mainApplication.getInstance().systemSound();
+            });
+        }
     }
     
     @Override
@@ -655,7 +749,14 @@ public class CoinRatingController extends PeriodicProcessThread {
             checkOrderExit();
         }
 
-        //doWait(have_all_coins_info ? updateTime * 1000 : delayTime * 1000);
+        if (System.currentTimeMillis() > (updateTrendMillis + updateTrendTime*1000)) {
+            updateTrendMillis = System.currentTimeMillis();
+            updateGlobalTrendData();
+        }
+        
+        if (have_all_coins_info) {
+            delayTime = updateTime;
+        }
     }
     
     @Override
@@ -835,5 +936,51 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     public SignalOrderController getSignalOrderController() {
         return signalOrderController;
+    }
+
+    /**
+     * @return the trendUpdateEvent
+     */
+    public GlobalTrendUpdateEvent getTrendUpdateEvent() {
+        return trendUpdateEvent;
+    }
+
+    /**
+     * @param trendUpdateEvent the trendUpdateEvent to set
+     */
+    public void setTrendUpdateEvent(GlobalTrendUpdateEvent trendUpdateEvent) {
+        this.trendUpdateEvent = trendUpdateEvent;
+    }
+
+    /**
+     * @return the upTrendPercent
+     */
+    public double getUpTrendPercent() {
+        return upTrendPercent;
+    }
+
+    /**
+     * @return the downTrendPercent
+     */
+    public double getDownTrendPercent() {
+        return downTrendPercent;
+    }
+
+    public boolean isInDownTrend() {
+        return downTrendPercent > upTrendPercent;
+    }
+    
+    /**
+     * @return the noAutoBuysOnDowntrend
+     */
+    public boolean isNoAutoBuysOnDowntrend() {
+        return noAutoBuysOnDowntrend;
+    }
+
+    /**
+     * @param noAutoBuysOnDowntrend the noAutoBuysOnDowntrend to set
+     */
+    public void setNoAutoBuysOnDowntrend(boolean noAutoBuysOnDowntrend) {
+        this.noAutoBuysOnDowntrend = noAutoBuysOnDowntrend;
     }
 }

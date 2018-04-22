@@ -13,6 +13,7 @@ import com.evgcompany.binntrdbot.signal.SignalController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.awt.Toolkit;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -41,6 +42,8 @@ public class mainApplication extends javax.swing.JFrame {
     
     private static volatile mainApplication instance = null;
     
+    private static final DecimalFormat df3 = new DecimalFormat("0.##");
+    
     public static mainApplication getInstance() {
         return instance;
     }
@@ -66,6 +69,11 @@ public class mainApplication extends javax.swing.JFrame {
         new StrategiesController().getStrategiesNames().forEach((strategy_name)->{
             ComboBoxMainStrategy.addItem(strategy_name);
             ((DefaultListModel)listBoxAutoStrategies.getModel()).addElement(strategy_name);
+        });
+        
+        coinRatingController.setTrendUpdateEvent((upt, dnt) -> {
+            labelUpTrend.setText("UP: " + df3.format(upt) + "%");
+            labelDownTrend.setText("DOWN: " + df3.format(dnt) + "%");
         });
         
         config.addComponent(instance, "window");
@@ -109,6 +117,7 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerSignalRatingMinForOrder, "signal_rating_min_for_order");
         config.addComponent(spinnerSignalPreloadCount, "signal_preload_count");
         config.addComponent(spinnerMaxSignalOrders, "signal_max_orders_count");
+        config.addComponent(checkBoxDowntrendNoAuto, "rating_no_auto_on_downtrend");
         config.Load();
     }
     
@@ -148,6 +157,10 @@ public class mainApplication extends javax.swing.JFrame {
         return pairController;
     }
     
+    public CoinRatingController getCoinRatingController() {
+        return coinRatingController;
+    }
+
     private void initAPI() {
         if (client == null) {
             client = new TradingAPIBinance(textFieldApiSecret.getText(), textFieldApiKey.getText());
@@ -262,6 +275,7 @@ public class mainApplication extends javax.swing.JFrame {
         spinnerRatingMaxOrderWait = new javax.swing.JSpinner();
         jLabel22 = new javax.swing.JLabel();
         spinnerRatingMinForOrder = new javax.swing.JSpinner();
+        checkBoxDowntrendNoAuto = new javax.swing.JCheckBox();
         jPanel5 = new javax.swing.JPanel();
         textFieldAPIID = new javax.swing.JTextField();
         jLabel17 = new javax.swing.JLabel();
@@ -294,6 +308,8 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCTrain = new javax.swing.JButton();
         buttonNNCAdd = new javax.swing.JButton();
         buttonRemove = new javax.swing.JButton();
+        labelUpTrend = new javax.swing.JLabel();
+        labelDownTrend = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -776,6 +792,13 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerRatingMinForOrder.setValue(5);
 
+        checkBoxDowntrendNoAuto.setText("No auto orders on downtrend");
+        checkBoxDowntrendNoAuto.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkBoxDowntrendNoAutoActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
@@ -797,7 +820,8 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                     .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.DEFAULT_SIZE, 82, Short.MAX_VALUE)
-                                    .addComponent(spinnerScanRatingUpdateTime))))
+                                    .addComponent(spinnerScanRatingUpdateTime)))
+                            .addComponent(checkBoxDowntrendNoAuto))
                         .addGap(25, 25, 25)
                         .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                             .addComponent(jLabel21)
@@ -842,7 +866,9 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(jLabel22)
                             .addComponent(spinnerRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap(119, Short.MAX_VALUE))
+                .addGap(18, 18, 18)
+                .addComponent(checkBoxDowntrendNoAuto)
+                .addContainerGap(78, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Coins rating", jPanel4);
@@ -1091,6 +1117,12 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
+        labelUpTrend.setForeground(new java.awt.Color(0, 204, 51));
+        labelUpTrend.setText("UP: 0%");
+
+        labelDownTrend.setForeground(new java.awt.Color(255, 0, 102));
+        labelDownTrend.setText("DOWN: 0%");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -1114,13 +1146,19 @@ public class mainApplication extends javax.swing.JFrame {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jLabel8)
-                            .addComponent(jScrollPane5, javax.swing.GroupLayout.DEFAULT_SIZE, 209, Short.MAX_VALUE)
+                            .addComponent(jScrollPane5, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
                             .addGroup(layout.createSequentialGroup()
                                 .addComponent(comboBoxRatingSortby, javax.swing.GroupLayout.PREFERRED_SIZE, 129, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(comboBoxRatingSort, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .addComponent(progressBarRatingAnalPercent, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .addComponent(progressBarRatingAnalPercent, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(jLabel8)
+                                .addGap(152, 152, 152))
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                                .addComponent(labelUpTrend, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(labelDownTrend)))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
@@ -1186,6 +1224,10 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jScrollPane5)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(labelUpTrend)
+                                    .addComponent(labelDownTrend))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(progressBarRatingAnalPercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addGroup(layout.createSequentialGroup()
                                 .addComponent(jLabel6)
@@ -1221,7 +1263,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jLabel10)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 120, Short.MAX_VALUE)
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 116, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(buttonBuy)
@@ -1484,6 +1526,7 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setLowHold(checkBoxLowHold.isSelected());
         coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
         coinRatingController.setAutoFastOrder(checkboxAutoFastorder.isSelected());
+        coinRatingController.setNoAutoBuysOnDowntrend(checkBoxDowntrendNoAuto.isSelected());
         coinRatingController.getSignalOrderController().setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
         coinRatingController.getSignalOrderController().setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
         coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
@@ -1577,6 +1620,10 @@ public class mainApplication extends javax.swing.JFrame {
         profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
     }//GEN-LAST:event_checkBoxAutoStrategyParamsActionPerformed
 
+    private void checkBoxDowntrendNoAutoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxDowntrendNoAutoActionPerformed
+        coinRatingController.setNoAutoBuysOnDowntrend(checkBoxDowntrendNoAuto.isSelected());
+    }//GEN-LAST:event_checkBoxDowntrendNoAutoActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1637,6 +1684,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkBoxAutoStrategyParams;
     private javax.swing.JCheckBox checkBoxBuyStopLimited;
     private javax.swing.JCheckBox checkBoxCheckOtherStrategies;
+    private javax.swing.JCheckBox checkBoxDowntrendNoAuto;
     private javax.swing.JCheckBox checkBoxLimitedOrders;
     private javax.swing.JCheckBox checkBoxLowHold;
     private javax.swing.JCheckBox checkBoxSellStopLimited;
@@ -1693,6 +1741,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane7;
     private javax.swing.JTabbedPane jTabbedPane2;
     private javax.swing.JTextArea jTextArea1;
+    private javax.swing.JLabel labelDownTrend;
+    private javax.swing.JLabel labelUpTrend;
     private javax.swing.JList<String> listBoxAutoStrategies;
     private javax.swing.JList<String> listCurrencies;
     private javax.swing.JList<String> listProfit;

@@ -133,7 +133,7 @@ public abstract class TradingAPIAbstractInterface {
     
     abstract public List<RateLimit> getRateLimits();
     abstract public List<Bar> getBars(String pair, String bar_interval);
-    abstract public List<Bar> getBars(String pair, String bar_interval, int count, long millis_from, long millis_to);
+    abstract public List<Bar> getBars(String pair, String bar_interval, Integer count, Long millis_from, Long millis_to);
     abstract public ExchangeInfo getExchangeInfo();
     abstract public SymbolInfo getSymbolInfo(String symbol);
     abstract public List<TickerPrice> getAllPrices();

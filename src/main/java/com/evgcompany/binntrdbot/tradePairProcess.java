@@ -296,7 +296,14 @@ public class tradePairProcess extends PeriodicProcessThread {
         }
         profitsChecker.setPairPrice(symbol, currentPrice);
     }
-    
+
+    private boolean canBuyForCoinRating() {
+        return app.getCoinRatingController() == null || 
+                !app.getCoinRatingController().isAlive() || 
+                !app.getCoinRatingController().isNoAutoBuysOnDowntrend() || 
+                !app.getCoinRatingController().isInDownTrend();
+    }
+
     private void checkStatus() {
         StrategiesController.StrategiesAction saction = strategiesController.checkStatus(
             is_hodling, 
@@ -305,7 +312,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         );
         if (saction == StrategiesController.StrategiesAction.DO_ENTER || saction == StrategiesController.StrategiesAction.DO_LEAVE) {
             if (saction == StrategiesController.StrategiesAction.DO_ENTER) {
-                doEnter(lastStrategyCheckPrice);
+                if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice);
             } else {
                 doExit(lastStrategyCheckPrice, false);
             }
@@ -607,7 +614,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         
         startMillis = System.currentTimeMillis();
 
-        if (buyOnStart && !strategiesController.isShouldLeave()) {
+        if (buyOnStart && canBuyForCoinRating() && !strategiesController.isShouldLeave()) {
             doBuy();
         }
 
