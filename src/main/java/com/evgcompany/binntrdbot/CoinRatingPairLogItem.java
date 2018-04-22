@@ -10,43 +10,43 @@ package com.evgcompany.binntrdbot;
  * @author EVG_adm_T
  */
 public class CoinRatingPairLogItem {
-    String symbol;
-    String fullname;
-    tradePairProcess pair = null;
+    public String symbol;
+    public String fullname;
+    public tradePairProcess pair = null;
 
-    int rank = 0;
-    float market_cap = 0;
-    int events_count = 0;
+    public int rank = 0;
+    public float market_cap = 0;
+    public int events_count = 0;
 
-    Float percent_hour = 0f;
-    Float percent_day = 0f;
-    Float percent_from_begin = 0f;
+    public Float percent_hour = 0f;
+    public Float percent_day = 0f;
+    public Float percent_from_begin = 0f;
 
-    Float start_price = 0f;
-    Float hour_ago_price = 0f;
-    Float day_ago_price = 0f;
-    Float current_price = 0f;
+    public Float start_price = 0f;
+    public Float hour_ago_price = 0f;
+    public Float day_ago_price = 0f;
+    public Float current_price = 0f;
 
-    Float hour_volume = 0f;
-    Float day_volume = 0f;
-    Float volatility = 0f;
+    public Float hour_volume = 0f;
+    public Float day_volume = 0f;
+    public Float volatility = 0f;
     
-    Float signal_rating = 0f;
+    public Float signal_rating = 0f;
 
-    boolean do_remove_flag = false;
-    boolean fastbuy_skip = false;
+    public boolean do_remove_flag = false;
+    public boolean fastbuy_skip = false;
 
-    Float sort = 0f;
-    int update_counter = 0;
+    public Float sort = 0f;
+    public int update_counter = 0;
 
-    String last_event_date;
-    long last_event_anno_millis = 0;
-    long last_rating_update_millis = 0;
-    double strategies_shouldenter_rate = 0;
-    double strategies_shouldexit_rate = 0;
+    public String last_event_date;
+    public long last_event_anno_millis = 0;
+    public long last_rating_update_millis = 0;
+    public double strategies_shouldenter_rate = 0;
+    public double strategies_shouldexit_rate = 0;
 
-    float rating = 0;
-    float rating_inc = 0;
+    public float rating = 0;
+    public float rating_inc = 0;
     
     public void calculateRating() {
         rating = 0;

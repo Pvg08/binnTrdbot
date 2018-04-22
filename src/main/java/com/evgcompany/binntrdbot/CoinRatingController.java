@@ -10,6 +10,7 @@ import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.JsonReader;
+import com.evgcompany.binntrdbot.signal.SignalOrderController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.io.Closeable;
 import java.io.IOException;
@@ -630,7 +631,6 @@ public class CoinRatingController extends PeriodicProcessThread {
         need_stop = false;
         paused = false;
         have_all_coins_info = false;
-        signalOrderController.start();
 
         doWait(1000);
 
@@ -643,6 +643,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         coinsPattern = String.join("|", accountCoins);
 
         updateCurrentPrices();
+        signalOrderController.start();
         
         while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
             doWait(1000);

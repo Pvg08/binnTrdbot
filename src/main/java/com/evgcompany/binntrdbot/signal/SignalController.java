@@ -5,6 +5,9 @@
  */
 package com.evgcompany.binntrdbot.signal;
 
+import com.evgcompany.binntrdbot.CoinRatingController;
+import com.evgcompany.binntrdbot.analysis.OHLC4Indicator;
+import com.evgcompany.binntrdbot.analysis.TimeSeriesManagerForIndicator;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.strategies.StrategySignal;
@@ -18,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -35,7 +39,6 @@ import org.ta4j.core.Decimal;
 import org.ta4j.core.Order;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.TimeSeries;
-import org.ta4j.core.TimeSeriesManager;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.analysis.criteria.NumberOfBarsCriterion;
 import org.ta4j.core.analysis.criteria.TotalProfitCriterion;
@@ -50,36 +53,48 @@ import org.zeroturnaround.exec.stream.LogOutputStream;
  */
 public class SignalController extends Thread {
 
-    private class ChannelStat {
+    private class SignalsStat {
         int signals_cnt = 0;                // all signals for channel (even with wrong symbols)
         int ok_signals = 0;                 // signals with aceptable params
         int skipped_signals = 0;            // too old (>SKIP_DAYS) or > 1000 bars
-        int done_signals = 0;               // signals that reached target from price1-2
+        int done_signals = 0;               // signals that reached target from price1-2 (mainorder)
+        int done_signals_fast = 0;          // signals that reached target from price1-2 (fastorder)
         int waiting_exit_signals = 0;       // not too old, target not reached, stoploss not reached
         int waiting_enter_signals = 0;      // not too old, not entered
-        int timeout_signals = 0;            // waiting which are old (>MAX_DAYS)
+        int timeout_signals = 0;            // waiting enter/exit which are old (>MAX_DAYS)
         int too_high_price_at_start = 0;    // start price > price2 or even target
+        int done_price_at_start = 0;        // price > target
         int stoploss_signals = 0;           // (trailing) stoploss reached
         int stoploss_done_signals = 0;      // (trailing) stoploss reached then done
         int price1_not_set = 0;
         int price2_not_set = 0;
         int price_target_not_set = 0;
+        int price_stop_not_set = 0;
         int copy_signals = 0;               // count copies from other channels
         long done_millis_diff_summ = 0;
         long copy_millis_diff_summ = 0;
         double done_summ_percent = 0;
+        long done_millis_diff_summ_fast = 0;
+        double done_summ_percent_fast = 0;
         double summ_percent = 0;
+        double summ_percent_fast = 0;
         double summ_rating = 0;
+        double avg_day_signal_profit = 0;
+        double recommended_rating = 0;
         Set<Integer> used_regexps = new HashSet<>();
         Set<String> copy_sources = new HashSet<>();
     }
-    private final HashMap<String, ChannelStat> channel_stats = new HashMap<>();
+    private final HashMap<String, SignalsStat> channel_stats = new HashMap<>();
+    private final HashMap<Integer, SignalsStat> regex_stats = new HashMap<>();
     private final Set<Integer> channel_used_regexps = new HashSet<>();
+    
+    private final HashMap<String, List<Bar>> pair_bars = new HashMap<>();
     
     private final int MAX_DAYS = 6;
     private final int SKIP_DAYS = 30;
     private int STOPLOSS_PERCENT = 10;
     private final int NO_SIGNAL_MINUTES_TO_RESTART = 360;
+    private CoinRatingController coinRatingController = null;
 
     private TradingAPIAbstractInterface client = null;
     private String signalsListenerFile;
@@ -243,6 +258,7 @@ public class SignalController extends Thread {
                 if (isChecking) {
                     stopSignalsProcess();
                 } else {
+                    pair_bars.clear();
                     logStats();
                 }
             }
@@ -271,64 +287,88 @@ public class SignalController extends Thread {
         }
     }
     
+    private void showStatInfo(SignalsStat stat) {
+        long avg_time = 0;
+        double avg_done_percent = 0;
+        long avg_time_fast = 0;
+        double avg_done_percent_fast = 0;
+        double avg_percent = 0;
+        double avg_percent_fast = 0;
+        double avg_rating = 0;
+        double avg_copy_diff = 0;
+        if (stat.done_signals > 0) {
+            avg_time = stat.done_millis_diff_summ / stat.done_signals;
+            avg_done_percent = stat.done_summ_percent / stat.done_signals;
+        }
+        if (stat.done_signals_fast > 0) {
+            avg_time_fast = stat.done_millis_diff_summ_fast / stat.done_signals_fast;
+            avg_done_percent_fast = stat.done_summ_percent_fast / stat.done_signals_fast;
+        }
+        if (stat.ok_signals > 0) {
+            avg_percent = stat.summ_percent / stat.ok_signals;
+            avg_percent_fast = stat.summ_percent_fast / stat.ok_signals;
+            avg_rating = stat.summ_rating / stat.ok_signals;
+        }
+        if (stat.copy_signals > 0) {
+            avg_copy_diff = stat.copy_millis_diff_summ / stat.copy_signals;
+        }
+        mainApplication.getInstance().log(
+            "All / Skipped / Normal Signals count: " + stat.signals_cnt + " / " + stat.skipped_signals + " / " + stat.ok_signals + "\n" +
+            "Signals with current price > price2 / price > target at start: " + stat.too_high_price_at_start + " / " + stat.done_price_at_start + "\n" +
+            "Waiting for enter / exit signals: " + stat.waiting_enter_signals + " / " + stat.waiting_exit_signals + "\n" + 
+            "Timeout signals (waiting for more than "+MAX_DAYS+"d): " + stat.timeout_signals + "\n" +
+            "Stoploss signals (default: -"+STOPLOSS_PERCENT+"%): " + stat.stoploss_signals + "\n" +
+            "Stoploss then done signals: " + stat.stoploss_done_signals + "\n" + 
+            "Signals without price1 / price2 / target / stoploss: " + stat.price1_not_set + " / " + stat.price2_not_set + " / " + stat.price_target_not_set + " / " + stat.price_stop_not_set + "\n" + 
+            "Done signals (main / fast): " + stat.done_signals + " / " + stat.done_signals_fast + "\n" + 
+            "Done signals avg time (main / fast): " + df8.format(avg_time / 86400000.0) + " / " + df8.format(avg_time_fast / 86400000.0) + " day.\n" + 
+            "Done signals avg percent profit (main / fast): " + df8.format(avg_done_percent) + " / " + df8.format(avg_done_percent_fast) + "%\n" + 
+            "Avg signal profit (main / fast): " + df8.format(avg_percent) + " / " + df8.format(avg_percent_fast) + "%\n" + 
+            "Avg rating: " + df8.format(avg_rating) + "\n" + 
+            "Copy avg interval: " + df8.format(avg_copy_diff / 60000) + " min.\n" + 
+            "Copy signals: " + stat.copy_signals + "\n" + 
+            "Channel copy sources: " + stat.copy_sources + "\n" + 
+            "Channel regexp_ids: " + stat.used_regexps + "\n" + 
+            "Average day signal profit: " + df8.format(stat.avg_day_signal_profit) + "%\n" + 
+            "Recommended rating: " + df8.format(stat.recommended_rating) + "\n" + 
+            "\n"
+        );
+    }
+    
     private void logStats() {
         checkSignalItems();
+        calculateRecommendedRatings(channel_stats.values());
+        calculateRecommendedRatings(regex_stats.values());
         mainApplication.getInstance().log("");
         mainApplication.getInstance().log("Channel stats:\n");
-        for (Map.Entry<String, ChannelStat> entry : channel_stats.entrySet()) {
+        for (Map.Entry<String, SignalsStat> entry : channel_stats.entrySet()) {
             if (!entry.getKey().isEmpty() && !entry.getKey().equals("-")) {
-                long avg_time = 0;
-                double avg_done_percent = 0;
-                double avg_percent = 0;
-                double avg_rating = 0;
-                double avg_copy_diff = 0;
-                if (entry.getValue().done_signals > 0) {
-                    avg_time = entry.getValue().done_millis_diff_summ / entry.getValue().done_signals;
-                    avg_done_percent = entry.getValue().done_summ_percent / entry.getValue().done_signals;
-                }
-                if (entry.getValue().ok_signals > 0) {
-                    avg_percent = entry.getValue().summ_percent / entry.getValue().ok_signals;
-                    avg_rating = entry.getValue().summ_rating / entry.getValue().ok_signals;
-                }
-                if (entry.getValue().copy_signals > 0) {
-                    avg_copy_diff = entry.getValue().copy_millis_diff_summ / entry.getValue().copy_signals;
-                }
-                mainApplication.getInstance().log(
-                    "Channel '" + entry.getKey() + "' Stats:\n" +
-                    "Signals count: " + entry.getValue().signals_cnt + "\n" +
-                    "Normal signals: " + entry.getValue().ok_signals + "\n" +
-                    "Skipped signals (default: "+SKIP_DAYS+"d): " + entry.getValue().skipped_signals + "\n" +
-                    "Signals with price > price2 at start: " + entry.getValue().too_high_price_at_start + "\n" +
-                    "Timeout signals ("+MAX_DAYS+"d): " + entry.getValue().timeout_signals + "\n" +
-                    "Waiting for enter signals: " + entry.getValue().waiting_enter_signals + "\n" + 
-                    "Waiting for exit signals: " + entry.getValue().waiting_exit_signals + "\n" + 
-                    "Stoploss signals (default: -"+STOPLOSS_PERCENT+"%): " + entry.getValue().stoploss_signals + "\n" +
-                    "Stoploss then done signals: " + entry.getValue().stoploss_done_signals + "\n" + 
-                    "Signals without price1: " + entry.getValue().price1_not_set + "\n" + 
-                    "Signals without price2: " + entry.getValue().price2_not_set + "\n" + 
-                    "Signals without target: " + entry.getValue().price_target_not_set + "\n" + 
-                    "Channel avg rating: " + df8.format(avg_rating) + "\n" + 
-                    "Done signals: " + entry.getValue().done_signals + "\n" + 
-                    "Done signals avg time: " + df8.format(avg_time / 86400000.0) + " day.\n" + 
-                    "Done signals avg percent profit: " + df8.format(avg_done_percent) + "%\n" + 
-                    "Channel avg signal profit: " + df8.format(avg_percent) + "%\n" + 
-                    "Copy signals: " + entry.getValue().copy_signals + "\n" + 
-                    "Channel copy sources: " + entry.getValue().copy_sources + "\n" + 
-                    "Channel copy avg interval: " + df8.format(avg_copy_diff / 60000) + " min.\n" + 
-                    "Channel regexp_ids: " + entry.getValue().used_regexps + "\n" + 
-                    "\n"
-                );
+                mainApplication.getInstance().log("Channel '" + entry.getKey() + "' Stats:");
+                showStatInfo(entry.getValue());
             }
         }
         mainApplication.getInstance().log("Set of all channels regexp_ids: " + channel_used_regexps.toString());
         mainApplication.getInstance().log("");
+        mainApplication.getInstance().log("");
+        mainApplication.getInstance().log("Regex stats:\n");
+        for (Map.Entry<Integer, SignalsStat> entry : regex_stats.entrySet()) {
+            if (entry.getKey() > 0) {
+                mainApplication.getInstance().log("Regex '" + entry.getKey() + "' Stats:");
+                showStatInfo(entry.getValue());
+            }
+        }
+        mainApplication.getInstance().log("");
     }
     
     private Double alignPrice(Double price, Double current) {
-        while (Math.abs(price - current) / current > 5) {
-            price *= 0.1;
+        if (price > 0 && current > 0) {
+            int i = 0;
+            while ((++i < 20) && (Math.abs(price - current) / current > 5)) {
+                price *= 0.1;
+            }
+            return price;
         }
-        return price;
+        return 0.0;
     }
     
     private int getMillisIndex(List<Bar> bars, long millisFrom) {
@@ -354,20 +394,34 @@ public class SignalController extends Thread {
     }
     
     private void addSignal(String symbol1, String symbol2, LocalDateTime datetime, double rating, Double price1, Double price2, Double price_target, Double price_stoploss, int exp_id, String title) {
+        SignalsStat chstat = null;
+        SignalsStat rxstat = null;
         if (title != null && !title.isEmpty()) {
-            ChannelStat stat;
             if (!channel_stats.containsKey(title)) {
-                stat = new ChannelStat();
-                channel_stats.put(title, stat);
+                chstat = new SignalsStat();
+                channel_stats.put(title, chstat);
             } else {
-                stat = channel_stats.get(title);
+                chstat = channel_stats.get(title);
             }
-            stat.signals_cnt++;
-            stat.used_regexps.add(exp_id);
-            
-            if (price1 == null) stat.price1_not_set++;
-            if (price2 == null) stat.price2_not_set++;
-            if (price_target == null) stat.price_target_not_set++;
+        }
+        if (exp_id > 0) {
+            if (!regex_stats.containsKey(exp_id)) {
+                rxstat = new SignalsStat();
+                regex_stats.put(exp_id, rxstat);
+            } else {
+                rxstat = regex_stats.get(exp_id);
+            }
+        }
+        SignalsStat stats[] = {chstat, rxstat};
+        for (SignalsStat stat : stats) {
+            if (stat != null) {
+                stat.signals_cnt++;
+                if (price1 == null) stat.price1_not_set++;
+                if (price2 == null) stat.price2_not_set++;
+                if (price_target == null) stat.price_target_not_set++;
+                if (price_stoploss == null) stat.price_stop_not_set++;
+                stat.used_regexps.add(exp_id);
+            }
         }
         channel_used_regexps.add(exp_id);
         if (symbol1 == null || symbol1.isEmpty() || datetime == null || rating == 0 || (price_target == null && price1 == null && price2 == null)) {
@@ -378,19 +432,33 @@ public class SignalController extends Thread {
         }
         symbol1 = symbol1.toUpperCase();
         symbol2 = symbol2.toUpperCase();
+        String symbol_pair = symbol1 + symbol2;
+        if (coinRatingController != null && !coinRatingController.getCoinRatingMap().isEmpty() && !coinRatingController.getCoinRatingMap().containsKey(symbol_pair)) {
+            return;
+        }
         List<Bar> bars = null;
-        try {
-            bars = client.getBars(symbol1 + symbol2, "15m");
-        } catch(Exception e) {}
+        double barMinutes = 15;
+        if (!initialSignalsIsLoaded && pair_bars.containsKey(symbol_pair)) {
+            bars = pair_bars.get(symbol_pair);
+        }
+        if (bars == null) {
+            try {
+                bars = client.getBars(symbol_pair, "15m");
+                if (!initialSignalsIsLoaded) {
+                    pair_bars.put(symbol_pair, bars);
+                }
+            } catch(Exception e) {}
+        }
+        
         if (bars == null || bars.isEmpty()) {
             return;
         }
 
-        ChannelStat stat = channel_stats.get(title);
-        
         boolean is_skipped = LocalDateTime.now().minusDays(SKIP_DAYS).isAfter(datetime) || datetime.isBefore(bars.get(0).getBeginTime().toLocalDateTime());
-        if (is_skipped && stat != null) {
-            stat.skipped_signals++;
+        if (is_skipped) {
+            for (SignalsStat stat : stats) {
+                if (stat != null) stat.skipped_signals++;
+            }
             return;
         }
 
@@ -443,6 +511,19 @@ public class SignalController extends Thread {
         }
         price_stoploss = alignPrice(price_stoploss, currPrice);
 
+        if (price1 > enter_price * 2.5
+                || price2 > enter_price * 3.0
+                || price_target > enter_price * 3.5
+                || price1 < enter_price / 2.5
+                || price2 < enter_price / 2.0
+                || price_target < enter_price / 1.5) {
+            System.out.println("Signal " + symbol_pair + ": suspicious prices. Skipping...");
+            for (SignalsStat stat : stats) {
+                if (stat != null) stat.skipped_signals++;
+            }
+            return;
+        }
+
         if (price1 > price_target) {
             price1 = price_target * 0.9;
             price1_a = true;
@@ -470,42 +551,61 @@ public class SignalController extends Thread {
         double max_order_price = (price2*90+price_target*10)/100;
         
         boolean is_done = false;
+        boolean is_done_fast = false;
         boolean is_waiting_exit = false;
+        boolean is_waiting_exitF = false;
+        boolean is_waiting_exitNS = false;
         boolean is_waiting_enter = false;
         boolean is_stop_loss = false;
         boolean is_stop_loss_done = false;
         boolean is_price_too_high = enter_price >= max_order_price;
-        boolean is_timeout = LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
+        boolean is_done_at_start = enter_price >= price_target;
+        boolean is_timeout = false;
         
-        if (millis_index  >= 0 && millis_index < bars.size()) {
+        if (is_done_at_start) {
+            for (SignalsStat stat : stats) {
+                if (stat != null) stat.done_price_at_start++;
+            }
+            is_done = true;
+            is_timeout = true;
+        } else if (millis_index  >= 0 && millis_index < bars.size()) {
             TimeSeries series = new BaseTimeSeries("STAT_SERIES");
             TradingAPIAbstractInterface.addSeriesBars(series, bars);
             TotalProfitCriterion profitCriterion = new TotalProfitCriterion();
             NumberOfBarsCriterion barsCountCriterion = new NumberOfBarsCriterion();
+            OHLC4Indicator indicator = new OHLC4Indicator(series);
 
             Strategy strategy_main = getSignalStrategy(series, false, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
             Strategy strategy_fast = getSignalStrategy(series, true, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
             Strategy strategy_fast_nostop = getSignalStrategy(series, true, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), BigDecimal.ZERO);
-            TimeSeriesManager seriesManager = new TimeSeriesManager(series);
+            TimeSeriesManagerForIndicator seriesManager = new TimeSeriesManagerForIndicator(series, indicator);
             TradingRecord tradingRecordMain = seriesManager.run(strategy_main, Order.OrderType.BUY, millis_index, series.getEndIndex());
             TradingRecord tradingRecordFast = seriesManager.run(strategy_fast, Order.OrderType.BUY, millis_index, series.getEndIndex());
             TradingRecord tradingRecordFastNS = seriesManager.run(strategy_fast_nostop, Order.OrderType.BUY, millis_index, series.getEndIndex());
 
             System.out.println();
-            System.out.println(symbol1+symbol2+" " + datetime + " " + df8.format(price1)+" " + df8.format(price2)+" " + df8.format(price_target)+" " + df8.format(price_stoploss) + "    " + millis_index + "/" + bars.size() + " -- " + bars.get(millis_index).getBeginTime());
+            System.out.println(symbol_pair+" " + datetime + " " + df8.format(price1)+" " + df8.format(price2)+" " + df8.format(price_target)+" " + df8.format(price_stoploss) + "    " + millis_index + "/" + bars.size() + " -- " + bars.get(millis_index).getBeginTime());
             
-            if (tradingRecordMain.getLastEntry() != null && tradingRecordMain.getLastExit() == null) {
-                tradingRecordMain.exit(series.getEndIndex(), series.getLastBar().getClosePrice(), Decimal.NaN);
-                System.out.println("Close main order on last index.");
-                is_waiting_exit = true;
-            }
-            if (tradingRecordFast.getLastEntry() != null && tradingRecordFast.getLastExit() == null) {
-                tradingRecordFast.exit(series.getEndIndex(), series.getLastBar().getClosePrice(), Decimal.NaN);
-                System.out.println("Close fast order on last index.");
-            }
-            if (tradingRecordFastNS.getLastEntry() != null && tradingRecordFastNS.getLastExit() == null) {
-                tradingRecordFastNS.exit(series.getEndIndex(), series.getLastBar().getClosePrice(), Decimal.NaN);
-                System.out.println("Close fast NS order on last index.");
+            if (millis_index < series.getEndIndex()) {
+                if (tradingRecordMain.getLastEntry() != null && tradingRecordMain.getLastExit() == null) {
+                    tradingRecordMain.exit(series.getEndIndex(), indicator.getValue(series.getEndIndex()), Decimal.NaN);
+                    System.out.println("Close main order on last index.");
+                    is_waiting_exit = true;
+                }
+                if (tradingRecordFast.getLastEntry() != null && tradingRecordFast.getLastExit() == null) {
+                    tradingRecordFast.exit(series.getEndIndex(), indicator.getValue(series.getEndIndex()), Decimal.NaN);
+                    System.out.println("Close fast order on last index.");
+                    is_waiting_exitF = true;
+                }
+                if (tradingRecordFastNS.getLastEntry() != null && tradingRecordFastNS.getLastExit() == null) {
+                    tradingRecordFastNS.exit(series.getEndIndex(), indicator.getValue(series.getEndIndex()), Decimal.NaN);
+                    System.out.println("Close fast NS order on last index.");
+                    is_waiting_exitNS = true;
+                }
+            } else {
+                if (tradingRecordMain.getTradeCount() > 0) tradingRecordMain.getTrades().clear();
+                if (tradingRecordFast.getTradeCount() > 0) tradingRecordFast.getTrades().clear();
+                if (tradingRecordFastNS.getTradeCount() > 0) tradingRecordFastNS.getTrades().clear();
             }
             
             double profit_main = profitCriterion.calculate(series, tradingRecordMain);
@@ -524,32 +624,45 @@ public class SignalController extends Thread {
             System.out.println();
             
             is_waiting_enter = tradingRecordMain.getTradeCount() == 0;
-            is_done = !is_price_too_high && !is_waiting_enter && !is_waiting_exit && profit_main > 1;
-            is_stop_loss = !is_price_too_high && !is_waiting_enter && !is_waiting_exit && profit_main < 1;
-            is_stop_loss_done = !is_price_too_high && !is_waiting_enter && !is_waiting_exit && barscnt_fast < 1 && profit_fastNS > 1;
-
-            if (stat != null) {
-                stat.ok_signals++;
-                if (is_done) stat.done_signals++;
-                if (is_stop_loss) stat.stoploss_signals++;
-                if (is_price_too_high) stat.too_high_price_at_start++;
-                if (is_timeout) stat.timeout_signals++;
-                if (is_waiting_exit) stat.waiting_exit_signals++;
-                if (is_waiting_enter) stat.waiting_enter_signals++;
-                if (is_stop_loss_done) stat.stoploss_done_signals++;
-                if (is_done) {
-                    stat.done_millis_diff_summ += barscnt_main * 15 * 60 * 1000;
-                    stat.done_summ_percent += 100*(profit_main-1);
-                }
-                stat.summ_percent += 100*(profit_main-1);
-                stat.summ_rating += rating;
-            }
+            is_done = !is_waiting_enter && !is_waiting_exit && profit_main > 1;
+            is_done_fast = !is_waiting_exitF && profit_fast > 1;
+            is_stop_loss = !is_waiting_enter && !is_waiting_exit && profit_main < 1;
+            is_stop_loss_done = !is_waiting_exitF && !is_waiting_exitNS && barscnt_fast < 1 && profit_fastNS > 1;
+            is_timeout = (is_waiting_enter || is_waiting_exit) && LocalDateTime.now().minusDays(MAX_DAYS).isAfter(datetime);
+            is_timeout = is_timeout || (!is_waiting_enter && !is_waiting_exit && barscnt_main > MAX_DAYS * 24 * 60 / barMinutes);
             
+            for (SignalsStat stat : stats) {
+                if (stat != null) {
+                    stat.ok_signals++;
+                    if (is_done) stat.done_signals++;
+                    if (is_done_fast) stat.done_signals_fast++;
+                    if (is_stop_loss) stat.stoploss_signals++;
+                    if (is_price_too_high) stat.too_high_price_at_start++;
+                    if (is_timeout) stat.timeout_signals++;
+                    if (is_waiting_exit) stat.waiting_exit_signals++;
+                    if (is_waiting_enter) stat.waiting_enter_signals++;
+                    if (is_stop_loss_done) stat.stoploss_done_signals++;
+                    if (is_done) {
+                        stat.done_millis_diff_summ += barscnt_main * barMinutes * 60 * 1000;
+                        stat.done_summ_percent += 100*(profit_main-1);
+                    }
+                    if (is_done_fast) {
+                        stat.done_millis_diff_summ_fast += barscnt_fast * barMinutes * 60 * 1000;
+                        stat.done_summ_percent_fast += 100*(profit_fast-1);
+                    }
+                    stat.summ_percent += 100*(profit_main-1);
+                    stat.summ_percent_fast += 100*(profit_fast-1);
+                    stat.summ_rating += rating;
+                }
+            }
+
         } else {
             System.out.println();
             System.out.println(millis_index);
             System.out.println();
-            if (stat != null) stat.skipped_signals++;
+            for (SignalsStat stat : stats) {
+                if (stat != null) stat.skipped_signals++;
+            }
         }
         
         SignalItem s = new SignalItem();
@@ -581,22 +694,93 @@ public class SignalController extends Thread {
         
         mainApplication.getInstance().log(
             "Signal "
-            + symbol1 + symbol2 + " from " 
+            + symbol_pair + " from " 
             + datetime.format(df) + " (channel = '"+title+"') " 
             + "rating = " + rating + "; "
             + df8.format(price1) + " - " 
             + df8.format(price2) + " ===> " 
             + df8.format(price_target)
             + "; Stoploss: " + df8.format(price_stoploss) + " : "
-            + (is_done ? "DONE" : (is_timeout ? "TIMEOUT" : "WAITING")) + " "
+            + (is_done ? "DONE " : " ")
+            + (is_stop_loss ? "STOP " : " ")
+            + (is_timeout ? "TIMEOUT " : "")
+            + (is_waiting_enter ? "WAIT_ENTER " : "")
+            + (is_waiting_exit ? "WAIT_EXIT " : "")
             + (is_copy ? "COPY" : "")
         );
         
-        if (signalEvent != null && !is_copy && initialSignalsIsLoaded) {
+        if (signalEvent != null && !is_copy) {
             signalEvent.onUpdate(s, getPairSignalRating(s.getPair()));
         }
     }
 
+    private void calculateRecommendedRatings(Collection<SignalsStat> stats) {
+        double min_avg_day_profit = Integer.MAX_VALUE;
+        double max_avg_day_profit = Integer.MIN_VALUE;
+        double min_ok_signals = Integer.MAX_VALUE;
+        double max_ok_signals = Integer.MIN_VALUE;
+        
+        for (SignalsStat stat : stats) {
+            long avg_time = 0;
+            long avg_time_fast = 0;
+            double avg_percent = 0;
+            double avg_percent_fast = 0;
+            double avg_day_signal_profit = 0;
+            if (stat.done_signals > 0) {
+                avg_time = stat.done_millis_diff_summ / stat.done_signals;
+            }
+            if (stat.done_signals_fast > 0) {
+                avg_time_fast = stat.done_millis_diff_summ_fast / stat.done_signals_fast;
+            }
+            if (stat.ok_signals > 0) {
+                avg_percent = stat.summ_percent / stat.ok_signals;
+                avg_percent_fast = stat.summ_percent_fast / stat.ok_signals;
+                if (avg_time > 0) {
+                    avg_day_signal_profit = avg_percent / ((double) avg_time / ((double) 1000 * 60 * 60 * 24));
+                } else if (avg_time_fast > 0) {
+                    avg_day_signal_profit = avg_percent_fast / ((double) avg_time_fast / ((double) 1000 * 60 * 60 * 24));
+                } else {
+                    avg_day_signal_profit = avg_percent;
+                }
+            }
+            stat.avg_day_signal_profit = avg_day_signal_profit;
+            if (min_ok_signals > stat.ok_signals) min_ok_signals = stat.ok_signals;
+            if (max_ok_signals < stat.ok_signals) max_ok_signals = stat.ok_signals;
+            if (min_avg_day_profit > avg_day_signal_profit) min_avg_day_profit = avg_day_signal_profit;
+            if (max_avg_day_profit < avg_day_signal_profit) max_avg_day_profit = avg_day_signal_profit;
+            stat.recommended_rating = 5;
+        }
+
+        if (max_ok_signals <= 0 || max_avg_day_profit <= -100) {
+            return;
+        }
+        
+        double avg_for_sub_half = min_avg_day_profit*0.75 + max_avg_day_profit * 0.25;
+        double avg_for_add_half = min_avg_day_profit*0.25 + max_avg_day_profit * 0.75;
+        double avg_diff = max_avg_day_profit - min_avg_day_profit;
+        
+        double ok_for_min = 5;
+        
+        for (SignalsStat stat : stats) {
+            if (stat.ok_signals <= ok_for_min && stat.avg_day_signal_profit < avg_for_sub_half) {
+                stat.recommended_rating = 2;
+            } else if (stat.ok_signals <= ok_for_min && stat.avg_day_signal_profit > avg_for_add_half) {
+                stat.recommended_rating = 7;
+            } else if (stat.ok_signals > ok_for_min) {
+                stat.recommended_rating = 9 * ((stat.avg_day_signal_profit - min_avg_day_profit) / avg_diff) + 1;
+            }
+            if (stat.ok_signals > 0) {
+                if (stat.stoploss_signals < 0.2 * stat.ok_signals) stat.recommended_rating += 1;
+                if (stat.stoploss_signals < 0.05 * stat.ok_signals) stat.recommended_rating += 1;
+                if (stat.stoploss_signals > 0.4 * stat.ok_signals) stat.recommended_rating -= 1;
+                if (stat.stoploss_signals > 0.6 * stat.ok_signals) stat.recommended_rating -= 1;
+                if (stat.stoploss_signals > 0.8 * stat.ok_signals) stat.recommended_rating -= 1;
+            }
+            if (stat.recommended_rating < 1) stat.recommended_rating = 1;
+            else if (stat.recommended_rating > 10) stat.recommended_rating = 10;
+        }
+    }
+    
     private void checkSignalItems() {
         List<SignalItem> to_remove = new ArrayList<>(0);
         for(int i=0; i < items.size(); i++) {
@@ -740,5 +924,19 @@ public class SignalController extends Thread {
      */
     public void setPreloadCount(int preload_count) {
         this.preload_count = preload_count;
+    }
+
+    /**
+     * @return the coinRatingController
+     */
+    public CoinRatingController getCoinRatingController() {
+        return coinRatingController;
+    }
+
+    /**
+     * @param coinRatingController the coinRatingController to set
+     */
+    public void setCoinRatingController(CoinRatingController coinRatingController) {
+        this.coinRatingController = coinRatingController;
     }
 }

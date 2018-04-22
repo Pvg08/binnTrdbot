@@ -19,6 +19,7 @@ class ChannelBlock(object):
         self.name = ''
         self.title = ''
         self.id = 0
+        self.rating = 0
         self.entity = None
 
 class RegBlock(object):
@@ -59,10 +60,12 @@ class SignalRow(object):
             self.sort = self.sort + 1.0
         if self.coin2:
             self.sort = self.sort + 0.75
-        self.sort = self.sort + self.rating / 20.0
+        if self.price_stoploss:
+            self.sort = self.sort + 0.5
+        self.sort = self.sort + self.rating / 50.0
 
     def __repr__(self):
-        return str(self.rating) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + self.price_stoploss + ';' + str(self.index) + ";" + str(self.title)
+        return str("%.2f" % round(float(self.rating),2)) + ";" + self.date + ";" + self.coin + ";" + self.coin2 + ";" + self.price_from + ";" + self.price_to + ";" + self.price_target + ';' + self.price_stoploss + ';' + str(self.index) + ";" + str(self.title)
 
 def enable_win_unicode_console():
     if sys.version_info >= (3, 6):
@@ -135,7 +138,7 @@ def numFix(txt):
         txt = ''
     return txt
 
-def separateCheck(txt, title, date, client):
+def separateCheck(txt, title, channel_rating, date, client):
     if (txt is None) or (txt == ''):
         return
 
@@ -154,15 +157,15 @@ def separateCheck(txt, title, date, client):
         if parts and len(parts) > 0:
             i = 0
             while i < len(parts):
-                textCheck(parts[i], title, date, client)
+                textCheck(parts[i], title, channel_rating, date, client)
                 i = i + 1
         else:
-            textCheck(txt, title, date, client)
+            textCheck(txt, title, channel_rating, date, client)
     else:
-        textCheck(txt, title, date, client)
+        textCheck(txt, title, channel_rating, date, client)
     return
 
-def textCheck(txt, title, date, client):
+def textCheck(txt, title, channel_rating, date, client):
     global signal_expr
     global log
 
@@ -264,7 +267,7 @@ def textCheck(txt, title, date, client):
                     ri.price_to = price_to
                     ri.price_target = price_target
                     ri.price_stoploss = price_stoploss
-                    ri.rating = signal_expr[i].rating
+                    ri.rating = (0.3*signal_expr[i].rating + 0.7*channel_rating)
                     ri.date = date
                     ri.index = i + 1
                     ri.init_sort()
@@ -301,6 +304,22 @@ def getChannelTitleForEvent(channels, event):
     if not title:
         title = '-'
     return title
+
+def getChannelRatingForEvent(channels, event):
+    try:
+        rating = 0
+        channel_id = event.message.to_id.channel_id
+        if channel_id > 0:
+            i = 0
+            while i < len(channels):
+                if channels[i].entity and channels[i].entity.channel_id and channels[i].entity.channel_id == channel_id:
+                    rating = channels[i].rating
+                i = i + 1
+    except:
+        rating = 0
+    if not rating:
+        rating = 0
+    return rating
 
 def checkCurchan(channel, client, signals_limit):
     chantitle = channel.title
@@ -348,7 +367,7 @@ def checkCurchan(channel, client, signals_limit):
                     msg.text = markdown.unparse(msg.message, msg.entities or [])
                 if msg.text is None and msg.message:
                     msg.text = msg.message
-                separateCheck(msg.text, chantitle, dateFix(msg.date), client)
+                separateCheck(msg.text, chantitle, channel.rating, dateFix(msg.date), client)
 
     return client.get_input_entity(channel_id)
 
@@ -375,6 +394,7 @@ def loadChanDataFromConfig(config):
     default_sell_regex = str(config['channels']['signal_default_target_regex'])
     default_stoploss_regex = str(config['channels']['signal_default_stoploss_regex'])
     default_rating = int(config['channels']['signal_default_rating'])
+    default_channel_rating = int(config['channels']['channel_default_rating'])
 
     chan_index = 1
     cname = ''
@@ -422,6 +442,12 @@ def loadChanDataFromConfig(config):
             newchan.name = cname
             newchan.id = cid
             newchan.title = channel_config['title']
+            try:
+                newchan.rating = int(channel_config['channel_rating'])
+                if newchan.rating <= 0:
+                    newchan.rating = default_channel_rating
+            except:
+                newchan.rating = default_channel_rating
             channels.append(newchan)
             expr_b.name = cname
             expr_b.cid = cid
@@ -536,7 +562,7 @@ def main():
                     log.write(">>>\n")
                     log.write(str(event))
                     log.write("<<<\n")
-                separateCheck(event.text, getChannelTitleForEvent(channels, event), dateFix(event.message.date), client)
+                separateCheck(event.text, getChannelTitleForEvent(channels, event), getChannelRatingForEvent(channels, event), dateFix(event.message.date), client)
         time.sleep(1)
         chan_index = chan_index + 1
 

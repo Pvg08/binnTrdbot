@@ -52,12 +52,20 @@ public class SignalItem {
     }
 
     public double getMedianProfitPercent() {
-        double median_price = price_from.add(price_to).divide(BigDecimal.valueOf(2)).doubleValue();
+        return getPriceProfitPercent(null);
+    }
+    public double getPriceProfitPercent(BigDecimal price) {
+        double median_price;
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            median_price = price_from.add(price_to).divide(BigDecimal.valueOf(2)).doubleValue();
+        } else {
+            median_price = price.doubleValue();
+        }
         double target_price = price_target.doubleValue();
         if (target_price <= 0) {
             target_price = median_price;
         }
-        return (target_price - median_price) / target_price;
+        return 100 * (target_price - median_price) / target_price;
     }
 
     public double getCurrentRating() {

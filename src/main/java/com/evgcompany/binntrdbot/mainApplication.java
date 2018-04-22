@@ -106,6 +106,8 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(checkBoxWalkForward, "auto_walkforward");
         config.addComponent(checkBoxAutoStrategyParams, "auto_strategyparamspick");
         config.addComponent(spinnerSignalRatingMinForOrder, "signal_rating_min_for_order");
+        config.addComponent(spinnerSignalPreloadCount, "signal_preload_count");
+        config.addComponent(spinnerMaxSignalOrders, "signal_max_orders_count");
         config.Load();
     }
     
@@ -271,6 +273,10 @@ public class mainApplication extends javax.swing.JFrame {
         checkboxAutoSignalFastorder = new javax.swing.JCheckBox();
         jLabel24 = new javax.swing.JLabel();
         spinnerSignalRatingMinForOrder = new javax.swing.JSpinner();
+        jLabel25 = new javax.swing.JLabel();
+        spinnerSignalPreloadCount = new javax.swing.JSpinner();
+        jLabel26 = new javax.swing.JLabel();
+        spinnerMaxSignalOrders = new javax.swing.JSpinner();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -871,6 +877,14 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerSignalRatingMinForOrder.setValue(5);
 
+        jLabel25.setText("Preload signals:");
+
+        spinnerSignalPreloadCount.setValue(200);
+
+        jLabel26.setText("Max orders:");
+
+        spinnerMaxSignalOrders.setValue(7);
+
         javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
@@ -893,15 +907,24 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(buttonTlgConnect))
                             .addComponent(jLabel20)))
-                    .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                        .addGroup(jPanel5Layout.createSequentialGroup()
-                            .addComponent(jLabel24)
-                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                            .addComponent(spinnerSignalRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGroup(jPanel5Layout.createSequentialGroup()
-                            .addComponent(checkboxAutoSignalOrder)
-                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                            .addComponent(checkboxAutoSignalFastorder))))
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addGroup(jPanel5Layout.createSequentialGroup()
+                                .addComponent(jLabel24)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerSignalRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(jPanel5Layout.createSequentialGroup()
+                                .addComponent(checkboxAutoSignalOrder)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(checkboxAutoSignalFastorder))
+                            .addGroup(jPanel5Layout.createSequentialGroup()
+                                .addComponent(jLabel25)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerSignalPreloadCount, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addGap(18, 18, 18)
+                        .addComponent(jLabel26)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(spinnerMaxSignalOrders, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(38, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
@@ -923,10 +946,18 @@ public class mainApplication extends javax.swing.JFrame {
                     .addComponent(checkboxAutoSignalOrder)
                     .addComponent(checkboxAutoSignalFastorder))
                 .addGap(18, 18, 18)
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(spinnerMaxSignalOrders, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jLabel26))
+                    .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(jLabel24)
+                        .addComponent(spinnerSignalRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel24)
-                    .addComponent(spinnerSignalRatingMinForOrder, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(106, Short.MAX_VALUE))
+                    .addComponent(jLabel25)
+                    .addComponent(spinnerSignalPreloadCount, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(75, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
@@ -1400,7 +1431,8 @@ public class mainApplication extends javax.swing.JFrame {
             }
             coinRatingController.doStop();
             coinRatingController.getSignalOrderController().doStop();
-            while (coinRatingController.isAlive() || coinRatingController.getSignalOrderController().isAlive()) {
+            int i = 0;
+            while (++i < 20 && (coinRatingController.isAlive() || coinRatingController.getSignalOrderController().isAlive())) {
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException ex) {
@@ -1459,6 +1491,8 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setMaxEnter((Integer) spinnerRatingMaxOrders.getValue());
         coinRatingController.setMinRatingForOrder((Integer) spinnerRatingMinForOrder.getValue());
         coinRatingController.getSignalOrderController().setMinSignalRatingForOrder((Integer) spinnerSignalRatingMinForOrder.getValue());
+        coinRatingController.getSignalOrderController().getSignalController().setPreloadCount((Integer) spinnerSignalPreloadCount.getValue());
+        coinRatingController.getSignalOrderController().setMaxEnter((Integer) spinnerMaxSignalOrders.getValue());
         coinRatingController.setSecondsOrderEnterWait((Integer) spinnerRatingMaxOrderWait.getValue());
         coinRatingController.setProgressBar(progressBarRatingAnalPercent);
         comboBoxRatingSortActionPerformed(null);
@@ -1635,6 +1669,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel22;
     private javax.swing.JLabel jLabel23;
     private javax.swing.JLabel jLabel24;
+    private javax.swing.JLabel jLabel25;
+    private javax.swing.JLabel jLabel26;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -1665,12 +1701,14 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JProgressBar progressBarRatingAnalPercent;
     private javax.swing.JSpinner spinnerBuyPercent;
     private javax.swing.JSpinner spinnerBuyStopLimited;
+    private javax.swing.JSpinner spinnerMaxSignalOrders;
     private javax.swing.JSpinner spinnerRatingMaxOrderWait;
     private javax.swing.JSpinner spinnerRatingMaxOrders;
     private javax.swing.JSpinner spinnerRatingMinForOrder;
     private javax.swing.JSpinner spinnerScanRatingDelayTime;
     private javax.swing.JSpinner spinnerScanRatingUpdateTime;
     private javax.swing.JSpinner spinnerSellStopLimited;
+    private javax.swing.JSpinner spinnerSignalPreloadCount;
     private javax.swing.JSpinner spinnerSignalRatingMinForOrder;
     private javax.swing.JSpinner spinnerStopGain;
     private javax.swing.JSpinner spinnerStopLoss;

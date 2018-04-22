@@ -233,7 +233,7 @@ public class CurrencyPlot extends JFrame {
             marker.setStroke(new BasicStroke(1));
             marker.setPaint(typeIndex==2 ? new Color(255, 189, 145) : new Color(255, 140, 255));
         }
-        marker.setAlpha(0.3f);
+        marker.setAlpha(0.15f);
         mainPlot.addDomainMarker(marker);
     }
     

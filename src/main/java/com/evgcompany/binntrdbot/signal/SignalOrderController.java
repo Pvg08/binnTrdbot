@@ -3,11 +3,10 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot;
+package com.evgcompany.binntrdbot.signal;
 
+import com.evgcompany.binntrdbot.*;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
-import com.evgcompany.binntrdbot.signal.SignalController;
-import com.evgcompany.binntrdbot.signal.SignalItem;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,12 +28,13 @@ public class SignalOrderController extends PeriodicProcessThread {
     private float minSignalRatingForOrder = 4;
     
     private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
-    private int maxEnter = 30;
+    private int maxEnter = 10;
     private int secondsOrderEnterWait = 28800;
     
     public SignalOrderController(CoinRatingController coinRatingController, tradePairProcessController paircontroller) {
         this.coinRatingController = coinRatingController;
         signalcontroller = new SignalController();
+        signalcontroller.setCoinRatingController(coinRatingController);
         this.paircontroller = paircontroller;
     }
     
@@ -42,7 +42,6 @@ public class SignalOrderController extends PeriodicProcessThread {
         String pair = item.getPair();
         if (
             autoSignalOrder && 
-            entered.size() < maxEnter && 
             !coinRatingController.getEntered().containsKey(pair) && 
             !entered.containsKey(pair) && 
             !coinRatingController.getCoinRatingMap().isEmpty() &&
@@ -75,18 +74,20 @@ public class SignalOrderController extends PeriodicProcessThread {
             for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
                 CoinRatingPairLogItem rentered = entry.getValue();
                 if (rentered != null && rentered.pair != null && rentered.pair.isInitialized()) {
+                    boolean is_free = !rentered.pair.isHodling() && 
+                                !rentered.pair.isInLimitOrder() &&
+                                rentered.pair.getFullOrdersCount() == 0;
                     if (    (
-                                !rentered.pair.isTriedBuy() && 
-                                (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
+                                is_free &&
+                                (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000
                             ) || (
-                                !rentered.pair.isTriedBuy() && 
+                                is_free &&
                                 rentered.pair.getLastPrice() != null &&
                                 rentered.pair.getLastPrice().compareTo(BigDecimal.ZERO) > 0 &&
                                 rentered.pair.getSignalItem() != null &&
                                 rentered.pair.getSignalItem().getPriceTarget().compareTo(rentered.pair.getLastPrice()) < 0
                             ) || (
-                                !rentered.pair.isHodling() && 
-                                !rentered.pair.isInLimitOrder() &&
+                                is_free &&
                                 signalcontroller.getPairSignalRating(rentered.pair.getSymbol()) < minSignalRatingForOrder
                             ) || (
                                 rentered.pair.getFullOrdersCount() > 0
@@ -97,7 +98,6 @@ public class SignalOrderController extends PeriodicProcessThread {
                         mainApplication.getInstance().log("Exit from order: " + rentered.pair.getSymbol(), true, true);
                         paircontroller.removePair(rentered.pair.getSymbol());
                         if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0 || !rentered.pair.isTriedBuy()) {
-                            //rentered.fastbuy_skip = true;
                             rentered.rating_inc -= 1;
                         } else {
                             rentered.rating_inc += 0.5;
@@ -108,10 +108,40 @@ public class SignalOrderController extends PeriodicProcessThread {
                     }
                 }
             }
+            if (listRemove.isEmpty() && entered.size() > maxEnter) {
+                String worst_free_pair = getWorstFreeEnteredSignal();
+                if (worst_free_pair != null && !worst_free_pair.isEmpty()) {
+                    mainApplication.getInstance().log("Exit from worst order: " + worst_free_pair, true, true);
+                    paircontroller.removePair(worst_free_pair);
+                    listRemove.add(worst_free_pair);
+                    entered.get(worst_free_pair).pair = null;
+                }
+            }
             listRemove.forEach((entry) -> {
                 entered.remove(entry);
             });
         }
+    }
+    
+    private String getWorstFreeEnteredSignal() {
+        String result = null;
+        double minCrit = 0;
+        for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
+            CoinRatingPairLogItem rentered = entry.getValue();
+            if (rentered != null && rentered.pair != null && rentered.pair.isInitialized() && rentered.pair.getSignalItem() != null) {
+                boolean is_free = !rentered.pair.isHodling()
+                        && !rentered.pair.isInLimitOrder()
+                        && rentered.pair.getFullOrdersCount() == 0;
+                if (is_free) {
+                    double currCrit = rentered.pair.getSignalItem().getCurrentRating()*rentered.pair.getSignalItem().getPriceProfitPercent(rentered.pair.getLastPrice());
+                    if (result == null || minCrit > currCrit) {
+                        result = entry.getKey();
+                        minCrit = currCrit;
+                    }
+                }
+            }
+        }
+        return result;
     }
     
     @Override
@@ -124,6 +154,7 @@ public class SignalOrderController extends PeriodicProcessThread {
                         item.getCurrentRating() > minSignalRatingForOrder/2 && 
                         !item.isDone() && 
                         !item.isTimeout() && 
+                        item.getMillisFromSignalStart() >= 0 &&
                         item.getMillisFromSignalStart() < 240 * 1000
                 ) {
                     signalOrderEnter(item);
