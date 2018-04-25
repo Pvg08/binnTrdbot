@@ -38,8 +38,8 @@ public class SignalOrderController extends PeriodicProcessThread {
         signalcontroller.setCoinRatingController(coinRatingController);
         this.paircontroller = paircontroller;
     }
-    
-    private void signalOrderEnter(SignalItem item) {
+
+    private boolean signalOrderEnter(SignalItem item) {
         String pair = item.getPair();
         if (
             autoSignalOrder && 
@@ -64,12 +64,14 @@ public class SignalOrderController extends PeriodicProcessThread {
                     toenter.pair.setSignalOrder(item);
                     entered.put(pair, toenter);
                     doWait(1000);
+                    return true;
                 }
             }
         }
+        return false;
     }
-    
-    private void checkSignalOrderExit() {
+
+    private void checkSignalOrders() {
         if (entered.size() > 0) {
             List<String> listRemove = new ArrayList<>();
             for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
@@ -105,6 +107,9 @@ public class SignalOrderController extends PeriodicProcessThread {
                         }
                         rentered.calculateRating();
                         listRemove.add(rentered.pair.getSymbol());
+                        if (rentered.pair.getSignalItem() != null && rentered.pair.getFullOrdersCount() > 0) {
+                            rentered.pair.getSignalItem().setAutopick(false);
+                        }
                         rentered.pair = null;
                     }
                 }
@@ -121,9 +126,16 @@ public class SignalOrderController extends PeriodicProcessThread {
             listRemove.forEach((entry) -> {
                 entered.remove(entry);
             });
+        } else if (entered.size() < maxEnter) {
+            SignalItem best_signal = signalcontroller.getBestSignalToReEnter(minSignalRatingForOrder);
+            if (best_signal != null) {
+                if (!signalOrderEnter(best_signal)) {
+                    best_signal.setAutopick(false);
+                }
+            }
         }
     }
-    
+
     private String getWorstFreeEnteredSignal() {
         String result = null;
         double minCrit = 0;
@@ -167,7 +179,7 @@ public class SignalOrderController extends PeriodicProcessThread {
 
     @Override
     protected void runBody() {
-        checkSignalOrderExit();
+        checkSignalOrders();
     }
 
     @Override

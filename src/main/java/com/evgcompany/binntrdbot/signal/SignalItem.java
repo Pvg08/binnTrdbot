@@ -5,6 +5,8 @@
  */
 package com.evgcompany.binntrdbot.signal;
 
+import com.evgcompany.binntrdbot.coinrating.CoinRatingPairLogItem;
+import com.evgcompany.binntrdbot.mainApplication;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -31,6 +33,7 @@ public class SignalItem {
     private boolean price_stoploss_auto;
     private boolean done;
     private boolean timeout;
+    private boolean autopick = true;
     private LocalDateTime datetime;
     private long localMillis;
     private double rating;
@@ -51,6 +54,35 @@ public class SignalItem {
         }
     }
 
+    public void updateDoneAndTimeout() {
+        if (!timeout) turnOffIfNeeded();
+        if (!done) {
+            double cprice = tryGetCurrentPrice(null);
+            done = cprice > price_target.doubleValue();
+        }
+    }
+    
+    public double tryGetCurrentPrice(BigDecimal default_price) {
+        double result;
+        if (default_price == null || default_price.compareTo(BigDecimal.ZERO) <= 0) {
+            CoinRatingPairLogItem logItem = null;
+            if (mainApplication.getInstance().getCoinRatingController() != null &&
+                    mainApplication.getInstance().getCoinRatingController().isAlive() &&
+                    !mainApplication.getInstance().getCoinRatingController().getCoinRatingMap().isEmpty()
+            ) {
+                logItem = mainApplication.getInstance().getCoinRatingController().getCoinRatingMap().get(getPair());
+            }
+            if (logItem != null) {
+                result = logItem.current_price;
+            } else {
+                result = price_from.add(price_to).divide(BigDecimal.valueOf(2)).doubleValue();
+            }
+        } else {
+            result = default_price.doubleValue();
+        }
+        return result;
+    }
+    
     public double getMedianProfitPercent() {
         return getPriceProfitPercent(null);
     }
@@ -377,5 +409,19 @@ public class SignalItem {
                 +df8.format(price_to)+"_"
                 +df8.format(price_target)+"_"
                 +df8.format(price_stoploss)+"_";
+    }
+
+    /**
+     * @return the autopick
+     */
+    public boolean isAutopick() {
+        return autopick;
+    }
+
+    /**
+     * @param autopick the autopick to set
+     */
+    public void setAutopick(boolean autopick) {
+        this.autopick = autopick;
     }
 }

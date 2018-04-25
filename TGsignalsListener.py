@@ -111,7 +111,7 @@ def percentFix(txt, price):
                 numtxt = float(txt)
                 nump = float(price)
                 numtxt = nump * 0.01 * (100-numtxt)
-                txt = str(numtxt).replace(',', '.')
+                txt = str("%.4f" % round(float(numtxt),4)).replace(',', '.')
         else:
             txt = ''
     else:
@@ -379,9 +379,13 @@ def getConfigValue(config, value):
     return result
 
 def fixRegex(txt):
+    global signal_coin1_variants
     global signal_coin2_variants
-    if txt is not None and txt and signal_coin2_variants:
-        txt = txt.replace('__COIN2_VARIANTS__', signal_coin2_variants)
+    if txt is not None and txt:
+        if signal_coin1_variants:
+            txt = txt.replace('__COIN1_VARIANTS__', signal_coin1_variants)
+        if signal_coin2_variants:
+            txt = txt.replace('__COIN2_VARIANTS__', signal_coin2_variants)
     return txt
 
 def loadChanDataFromConfig(config):
@@ -395,6 +399,7 @@ def loadChanDataFromConfig(config):
     default_stoploss_regex = str(config['channels']['signal_default_stoploss_regex'])
     default_rating = int(config['channels']['signal_default_rating'])
     default_channel_rating = int(config['channels']['channel_default_rating'])
+    channels_filter = str(config['channels']['channels_filter'])
 
     chan_index = 1
     cname = ''
@@ -403,6 +408,7 @@ def loadChanDataFromConfig(config):
     last_cid = 0
     while chan_index <= chancount:
         channel_config = config['channel_' + str(chan_index)]
+        channel_title = channel_config['title']
         expr_b = RegBlock()
         expr_b.reg_has = fixRegex(getConfigValue(channel_config, 'signal_has'))
         expr_b.reg_skip = fixRegex(getConfigValue(channel_config, 'signal_skip'))
@@ -441,14 +447,20 @@ def loadChanDataFromConfig(config):
             newchan = ChannelBlock()
             newchan.name = cname
             newchan.id = cid
-            newchan.title = channel_config['title']
+            newchan.title = channel_title
             try:
                 newchan.rating = int(channel_config['channel_rating'])
                 if newchan.rating <= 0:
                     newchan.rating = default_channel_rating
             except:
                 newchan.rating = default_channel_rating
-            channels.append(newchan)
+
+            if channels_filter:
+                if getFirstMatch("("+channels_filter+")", channel_title):
+                    channels.append(newchan)
+            else:
+                channels.append(newchan)
+
             expr_b.name = cname
             expr_b.cid = cid
         else:
@@ -456,6 +468,7 @@ def loadChanDataFromConfig(config):
             expr_b.cid = last_cid
 
         signal_expr.append(expr_b)
+
         chan_index = chan_index + 1
         
     return channels, signal_expr
@@ -482,12 +495,14 @@ def main():
 
     global signal_expr
     global signal_separator
+    global signal_coin1_variants
     global signal_coin2_variants
     global log
 
     if signals_preload < 0:
         signals_preload = int(config['channels']['signals_preload_default'])
     signal_separator = str(config['channels']['signal_separator'])
+    signal_coin1_variants = str(config['channels']['signal_coin1_variants'])
     signal_coin2_variants = str(config['channels']['signal_coin2_variants'])
     debug_mode = int(config['main']['debug_mode']) > 0
     log_file_name = str(config['main']['log_file'])

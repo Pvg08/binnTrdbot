@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot.signal;
 
+import com.evgcompany.binntrdbot.analysis.MaxDipCriterion;
 import com.evgcompany.binntrdbot.analysis.OHLC4Indicator;
 import com.evgcompany.binntrdbot.analysis.TimeSeriesManagerForIndicator;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
@@ -81,6 +82,7 @@ public class SignalController extends Thread {
         double summ_rating = 0;
         double avg_day_signal_profit = 0;
         double recommended_rating = 0;
+        double max_done_dip_summ_percent = 0;
         Set<Integer> used_regexps = new HashSet<>();
         Set<String> copy_sources = new HashSet<>();
     }
@@ -227,7 +229,37 @@ public class SignalController extends Thread {
             mainApplication.getInstance().log(ex.getMessage());
         }
     }
-    
+
+    public SignalItem getBestSignalToReEnter(double min_current_rating) {
+        double best_rating = 0;
+        SignalItem best_item = null;
+        for (SignalItem item : items) {
+            if (item.isAutopick() && !item.isDone() && !item.isTimeout()) {
+                double c_rating = item.getCurrentRating();
+                if (c_rating > min_current_rating) {
+                    if (coinRatingController == null || 
+                        !coinRatingController.isAlive() ||
+                        coinRatingController.getCoinRatingMap().isEmpty() ||
+                        !coinRatingController.getCoinRatingMap().containsKey(item.getPair())
+                    ) {
+                        item.updateDoneAndTimeout();
+                        if (!item.isDone() && !item.isTimeout()) {
+                            if (item.isPriceFromAuto()) c_rating-=0.3;
+                            if (item.isPriceToAuto()) c_rating-=0.2;
+                            if (item.isPriceTargetAuto()) c_rating-=0.3;
+                            if (item.isPriceStoplossAuto()) c_rating-=0.1;
+                            if (best_rating < c_rating) {
+                                best_rating = c_rating;
+                                best_item = item;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return best_item;
+    }
+
     public void inputStr(String str) {
         try {
             OutputStream stdin = signalsProcess.getProcess().getOutputStream();
@@ -295,10 +327,12 @@ public class SignalController extends Thread {
         double avg_percent = 0;
         double avg_percent_fast = 0;
         double avg_rating = 0;
+        double avg_max_done_dip_percent = 0;
         double avg_copy_diff = 0;
         if (stat.done_signals > 0) {
             avg_time = stat.done_millis_diff_summ / stat.done_signals;
             avg_done_percent = stat.done_summ_percent / stat.done_signals;
+            avg_max_done_dip_percent = stat.max_done_dip_summ_percent / stat.ok_signals;
         }
         if (stat.done_signals_fast > 0) {
             avg_time_fast = stat.done_millis_diff_summ_fast / stat.done_signals_fast;
@@ -325,6 +359,7 @@ public class SignalController extends Thread {
             "Done signals avg percent profit (main / fast): " + df8.format(avg_done_percent) + " / " + df8.format(avg_done_percent_fast) + "%\n" + 
             "Avg signal profit (main / fast): " + df8.format(avg_percent) + " / " + df8.format(avg_percent_fast) + "%\n" + 
             "Avg rating: " + df8.format(avg_rating) + "\n" + 
+            "Avg MAX Dip percent: " + df8.format(avg_max_done_dip_percent) + "%\n" + 
             "Copy avg interval: " + df8.format(avg_copy_diff / 60000) + " min.\n" + 
             "Copy signals: " + stat.copy_signals + "\n" + 
             "Channel copy sources: " + stat.copy_sources + "\n" + 
@@ -573,6 +608,7 @@ public class SignalController extends Thread {
             TradingAPIAbstractInterface.addSeriesBars(series, bars);
             TotalProfitCriterion profitCriterion = new TotalProfitCriterion();
             NumberOfBarsCriterion barsCountCriterion = new NumberOfBarsCriterion();
+            MaxDipCriterion maxDipCriterion = new MaxDipCriterion();
             OHLC4Indicator indicator = new OHLC4Indicator(series);
 
             Strategy strategy_main = getSignalStrategy(series, false, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
@@ -614,9 +650,10 @@ public class SignalController extends Thread {
             double barscnt_main = barsCountCriterion.calculate(series, tradingRecordMain);
             double barscnt_fast = barsCountCriterion.calculate(series, tradingRecordFast);
             double barscnt_fastNS = barsCountCriterion.calculate(series, tradingRecordFastNS);
+            double maxdip_main = maxDipCriterion.calculate(series, tradingRecordMain);
             
             System.out.println(tradingRecordMain.getTrades());
-            System.out.println("M  Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount());
+            System.out.println("M  Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount() + "    Maxdip:" + df8.format(maxdip_main)+"%");
             System.out.println(tradingRecordFast.getTrades());
             System.out.println("F  Profit:" + profit_fast + "   Bars:" + barscnt_fast + "   Trades:" + tradingRecordFast.getTradeCount());
             System.out.println(tradingRecordFastNS.getTrades());
@@ -645,6 +682,7 @@ public class SignalController extends Thread {
                     if (is_done) {
                         stat.done_millis_diff_summ += barscnt_main * barMinutes * 60 * 1000;
                         stat.done_summ_percent += 100*(profit_main-1);
+                        stat.max_done_dip_summ_percent += maxdip_main;
                     }
                     if (is_done_fast) {
                         stat.done_millis_diff_summ_fast += barscnt_fast * barMinutes * 60 * 1000;

@@ -671,6 +671,15 @@ public class CoinRatingController extends PeriodicProcessThread {
                             newlog.fastbuy_skip = false;
 
                             String psymbol = symbol.substring(0, symbol.length() - 3).toUpperCase();
+                            if (!coinRanks.containsKey(psymbol)) {
+                                psymbol = symbol.substring(0, 3).toUpperCase();
+                                if (!coinRanks.containsKey(psymbol)) {
+                                    psymbol = symbol.substring(0, 4).toUpperCase();
+                                    if (!coinRanks.containsKey(psymbol)) {
+                                        psymbol = symbol.substring(0, 5).toUpperCase();
+                                    }
+                                }
+                            }
                             if (coinRanks.containsKey(psymbol)) {
                                 newlog.rank = Integer.parseInt(coinRanks.get(psymbol).optString("rank", "9999"));
                                 newlog.market_cap = Float.parseFloat(coinRanks.get(psymbol).optString("market_cap_usd", "0"));
@@ -967,7 +976,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     public boolean isInDownTrend() {
-        return downTrendPercent > upTrendPercent;
+        return downTrendPercent > (2 * upTrendPercent) && downTrendPercent > 1;
     }
     
     /**
