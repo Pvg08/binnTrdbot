@@ -56,9 +56,12 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     private StrategiesController strategiesController = null;
     private SignalOrderController signalOrderController = null;
+    private CoinCycleController coinCycleController = null;
     private boolean lowHold = true;
     private boolean autoOrder = true;
     private boolean autoFastOrder = false;
+    private boolean useSignals = false;
+    private boolean useCycles = false;
 
     private boolean analyzer = false;
     private CoinRatingSort sortby = CoinRatingSort.CR_RANK;
@@ -275,7 +278,9 @@ public class CoinRatingController extends PeriodicProcessThread {
         strategiesController.resetStrategies();
         curr.strategies_shouldenter_rate = strategiesController.getStrategiesEnterRate(6);
         curr.strategies_shouldexit_rate = strategiesController.getStrategiesExitRate(6);
-        curr.signal_rating = (float) signalOrderController.getSignalController().getPairSignalRating(curr.symbol);
+        if (signalOrderController != null) {
+            curr.signal_rating = (float) signalOrderController.getSignalController().getPairSignalRating(curr.symbol);
+        }
         curr.calculateRating();
         curr.last_rating_update_millis = System.currentTimeMillis();
     }
@@ -542,7 +547,10 @@ public class CoinRatingController extends PeriodicProcessThread {
         if (
             autoOrder && 
             entered.size() < maxEnter && 
-            !signalOrderController.getEntered().containsKey(pair) && 
+            (
+                signalOrderController == null ||
+                !signalOrderController.getEntered().containsKey(pair)
+            ) && 
             !entered.containsKey(pair) && 
             !heroesMap.isEmpty()
         ) {
@@ -639,7 +647,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             });
             List<TickerPrice> allPrices = client.getAllPrices();
             if (heroesMap.isEmpty()) {
-                mainApplication.getInstance().log("Found " + allPrices.size() + " prices...");
+                mainApplication.getInstance().log("Found " + allPrices.size() + " pair prices...");
                 mainApplication.getInstance().log("Checking them using pattern: " + coinsPattern);
             }
             allPrices.forEach((price) -> {
@@ -709,12 +717,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
-        
-        /*CoinCycleController ccc = new CoinCycleController(client, paircontroller.getProfitsChecker().getTradeComissionPercent().doubleValue());
-        ccc.setDelayTime(360);
-        ccc.start();
-        return;*/
-        
+
         mainApplication.getInstance().log("CoinRatingController starting...");
         
         loadRatingData();
@@ -733,12 +736,25 @@ public class CoinRatingController extends PeriodicProcessThread {
         });
         coinsPattern = String.join("|", accountCoins);
 
+        if (useCycles) {
+            coinCycleController = new CoinCycleController(client, paircontroller.getProfitsChecker().getTradeComissionPercent().doubleValue());
+            coinCycleController.setDelayTime(360);
+            coinCycleController.start();
+            while (!need_stop && !coinCycleController.isInitializedGraph()) {
+                doWait(1000);
+            }
+        } else {
+            coinCycleController = null;
+        }
+        
         updateCurrentPrices();
         updateGlobalTrendData();
-        signalOrderController.start();
         
-        while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
-            doWait(1000);
+        if (useSignals) {
+            signalOrderController.start();
+            while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
+                doWait(1000);
+            }
         }
         
         if (paircontroller != null && paircontroller.getProfitsChecker() != null && !paircontroller.getProfitsChecker().isTestMode()) {
@@ -776,7 +792,8 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runFinish() {
-        signalOrderController.doStop();
+        if (signalOrderController != null && signalOrderController.isAlive()) signalOrderController.doStop();
+        if (coinCycleController != null && coinCycleController.isAlive()) coinCycleController.doStop();
         if (orderEvent != null) {
             try {
                 orderEvent.close();
@@ -796,7 +813,7 @@ public class CoinRatingController extends PeriodicProcessThread {
 
     public void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
-        signalOrderController.setClient(client);
+        if (signalOrderController != null) signalOrderController.setClient(client);
     }
     
     /**
@@ -953,6 +970,10 @@ public class CoinRatingController extends PeriodicProcessThread {
         return signalOrderController;
     }
 
+    public CoinCycleController getCoinCycleController() {
+        return coinCycleController;
+    }
+    
     /**
      * @return the trendUpdateEvent
      */
@@ -997,5 +1018,33 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public void setNoAutoBuysOnDowntrend(boolean noAutoBuysOnDowntrend) {
         this.noAutoBuysOnDowntrend = noAutoBuysOnDowntrend;
+    }
+
+    /**
+     * @return the useSignals
+     */
+    public boolean isUseSignals() {
+        return useSignals;
+    }
+
+    /**
+     * @param useSignals the useSignals to set
+     */
+    public void setUseSignals(boolean useSignals) {
+        this.useSignals = useSignals;
+    }
+
+    /**
+     * @return the useCycles
+     */
+    public boolean isUseCycles() {
+        return useCycles;
+    }
+
+    /**
+     * @param useCycles the useCycles to set
+     */
+    public void setUseCycles(boolean useCycles) {
+        this.useCycles = useCycles;
     }
 }

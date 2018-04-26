@@ -25,7 +25,8 @@ public class CoinCycleController extends PeriodicProcessThread {
     private Set<String> basePrices = null;
     
     private TradingAPIAbstractInterface client = null;
-    private double comissionPercent;
+    private final double comissionPercent;
+    private boolean initialized = false;
     
     public CoinCycleController(TradingAPIAbstractInterface client, double comissionPercent) {
         this.client = client;
@@ -81,8 +82,8 @@ public class CoinCycleController extends PeriodicProcessThread {
                 doWait(50);
             }
         });
-        System.out.println(basePrices);
-        System.out.println(graph);
+        mainApplication.getInstance().log("Coin graph built: Vertexes=" + graph.vertexSet().size() + "; Edges=" + graph.edgeSet().size());
+        mainApplication.getInstance().log("Quote assets: " + basePrices);
     }
 
     private double getCycleWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle) {
@@ -109,9 +110,9 @@ public class CoinCycleController extends PeriodicProcessThread {
         }
         if (best_cycle != null) {
             best_cycle.add(baseCoin);
-            System.out.println("Best cycle: " + best_cycle);
-            System.out.println("Profit: " + best_profit);
-            System.out.println();
+            mainApplication.getInstance().log("");
+            mainApplication.getInstance().log("Found cycle: " + best_cycle);
+            mainApplication.getInstance().log("Profit: " + best_profit);
         }
     }
     
@@ -124,12 +125,14 @@ public class CoinCycleController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
+        initialized = false;
         mainApplication.getInstance().log("Graph thread starting...");
         mainApplication.getInstance().log("Graph init begin...");
         initGraph();
         mainApplication.getInstance().log("Graph init end...");
         checkCycles("BTC");
         checkCycles("NEO");
+        initialized = true;
     }
 
     @Override
@@ -142,6 +145,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         mainApplication.getInstance().log("Graph thread end...");
+        initialized = false;
     }
 
     /**
@@ -149,5 +153,12 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public Set<String> getBasePrices() {
         return basePrices;
+    }
+
+    /**
+     * @return the initialized
+     */
+    public boolean isInitializedGraph() {
+        return initialized;
     }
 }

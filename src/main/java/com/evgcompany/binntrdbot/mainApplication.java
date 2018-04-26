@@ -118,6 +118,8 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerSignalPreloadCount, "signal_preload_count");
         config.addComponent(spinnerMaxSignalOrders, "signal_max_orders_count");
         config.addComponent(checkBoxDowntrendNoAuto, "rating_no_auto_on_downtrend");
+        config.addComponent(checkBoxUseSignals, "signals_use");
+        config.addComponent(checkBoxUseCycles, "cycles_use");
         config.Load();
     }
     
@@ -292,6 +294,9 @@ public class mainApplication extends javax.swing.JFrame {
         spinnerSignalPreloadCount = new javax.swing.JSpinner();
         jLabel26 = new javax.swing.JLabel();
         spinnerMaxSignalOrders = new javax.swing.JSpinner();
+        checkBoxUseSignals = new javax.swing.JCheckBox();
+        jPanel6 = new javax.swing.JPanel();
+        checkBoxUseCycles = new javax.swing.JCheckBox();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -912,6 +917,13 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerMaxSignalOrders.setValue(7);
 
+        checkBoxUseSignals.setText("Use signals");
+        checkBoxUseSignals.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkBoxUseSignalsActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
@@ -951,7 +963,8 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGap(18, 18, 18)
                         .addComponent(jLabel26)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(spinnerMaxSignalOrders, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(spinnerMaxSignalOrders, javax.swing.GroupLayout.PREFERRED_SIZE, 79, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(checkBoxUseSignals))
                 .addContainerGap(38, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
@@ -968,7 +981,9 @@ public class mainApplication extends javax.swing.JFrame {
                     .addComponent(textFieldAPIHash, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(textFieldPhone, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(buttonTlgConnect))
-                .addGap(18, 18, 18)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(checkBoxUseSignals)
+                .addGap(13, 13, 13)
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(checkboxAutoSignalOrder)
                     .addComponent(checkboxAutoSignalFastorder))
@@ -984,10 +999,36 @@ public class mainApplication extends javax.swing.JFrame {
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel25)
                     .addComponent(spinnerSignalPreloadCount, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(75, Short.MAX_VALUE))
+                .addContainerGap(50, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
+
+        checkBoxUseCycles.setText("Use cycles");
+        checkBoxUseCycles.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                checkBoxUseCyclesActionPerformed(evt);
+            }
+        });
+
+        javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
+        jPanel6.setLayout(jPanel6Layout);
+        jPanel6Layout.setHorizontalGroup(
+            jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel6Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(checkBoxUseCycles)
+                .addContainerGap(409, Short.MAX_VALUE))
+        );
+        jPanel6Layout.setVerticalGroup(
+            jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel6Layout.createSequentialGroup()
+                .addGap(17, 17, 17)
+                .addComponent(checkBoxUseCycles)
+                .addContainerGap(199, Short.MAX_VALUE))
+        );
+
+        jTabbedPane2.addTab("Cycles", jPanel6);
 
         jTextArea1.setColumns(20);
         jTextArea1.setLineWrap(true);
@@ -1402,7 +1443,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonSetPairsActionPerformed
 
     private void buttonUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonUpdateActionPerformed
-        if (pairController.getPairs().size() > 0) {
+        if (profitsChecker != null) {
             profitsChecker.updateAllBalances();
         }
     }//GEN-LAST:event_buttonUpdateActionPerformed
@@ -1527,6 +1568,8 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
         coinRatingController.setAutoFastOrder(checkboxAutoFastorder.isSelected());
         coinRatingController.setNoAutoBuysOnDowntrend(checkBoxDowntrendNoAuto.isSelected());
+        coinRatingController.setUseSignals(checkBoxUseSignals.isSelected());
+        coinRatingController.setUseCycles(checkBoxUseCycles.isSelected());
         coinRatingController.getSignalOrderController().setAutoSignalOrder(checkboxAutoSignalOrder.isSelected());
         coinRatingController.getSignalOrderController().setAutoSignalFastOrder(checkboxAutoSignalFastorder.isSelected());
         coinRatingController.setAnalyzer(checkBoxAutoAnalyzer.isSelected());
@@ -1624,6 +1667,14 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setNoAutoBuysOnDowntrend(checkBoxDowntrendNoAuto.isSelected());
     }//GEN-LAST:event_checkBoxDowntrendNoAutoActionPerformed
 
+    private void checkBoxUseSignalsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxUseSignalsActionPerformed
+        coinRatingController.setUseSignals(checkBoxUseSignals.isSelected());
+    }//GEN-LAST:event_checkBoxUseSignalsActionPerformed
+
+    private void checkBoxUseCyclesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxUseCyclesActionPerformed
+        coinRatingController.setUseCycles(checkBoxUseCycles.isSelected());
+    }//GEN-LAST:event_checkBoxUseCyclesActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1690,6 +1741,8 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkBoxSellStopLimited;
     private javax.swing.JCheckBox checkBoxStopGain;
     private javax.swing.JCheckBox checkBoxStopLoss;
+    private javax.swing.JCheckBox checkBoxUseCycles;
+    private javax.swing.JCheckBox checkBoxUseSignals;
     private javax.swing.JCheckBox checkBoxWalkForward;
     private javax.swing.JCheckBox checkboxAutoFastorder;
     private javax.swing.JCheckBox checkboxAutoOrder;
@@ -1732,6 +1785,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;
+    private javax.swing.JPanel jPanel6;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;

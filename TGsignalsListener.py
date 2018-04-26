@@ -194,6 +194,7 @@ def textCheck(txt, title, channel_rating, date, client):
         'PRIVATE', 
         'MARKET', 
         'AGAIN', 
+        'CLASSIC', 
         'RESULT', 
         'RESULTS', 
         'BELOW', 
@@ -211,8 +212,7 @@ def textCheck(txt, title, channel_rating, date, client):
         'LONGTER', 
         'CRYPTOR', 
         'TRUSTPL', 
-        'CRYPTOW', 
-        'PART', 
+        'CRYPTOW',
         'OK', 
         'SOME'
     ]

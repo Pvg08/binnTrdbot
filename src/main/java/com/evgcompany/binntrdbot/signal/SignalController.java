@@ -478,7 +478,7 @@ public class SignalController extends Thread {
         }
         if (bars == null) {
             try {
-                bars = client.getBars(symbol_pair, "15m");
+                bars = client.getBars(symbol_pair, "15m", 2500, null, null);
                 if (!initialSignalsIsLoaded) {
                     pair_bars.put(symbol_pair, bars);
                 }
