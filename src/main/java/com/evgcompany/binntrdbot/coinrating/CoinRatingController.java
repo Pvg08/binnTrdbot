@@ -9,6 +9,7 @@ import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.*;
+import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
@@ -708,6 +709,11 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
+        
+        /*CoinCycleController ccc = new CoinCycleController(client, paircontroller.getProfitsChecker().getTradeComissionPercent().doubleValue());
+        ccc.setDelayTime(360);
+        ccc.start();
+        return;*/
         
         mainApplication.getInstance().log("CoinRatingController starting...");
         

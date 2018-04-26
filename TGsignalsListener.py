@@ -105,7 +105,7 @@ def dateFix(date):
 def percentFix(txt, price):
     if txt and txt.count('%') > 0:
         if price:
-            txt = txt.replace('%', '')
+            txt = txt.replace('%', '').strip(' ')
             txt = numFix(txt)
             if txt:
                 numtxt = float(txt)
@@ -192,6 +192,7 @@ def textCheck(txt, title, channel_rating, date, client):
         'VIP', 
         'INSIDE', 
         'PRIVATE', 
+        'MARKET', 
         'AGAIN', 
         'RESULT', 
         'RESULTS', 
