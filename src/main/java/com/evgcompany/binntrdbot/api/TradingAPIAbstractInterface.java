@@ -18,6 +18,7 @@ import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.ta4j.core.Bar;
 import org.ta4j.core.TimeSeries;
@@ -129,6 +130,50 @@ public abstract class TradingAPIAbstractInterface {
                 }
             }
         }
+    }
+    
+    private void mergeBars(List<Bar> bars, List<Bar> bars_next) {
+        if (bars.isEmpty()) {
+            if (!bars_next.isEmpty()) {
+                bars.addAll(bars_next);
+            }
+            return;
+        }
+        long last_end_time = bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli();
+        int i = 0;
+        while (i < bars_next.size() && 
+                bars_next.get(i).getBeginTime().toInstant().toEpochMilli() < last_end_time
+        ) {
+            i++;
+        }
+        for(;i<bars_next.size();i++) {
+            bars.add(bars_next.get(i));
+        }
+    }
+    
+    private List<Bar> getPreBars(String pair, String barInterval, int n, int size, long lastbar_from, long lastbar_to) {
+        List<Bar> result = new ArrayList<>();
+        if (n > 0) {
+            long period = Math.floorDiv(lastbar_to - lastbar_from + 1, 1000) * 1000;
+            long barSeconds = barIntervalToSeconds(barInterval);
+            result = getBars(pair, barInterval, size, lastbar_from - period + barSeconds * 1000 * 30, lastbar_from + barSeconds * 1000 * 30);
+            if (result.size() > 0) {
+                List<Bar> pre = getPreBars(pair, barInterval, n-1, result.size(), result.get(0).getBeginTime().toInstant().toEpochMilli(), result.get(result.size()-1).getEndTime().toInstant().toEpochMilli());
+                mergeBars(pre, result);
+                result = pre;
+            }
+        }
+        return result;
+    }
+    
+    public List<Bar> getBars(String pair, String bar_interval, Integer count, int queries_cnt) {
+        List<Bar> result = getBars(pair, bar_interval, count, null, null);
+        if (result.size() >= 2 && queries_cnt > 1) {
+            List<Bar> pre = getPreBars(pair, bar_interval, queries_cnt-1, result.size(), result.get(0).getBeginTime().toInstant().toEpochMilli(), result.get(result.size()-1).getEndTime().toInstant().toEpochMilli());
+            mergeBars(pre, result);
+            result = pre;
+        }
+        return result;
     }
     
     abstract public List<RateLimit> getRateLimits();

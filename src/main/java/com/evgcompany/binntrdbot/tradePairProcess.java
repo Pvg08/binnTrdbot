@@ -434,17 +434,6 @@ public class tradePairProcess extends PeriodicProcessThread {
         app.log("Can't set SellUp mode for " + symbol, true, true);
     } 
     
-    private void addPreBars(int count, int size, long lastbar_from, long lastbar_to) {
-        if (count > 0) {
-            long period = Math.floorDiv(lastbar_to - lastbar_from + 1, 1000) * 1000;
-            List<Bar> bars_pre = client.getBars(symbol, barInterval, size, lastbar_from - period + barSeconds * 1000 * 30, lastbar_from + barSeconds * 1000 * 30);
-            if (bars_pre.size() > 0) {
-                addPreBars(count-1, bars_pre.size(), bars_pre.get(0).getBeginTime().toInstant().toEpochMilli(), bars_pre.get(bars_pre.size()-1).getEndTime().toInstant().toEpochMilli());
-                addBars(bars_pre);
-            }
-        }
-    }
-    
     private void stopSockets() {
         if (socket != null) {
             try {
@@ -469,10 +458,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         
         stopSockets();
 
-        List<Bar> bars = client.getBars(symbol, barInterval);
-        if (bars.size() >= 2 && barQueryCount > 1) {
-            addPreBars(barQueryCount-1, bars.size(), bars.get(0).getBeginTime().toInstant().toEpochMilli(), bars.get(bars.size()-1).getEndTime().toInstant().toEpochMilli());
-        }
+        List<Bar> bars = client.getBars(symbol, barInterval, 500, barQueryCount);
         if (bars.size() > 0) {
             addBars(bars);
             last_time = bars.get(bars.size() - 1).getBeginTime().toInstant().toEpochMilli();
@@ -510,7 +496,7 @@ public class tradePairProcess extends PeriodicProcessThread {
             }
             strategiesController.resetStrategies();
         } else {
-            bars = client.getBars(symbol, barInterval, 500, last_time, last_time + barSeconds * 2000);
+            bars = client.getBars(symbol, barInterval, 500, last_time, null);
             addBars(bars);
         }
         if (bars != null && bars.size() > 0) {

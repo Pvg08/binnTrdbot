@@ -5,15 +5,23 @@
  */
 package com.evgcompany.binntrdbot.analysis;
 
+import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.tradePairProcessController;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
+import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 /**
@@ -22,34 +30,39 @@ import org.jgrapht.graph.DefaultWeightedEdge;
  */
 public class CoinCycleController extends PeriodicProcessThread {
     DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph = null;
+    DefaultDirectedGraph<String, DefaultEdge> graph_pair = null;
     private Set<String> basePrices = null;
+    private List<String> coinsToCheck = null;
+    
+    tradePairProcessController pairProcessController = null;
     
     private TradingAPIAbstractInterface client = null;
     private final double comissionPercent;
     private boolean initialized = false;
     
-    public CoinCycleController(TradingAPIAbstractInterface client, double comissionPercent) {
-        this.client = client;
-        this.comissionPercent = comissionPercent;
-    }
-    
-    private void addPairToGraph(String symbol1, String symbol2, double price) {
-        if (!graph.containsVertex(symbol1)) {
-            graph.addVertex(symbol1);
-        }
-        if (!graph.containsVertex(symbol2)) {
-            graph.addVertex(symbol2);
-        }
+    private final String baseCoin = "BTC";
+    private final double baseCoinMinCount = 0.001;
 
-        if (!graph.containsEdge(symbol1, symbol2)) {
-            graph.addEdge(symbol1, symbol2);
-        }
+    public CoinCycleController(TradingAPIAbstractInterface client, tradePairProcessController pairProcessController, String coins) {
+        this.client = client;
+        this.pairProcessController = pairProcessController;
+        this.comissionPercent = pairProcessController.getProfitsChecker().getTradeComissionPercent().doubleValue();
+        coinsToCheck = Arrays.asList(coins.split(","));
+    }
+
+    private void addPairToGraph(String symbol1, String symbol2, double price) {
+        if (!graph.containsVertex(symbol1)) graph.addVertex(symbol1);
+        if (!graph.containsVertex(symbol2)) graph.addVertex(symbol2);
+
+        if (!graph_pair.containsVertex(symbol1)) graph_pair.addVertex(symbol1);
+        if (!graph_pair.containsVertex(symbol2)) graph_pair.addVertex(symbol2);
+        if (!graph_pair.containsEdge(symbol1, symbol2)) graph_pair.addEdge(symbol1, symbol2);
+        
+        if (!graph.containsEdge(symbol1, symbol2)) graph.addEdge(symbol1, symbol2);
         DefaultWeightedEdge edge1 = graph.getEdge(symbol1, symbol2);
         graph.setEdgeWeight(edge1, price * (100.0-comissionPercent) / 100.0);
 
-        if (!graph.containsEdge(symbol2, symbol1)) {
-            graph.addEdge(symbol2, symbol1);
-        }
+        if (!graph.containsEdge(symbol2, symbol1)) graph.addEdge(symbol2, symbol1);
         DefaultWeightedEdge edge2 = graph.getEdge(symbol2, symbol1);
         graph.setEdgeWeight(edge2, (1/price) * (100.0-comissionPercent) / 100.0);
     }
@@ -70,6 +83,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     
     private void initGraph() {
         graph = new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        graph_pair = new DefaultDirectedGraph<>(DefaultEdge.class);
         basePrices = new HashSet<>();
         List<TickerPrice> allPrices = client.getAllPrices();
         allPrices.forEach((price) -> {
@@ -82,7 +96,7 @@ public class CoinCycleController extends PeriodicProcessThread {
                 doWait(50);
             }
         });
-        mainApplication.getInstance().log("Coin graph built: Vertexes=" + graph.vertexSet().size() + "; Edges=" + graph.edgeSet().size());
+        mainApplication.getInstance().log("Coin graph built: Vertexes=" + graph.vertexSet().size() + "; Edges=" + graph.edgeSet().size() + "; Straight pairs=" + graph_pair.edgeSet().size());
         mainApplication.getInstance().log("Quote assets: " + basePrices);
     }
 
@@ -92,54 +106,153 @@ public class CoinCycleController extends PeriodicProcessThread {
             double weight = graph.getEdgeWeight(graph.getEdge(cycle.get(i-1), cycle.get(i)));
             totalWeight *= weight;
         }
-        double weightBackToStart = graph.getEdgeWeight(graph.getEdge(cycle.get(cycle.size()-1), cycle.get(0)));
-        return totalWeight * weightBackToStart;
+        return totalWeight;
     }
 
-    private void checkCycles(String baseCoin) {
-        TarjanSimpleCyclesFromVertex<String, DefaultWeightedEdge> simple_cycles = new TarjanSimpleCyclesFromVertex<>(graph);
-        List<List<String>> cycles = simple_cycles.findSimpleCycles(baseCoin);
+    private List<String> getCycleDescription(List<String> cycle) {
+        List<String> cycle_description = new ArrayList<>();
+        for(int i=1; i < cycle.size(); i++) {
+            String symbol1 = cycle.get(i-1);
+            String symbol2 = cycle.get(i);
+            if (graph_pair.containsEdge(symbol2, symbol1)) {
+                cycle_description.add(symbol2+symbol1 + " BUY");
+            } else {
+                cycle_description.add(symbol1+symbol2 + " SELL");
+            }
+        }
+        return cycle_description;
+    }
+
+    private boolean cycleIsValid(List<String> cycle) {
+        if (cycle.size() < 3 || cycle.size() > 5) return false;
+        for(int i=1; i<cycle.size(); i++) {
+            String symbol1 = cycle.get(i-1);
+            String symbol2 = cycle.get(i);
+            if (!graph_pair.containsEdge(symbol2, symbol1) && !graph_pair.containsEdge(symbol1, symbol2)) {
+                return false;
+            }
+            if (pairProcessController != null) {
+                if (pairProcessController.hasPair(symbol1 + symbol2) || pairProcessController.hasPair(symbol2 + symbol1)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static double round(double value, int places) {
+        if (places < 0) places = 0;
+        BigDecimal bd = new BigDecimal(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+    }
+
+    private List<String> getBestValidCycle(List<List<String>> cycles) {
         double best_profit = 0;
         List<String> best_cycle = null;
         for(List<String> cycle : cycles) {
-            double weight = getCycleWeight(graph, cycle);
-            if (weight > best_profit && cycle.size() <= 5 && weight > 1.02) {
-                best_cycle = cycle;
-                best_profit = weight;
+            if (cycleIsValid(cycle)) {
+                double weight = round(getCycleWeight(graph, cycle), 2);
+                if (weight > 1.02 && (weight > best_profit || (weight == best_profit && Math.random() < 0.5))) {
+                    best_cycle = cycle;
+                    best_profit = weight;
+                }
             }
         }
-        if (best_cycle != null) {
-            best_cycle.add(baseCoin);
-            mainApplication.getInstance().log("");
-            mainApplication.getInstance().log("Found cycle: " + best_cycle);
-            mainApplication.getInstance().log("Profit: " + best_profit);
-        }
+        return best_cycle;
     }
     
-    private void updatePrices() {
+    private List<String> getBestValidCoinCycle(String baseCoin) {
+        TarjanSimpleCyclesFromVertex<String, DefaultWeightedEdge> simple_cycles = new TarjanSimpleCyclesFromVertex<>(graph);
+        List<List<String>> cycles = simple_cycles.findSimpleCycles(baseCoin);
+        for(List<String> cycle : cycles) {
+            cycle.add(baseCoin);
+        }
+        return getBestValidCycle(cycles);
+    }
+
+    private List<String> getBestCycle() {
+        List<List<String>> best_cycles = new ArrayList<>();
+        for(String coin : coinsToCheck) {
+            List<String> best_cycle = getBestValidCoinCycle(coin);
+            if (best_cycle != null) {
+                best_cycles.add(best_cycle);
+            }
+        }
+        if (best_cycles.size() >= 2) {
+            return getBestValidCycle(best_cycles);
+        } else if (best_cycles.size() == 1) {
+            return best_cycles.get(0);
+        }
+        return null;
+    }
+
+    private void checkCycles() {
+        List<String> best_cycle = getBestCycle();
+        if (best_cycle != null) {
+            double best_profit = round(getCycleWeight(graph, best_cycle), 2);
+            mainApplication.getInstance().log("", true, false);
+            mainApplication.getInstance().log("Found cycle: " + best_cycle, true, true);
+            mainApplication.getInstance().log("Cycle description: " + getCycleDescription(best_cycle), true, false);
+            mainApplication.getInstance().log("Profit: " + best_profit, true, false);
+        }
+    }
+
+    public double convertSumm(String symbol1, double price, String symbol2) {
+        if (graph.containsEdge(symbol1, symbol2)) {
+            return price * graph.getEdgeWeight(graph.getEdge(symbol1, symbol2));
+        }
+        return 0;
+    }
+    
+    public void updatePrices() {
         List<TickerPrice> allPrices = client.getAllPrices();
+        updatePrices(allPrices);
+    }
+
+    public void updatePrices(List<TickerPrice> allPrices) {
         allPrices.forEach((price) -> {
             addPairToGraph(price.getSymbol().toUpperCase(), Double.valueOf(price.getPrice()));
         });
     }
-    
-    @Override
-    protected void runStart() {
+
+    public void runInit() {
         initialized = false;
         mainApplication.getInstance().log("Graph thread starting...");
         mainApplication.getInstance().log("Graph init begin...");
         initGraph();
+        
+        updatePrices();
+        List<String> oldCoinsToCheck = coinsToCheck;
+        coinsToCheck = new ArrayList<>();
+        oldCoinsToCheck.forEach((checkCoin) -> {
+            AssetBalance balance = client.getAssetBalance(checkCoin);
+            if (balance != null && !balance.getAsset().isEmpty()) {
+                double full_balance = Double.parseDouble(balance.getFree()) + Double.parseDouble(balance.getLocked());
+                if (
+                    (checkCoin.equals(baseCoin) && full_balance >= baseCoinMinCount) || 
+                    convertSumm(checkCoin, full_balance, baseCoin) >= baseCoinMinCount
+                ) {
+                    coinsToCheck.add(checkCoin);
+                }
+            }
+        });
+        mainApplication.getInstance().log("Cycle coins to check: " + coinsToCheck);
+        
         mainApplication.getInstance().log("Graph init end...");
-        checkCycles("BTC");
-        checkCycles("NEO");
+        checkCycles();
         initialized = true;
+    }
+    
+    @Override
+    protected void runStart() {
+        if (!initialized) runInit();
     }
 
     @Override
     protected void runBody() {
         updatePrices();
-        checkCycles("BTC");
-        checkCycles("NEO");
+        checkCycles();
     }
 
     @Override
@@ -160,5 +273,12 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public boolean isInitializedGraph() {
         return initialized;
+    }
+
+    /**
+     * @return the coinsToCheck
+     */
+    public List<String> getCoinsToCheck() {
+        return coinsToCheck;
     }
 }

@@ -82,7 +82,10 @@ public class SignalController extends Thread {
         double summ_rating = 0;
         double avg_day_signal_profit = 0;
         double recommended_rating = 0;
-        double max_done_dip_summ_percent = 0;
+        double max_done_dip_summ_percent_main = 0;
+        double max_done_dip_summ_percent_mainNS = 0;
+        double max_done_dip_summ_percent_fast = 0;
+        double max_done_dip_summ_percent_fastNS = 0;
         Set<Integer> used_regexps = new HashSet<>();
         Set<String> copy_sources = new HashSet<>();
     }
@@ -291,7 +294,9 @@ public class SignalController extends Thread {
                     stopSignalsProcess();
                 } else {
                     pair_bars.clear();
+                    checkSignalItems();
                     logStats();
+                    sendPreviousSignals();
                 }
             }
             return;
@@ -332,7 +337,7 @@ public class SignalController extends Thread {
         if (stat.done_signals > 0) {
             avg_time = stat.done_millis_diff_summ / stat.done_signals;
             avg_done_percent = stat.done_summ_percent / stat.done_signals;
-            avg_max_done_dip_percent = stat.max_done_dip_summ_percent / stat.ok_signals;
+            avg_max_done_dip_percent = stat.max_done_dip_summ_percent_main / stat.ok_signals;
         }
         if (stat.done_signals_fast > 0) {
             avg_time_fast = stat.done_millis_diff_summ_fast / stat.done_signals_fast;
@@ -371,7 +376,6 @@ public class SignalController extends Thread {
     }
     
     private void logStats() {
-        checkSignalItems();
         calculateRecommendedRatings(channel_stats.values());
         calculateRecommendedRatings(regex_stats.values());
         mainApplication.getInstance().log("");
@@ -393,6 +397,20 @@ public class SignalController extends Thread {
             }
         }
         mainApplication.getInstance().log("");
+    }
+    
+    private void sendPreviousSignals() {
+        if (signalEvent == null) return;
+        for (SignalItem item : items) {
+            if (!item.isDone() && 
+                !item.isTimeout() && 
+                item.isAutopick() &&
+                item.getMillisFromSignalStart() >= 0 &&
+                item.getMillisFromSignalStart() < 2 * 60 * 60 * 1000
+            ) {
+                signalEvent.onUpdate(item, getPairSignalRating(item.getPair()));
+            }
+        }
     }
     
     private Double alignPrice(Double price, Double current) {
@@ -472,14 +490,16 @@ public class SignalController extends Thread {
             return;
         }
         List<Bar> bars = null;
-        double barMinutes = 15;
+        double barMinutes = 5;
         if (!initialSignalsIsLoaded && pair_bars.containsKey(symbol_pair)) {
             bars = pair_bars.get(symbol_pair);
         }
         if (bars == null) {
             try {
-                bars = client.getBars(symbol_pair, "15m", 2500, null, null);
-                if (!initialSignalsIsLoaded) {
+                if (initialSignalsIsLoaded) {
+                    bars = client.getBars(symbol_pair, "5m", 1000, 1);
+                } else {
+                    bars = client.getBars(symbol_pair, "5m", 1000, 8);
                     pair_bars.put(symbol_pair, bars);
                 }
             } catch(Exception e) {}
@@ -590,6 +610,7 @@ public class SignalController extends Thread {
         boolean is_waiting_exit = false;
         boolean is_waiting_exitF = false;
         boolean is_waiting_exitNS = false;
+        boolean is_waiting_exitMNS = false;
         boolean is_waiting_enter = false;
         boolean is_stop_loss = false;
         boolean is_stop_loss_done = false;
@@ -612,10 +633,12 @@ public class SignalController extends Thread {
             OHLC4Indicator indicator = new OHLC4Indicator(series);
 
             Strategy strategy_main = getSignalStrategy(series, false, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
+            Strategy strategy_main_nostop = getSignalStrategy(series, false, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), BigDecimal.ZERO);
             Strategy strategy_fast = getSignalStrategy(series, true, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), new BigDecimal(price_stoploss));
             Strategy strategy_fast_nostop = getSignalStrategy(series, true, new BigDecimal(price1), new BigDecimal(price2), new BigDecimal(price_target), BigDecimal.ZERO);
             TimeSeriesManagerForIndicator seriesManager = new TimeSeriesManagerForIndicator(series, indicator);
             TradingRecord tradingRecordMain = seriesManager.run(strategy_main, Order.OrderType.BUY, millis_index, series.getEndIndex());
+            TradingRecord tradingRecordMainNS = seriesManager.run(strategy_main_nostop, Order.OrderType.BUY, millis_index, series.getEndIndex());
             TradingRecord tradingRecordFast = seriesManager.run(strategy_fast, Order.OrderType.BUY, millis_index, series.getEndIndex());
             TradingRecord tradingRecordFastNS = seriesManager.run(strategy_fast_nostop, Order.OrderType.BUY, millis_index, series.getEndIndex());
 
@@ -627,6 +650,11 @@ public class SignalController extends Thread {
                     tradingRecordMain.exit(series.getEndIndex(), indicator.getValue(series.getEndIndex()), Decimal.NaN);
                     System.out.println("Close main order on last index.");
                     is_waiting_exit = true;
+                }
+                if (tradingRecordMainNS.getLastEntry() != null && tradingRecordMainNS.getLastExit() == null) {
+                    tradingRecordMainNS.exit(series.getEndIndex(), indicator.getValue(series.getEndIndex()), Decimal.NaN);
+                    System.out.println("Close main NS order on last index.");
+                    is_waiting_exitMNS = true;
                 }
                 if (tradingRecordFast.getLastEntry() != null && tradingRecordFast.getLastExit() == null) {
                     tradingRecordFast.exit(series.getEndIndex(), indicator.getValue(series.getEndIndex()), Decimal.NaN);
@@ -640,24 +668,32 @@ public class SignalController extends Thread {
                 }
             } else {
                 if (tradingRecordMain.getTradeCount() > 0) tradingRecordMain.getTrades().clear();
+                if (tradingRecordMainNS.getTradeCount() > 0) tradingRecordMainNS.getTrades().clear();
                 if (tradingRecordFast.getTradeCount() > 0) tradingRecordFast.getTrades().clear();
                 if (tradingRecordFastNS.getTradeCount() > 0) tradingRecordFastNS.getTrades().clear();
             }
             
             double profit_main = profitCriterion.calculate(series, tradingRecordMain);
+            double profit_mainNS = profitCriterion.calculate(series, tradingRecordMainNS);
             double profit_fast = profitCriterion.calculate(series, tradingRecordFast);
             double profit_fastNS = profitCriterion.calculate(series, tradingRecordFastNS);
             double barscnt_main = barsCountCriterion.calculate(series, tradingRecordMain);
+            double barscnt_mainNS = barsCountCriterion.calculate(series, tradingRecordMainNS);
             double barscnt_fast = barsCountCriterion.calculate(series, tradingRecordFast);
             double barscnt_fastNS = barsCountCriterion.calculate(series, tradingRecordFastNS);
             double maxdip_main = maxDipCriterion.calculate(series, tradingRecordMain);
+            double maxdip_mainNS = maxDipCriterion.calculate(series, tradingRecordMainNS);
+            double maxdip_fast = maxDipCriterion.calculate(series, tradingRecordFast);
+            double maxdip_fastNS = maxDipCriterion.calculate(series, tradingRecordFastNS);
             
             System.out.println(tradingRecordMain.getTrades());
-            System.out.println("M  Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount() + "    Maxdip:" + df8.format(maxdip_main)+"%");
+            System.out.println("M   Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount() + "    Maxdip:" + df8.format(maxdip_main)+"%");
+            System.out.println(tradingRecordMainNS.getTrades());
+            System.out.println("MNS Profit:" + profit_mainNS + "   Bars:" + barscnt_mainNS + "   Trades:" + tradingRecordMainNS.getTradeCount() + "    Maxdip:" + df8.format(maxdip_mainNS)+"%");
             System.out.println(tradingRecordFast.getTrades());
-            System.out.println("F  Profit:" + profit_fast + "   Bars:" + barscnt_fast + "   Trades:" + tradingRecordFast.getTradeCount());
+            System.out.println("F   Profit:" + profit_fast + "   Bars:" + barscnt_fast + "   Trades:" + tradingRecordFast.getTradeCount() + "    Maxdip:" + df8.format(maxdip_fast)+"%");
             System.out.println(tradingRecordFastNS.getTrades());
-            System.out.println("NS Profit:" + profit_fastNS + "   Bars:" + barscnt_fastNS + "   Trades:" + tradingRecordFastNS.getTradeCount());
+            System.out.println("NS  Profit:" + profit_fastNS + "   Bars:" + barscnt_fastNS + "   Trades:" + tradingRecordFastNS.getTradeCount() + "    Maxdip:" + df8.format(maxdip_fastNS)+"%");
             System.out.println();
             
             is_waiting_enter = tradingRecordMain.getTradeCount() == 0;
@@ -682,7 +718,10 @@ public class SignalController extends Thread {
                     if (is_done) {
                         stat.done_millis_diff_summ += barscnt_main * barMinutes * 60 * 1000;
                         stat.done_summ_percent += 100*(profit_main-1);
-                        stat.max_done_dip_summ_percent += maxdip_main;
+                        stat.max_done_dip_summ_percent_main += maxdip_main;
+                        /*stat.max_done_dip_summ_percent_mainNS += maxdip_mainNS;
+                        stat.max_done_dip_summ_percent_fast += maxdip_fast;
+                        stat.max_done_dip_summ_percent_fastNS += maxdip_fast;*/
                     }
                     if (is_done_fast) {
                         stat.done_millis_diff_summ_fast += barscnt_fast * barMinutes * 60 * 1000;

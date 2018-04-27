@@ -163,12 +163,13 @@ public class SignalOrderController extends PeriodicProcessThread {
         signalcontroller.setSignalEvent((item, rating) -> {
             if (coinRatingController.setPairSignalRating(item.getPair(), (float) rating)) {
                 if (
+                        signalcontroller.isInitialSignalsLoaded() &&
                         rating >= minSignalRatingForOrder && 
                         item.getCurrentRating() > minSignalRatingForOrder/2 && 
                         !item.isDone() && 
                         !item.isTimeout() && 
                         item.getMillisFromSignalStart() >= 0 &&
-                        item.getMillisFromSignalStart() < 240 * 1000
+                        item.getMillisFromSignalStart() < 2 * 60 * 60 * 1000
                 ) {
                     signalOrderEnter(item);
                 }

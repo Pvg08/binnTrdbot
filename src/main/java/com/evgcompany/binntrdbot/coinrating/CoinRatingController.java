@@ -730,22 +730,22 @@ public class CoinRatingController extends PeriodicProcessThread {
 
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
-            if ((Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) >= 0.0005 && !balance.getAsset().equals("BNB")) {
+            if ((Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) >= 0.0001 && !balance.getAsset().equals("BNB")) {
                 accountCoins.add(balance.getAsset());
             }
         });
-        coinsPattern = String.join("|", accountCoins);
 
+        coinCycleController = new CoinCycleController(client, paircontroller, String.join(",", accountCoins));
         if (useCycles) {
-            coinCycleController = new CoinCycleController(client, paircontroller.getProfitsChecker().getTradeComissionPercent().doubleValue());
-            coinCycleController.setDelayTime(360);
+            coinCycleController.setDelayTime(90);
             coinCycleController.start();
             while (!need_stop && !coinCycleController.isInitializedGraph()) {
-                doWait(1000);
+                doWait(2000);
             }
         } else {
-            coinCycleController = null;
+            coinCycleController.runInit();
         }
+        coinsPattern = String.join("|", coinCycleController.getCoinsToCheck());
         
         updateCurrentPrices();
         updateGlobalTrendData();
@@ -753,7 +753,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         if (useSignals) {
             signalOrderController.start();
             while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
-                doWait(1000);
+                doWait(2000);
             }
         }
         
