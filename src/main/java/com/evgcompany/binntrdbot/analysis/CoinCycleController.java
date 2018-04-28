@@ -11,6 +11,7 @@ import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.tradeCycleProcess;
 import com.evgcompany.binntrdbot.tradePairProcessController;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -34,7 +35,8 @@ public class CoinCycleController extends PeriodicProcessThread {
     private Set<String> basePrices = null;
     private List<String> coinsToCheck = null;
     
-    tradePairProcessController pairProcessController = null;
+    private tradePairProcessController pairProcessController = null;
+    private tradeCycleProcess cycleProcess = null;
     
     private TradingAPIAbstractInterface client = null;
     private final double comissionPercent;
@@ -123,6 +125,18 @@ public class CoinCycleController extends PeriodicProcessThread {
         return cycle_description;
     }
 
+    private void addCycleToCycleChain(List<String> cycle) {
+        for(int i=1; i < cycle.size(); i++) {
+            String symbol1 = cycle.get(i-1);
+            String symbol2 = cycle.get(i);
+            if (graph_pair.containsEdge(symbol2, symbol1)) { // BUY
+                cycleProcess.addChain(symbol2+symbol1 + " BUY", graph.getEdgeWeight(graph.getEdge(symbol2, symbol1))); 
+            } else { // SELL
+                cycleProcess.addChain(symbol1+symbol2 + " SELL", graph.getEdgeWeight(graph.getEdge(symbol1, symbol2)));
+            }
+        }
+    }
+
     private boolean cycleIsValid(List<String> cycle) {
         if (cycle.size() < 3 || cycle.size() > 5) return false;
         for(int i=1; i<cycle.size(); i++) {
@@ -152,7 +166,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         List<String> best_cycle = null;
         for(List<String> cycle : cycles) {
             if (cycleIsValid(cycle)) {
-                double weight = round(getCycleWeight(graph, cycle), 2);
+                double weight = round(getCycleWeight(graph, cycle), 3);
                 if (weight > 1.02 && (weight > best_profit || (weight == best_profit && Math.random() < 0.5))) {
                     best_cycle = cycle;
                     best_profit = weight;
@@ -190,11 +204,15 @@ public class CoinCycleController extends PeriodicProcessThread {
     private void checkCycles() {
         List<String> best_cycle = getBestCycle();
         if (best_cycle != null) {
-            double best_profit = round(getCycleWeight(graph, best_cycle), 2);
+            double best_profit = round(getCycleWeight(graph, best_cycle), 3);
             mainApplication.getInstance().log("", true, false);
             mainApplication.getInstance().log("Found cycle: " + best_cycle, true, true);
             mainApplication.getInstance().log("Cycle description: " + getCycleDescription(best_cycle), true, false);
             mainApplication.getInstance().log("Profit: " + best_profit, true, false);
+            cycleProcess = new tradeCycleProcess(this);
+            cycleProcess.setDelayTime(2);
+            addCycleToCycleChain(best_cycle);
+            cycleProcess.start();
         }
     }
 
@@ -218,6 +236,9 @@ public class CoinCycleController extends PeriodicProcessThread {
 
     public void runInit() {
         initialized = false;
+        
+        doWait(1000);
+        
         mainApplication.getInstance().log("Graph thread starting...");
         mainApplication.getInstance().log("Graph init begin...");
         initGraph();
@@ -240,8 +261,9 @@ public class CoinCycleController extends PeriodicProcessThread {
         mainApplication.getInstance().log("Cycle coins to check: " + coinsToCheck);
         
         mainApplication.getInstance().log("Graph init end...");
-        checkCycles();
         initialized = true;
+        doWait(3000);
+        checkCycles();
     }
     
     @Override
@@ -252,7 +274,9 @@ public class CoinCycleController extends PeriodicProcessThread {
     @Override
     protected void runBody() {
         updatePrices();
-        checkCycles();
+        if (cycleProcess == null || !cycleProcess.isAlive()) {
+            checkCycles();
+        }
     }
 
     @Override
@@ -280,5 +304,19 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public List<String> getCoinsToCheck() {
         return coinsToCheck;
+    }
+
+    /**
+     * @return the client
+     */
+    public TradingAPIAbstractInterface getClient() {
+        return client;
+    }
+
+    /**
+     * @return the pairProcessController
+     */
+    public tradePairProcessController getPairProcessController() {
+        return pairProcessController;
     }
 }

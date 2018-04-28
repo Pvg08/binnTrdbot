@@ -11,9 +11,6 @@ import com.binance.api.client.domain.OrderType;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
-import com.binance.api.client.domain.general.ExchangeInfo;
-import com.binance.api.client.domain.general.SymbolFilter;
-import com.binance.api.client.domain.general.SymbolInfo;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
@@ -46,6 +43,7 @@ public class tradePairProcess extends PeriodicProcessThread {
     TradingAPIAbstractInterface client;
     
     NeuralNetworkStockPredictor predictor = null;
+    CoinFilters filter = null;
 
     private final String symbol;
     private String baseAssetSymbol;
@@ -88,17 +86,6 @@ public class tradePairProcess extends PeriodicProcessThread {
     private boolean base_strategy_sell_ignored = false;
     private boolean do_remove_flag = false;
     
-    private boolean filterPrice = false;
-    private BigDecimal filterPriceTickSize = BigDecimal.ZERO;
-    private BigDecimal filterMinPrice = BigDecimal.ZERO;
-    private BigDecimal filterMaxPrice = BigDecimal.ZERO;
-    private boolean filterQty = false;
-    private BigDecimal filterQtyStep = BigDecimal.ZERO;
-    private BigDecimal filterMinQty = BigDecimal.ZERO;
-    private BigDecimal filterMaxQty = BigDecimal.ZERO;
-    private boolean filterNotional = false;
-    private BigDecimal filterMinNotional = BigDecimal.ZERO;
-    
     private static DecimalFormat df5 = new DecimalFormat("0.#####");
     private static DecimalFormat df8 = new DecimalFormat("0.########");
     
@@ -140,41 +127,42 @@ public class tradePairProcess extends PeriodicProcessThread {
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        BigDecimal summ_to_buy = profitsChecker.getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent);
-        sold_price = normalizePrice(curPrice);
-        sold_amount = normalizeQuantity(summ_to_buy.divide(curPrice, RoundingMode.HALF_DOWN), true);
-        sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
-        if (!profitsChecker.canBuy(symbol, sold_amount, curPrice) && filterQtyStep != null && sold_amount.compareTo(filterQtyStep) > 0) {
-            sold_amount = sold_amount.subtract(filterQtyStep);
-        }
-        summ_to_buy = sold_price.multiply(sold_amount);
+        BigDecimal quote_asset_amount = profitsChecker.getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent);
+        filter.setCurrentPrice(curPrice);
+        filter.setCurrentAmount(quote_asset_amount);
+        filter.prepareForBuy(profitsChecker);
+        sold_price = filter.getCurrentPrice();
+        sold_amount = filter.getCurrentAmount();
+        quote_asset_amount = sold_price.multiply(sold_amount);
         base_strategy_sell_ignored = false;
-        if (profitsChecker.canBuy(symbol, sold_amount, curPrice)) {
-            app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
-            long result = profitsChecker.Buy(symbol, sold_amount, curPrice);
+        if (profitsChecker.canBuy(symbol, sold_amount, sold_price)) {
+            app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + df8.format(sold_price) + ")", true, true);
+            long result = profitsChecker.Buy(symbol, sold_amount, sold_price);
             if (result >= 0) {
                 limitOrderId = result;
                 app.log("Successful!", true, true);
                 is_hodling = true;
                 lastOrderMillis = System.currentTimeMillis();
                 if (limitOrderId == 0) {
-                    strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
+                    strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(sold_price), Decimal.valueOf(sold_amount));
                 }
             } else {
                 app.log("Error!", true, true);
             }
         } else {
-            app.log("Can't buy " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(summ_to_buy) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")");
+            app.log("Can't buy " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")");
         }
     }
     private void doExit(BigDecimal curPrice, boolean skip_check) {
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        curPrice = normalizePrice(curPrice);
-        sold_amount = normalizeQuantity(sold_amount, true);
-        sold_amount = normalizeNotionalQuantity(sold_amount, curPrice);
-        BigDecimal new_sold_price = sold_amount.multiply(curPrice);
+        filter.setCurrentPrice(curPrice);
+        filter.setCurrentAmount(sold_amount);
+        filter.prepareForSell(profitsChecker);
+        curPrice = filter.getCurrentPrice();
+        sold_amount = filter.getCurrentAmount();
+        BigDecimal quote_asset_amount = sold_amount.multiply(curPrice);
         BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(profitsChecker.getTradeComissionPercent()))).subtract(sold_price));
         BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
         if (
@@ -189,7 +177,7 @@ public class tradePairProcess extends PeriodicProcessThread {
             ) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
                 base_strategy_sell_ignored = false;
-                app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(new_sold_price) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
+                app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
                 long result = profitsChecker.Sell(symbol, sold_amount, curPrice, orderToCancelOnSellUp);
                 if (result >= 0) {
                     limitOrderId = result;
@@ -335,49 +323,6 @@ public class tradePairProcess extends PeriodicProcessThread {
             plot.updateSeries();
         }
         SEMAPHORE_ADD.release();
-    }
-    
-    public BigDecimal normalizeQuantity(BigDecimal qty, boolean qty_down_only) {
-        if (filterQty) {
-            BigDecimal pqty = qty;
-            if (filterQtyStep.compareTo(BigDecimal.ZERO) > 0) {
-                qty = qty.divide(filterQtyStep).setScale(0, RoundingMode.HALF_UP).multiply(filterQtyStep);
-            }
-            if (qty.compareTo(filterMinQty) < 0) {
-                qty = filterMinQty;
-            } else if (qty.compareTo(filterMaxQty) > 0) {
-                qty = filterMaxQty;
-            }
-            if (qty_down_only && qty.compareTo(pqty) > 0) {
-                qty = qty.subtract(filterQtyStep);
-                if (qty.compareTo(BigDecimal.ZERO) < 0) {
-                    qty = BigDecimal.ZERO;
-                }
-            }
-        }
-        return qty;
-    }
-    public BigDecimal normalizePrice(BigDecimal price) {
-        if (filterPrice) {
-            if (filterPriceTickSize.compareTo(BigDecimal.ZERO) > 0) {
-                price = price.divide(filterPriceTickSize).setScale(0, RoundingMode.HALF_UP).multiply(filterPriceTickSize);
-            }
-            if (price.compareTo(filterMinPrice) < 0) {
-                price = filterMinPrice;
-            } else if (price.compareTo(filterMaxPrice) > 0) {
-                price = filterMaxPrice;
-            }
-        }
-        return price;
-    }
-    public BigDecimal normalizeNotionalQuantity(BigDecimal quantity, BigDecimal price) {
-        if (filterNotional && price.compareTo(BigDecimal.ZERO) > 0) {
-            if (quantity.multiply(price).compareTo(filterMinNotional) < 0) {
-                quantity = filterMinNotional.divide(price, filterMinNotional.scale(), RoundingMode.HALF_UP);
-                quantity = normalizeQuantity(quantity, false);
-            }
-        }
-        return quantity;
     }
     
     private void tryStartSellUpSeq() {
@@ -536,52 +481,17 @@ public class tradePairProcess extends PeriodicProcessThread {
         app.log("");
         
         try {
-            ExchangeInfo info = client.getExchangeInfo();
-            SymbolInfo pair_sinfo = info.getSymbolInfo(symbol);
-            baseAssetSymbol = pair_sinfo.getBaseAsset();
-            quoteAssetSymbol = pair_sinfo.getQuoteAsset();
-
-            List<SymbolFilter> filters = pair_sinfo.getFilters();        
-            filters.forEach((filter)->{
-                if (null != filter.getFilterType()) switch (filter.getFilterType()) {
-                    case PRICE_FILTER:
-                        filterPrice = true;
-                        filterMinPrice = new BigDecimal(filter.getMinPrice());
-                        filterMaxPrice = new BigDecimal(filter.getMaxPrice());
-                        filterPriceTickSize = new BigDecimal(filter.getTickSize());
-                        break;
-                    case LOT_SIZE:
-                        filterQty = true;
-                        filterQtyStep = new BigDecimal(filter.getStepSize());
-                        filterMinQty = new BigDecimal(filter.getMinQty());
-                        filterMaxQty = new BigDecimal(filter.getMaxQty());
-                        break;
-                    case MIN_NOTIONAL:
-                        filterNotional = true;
-                        filterMinNotional = new BigDecimal(filter.getMinNotional());
-                        break;
-                    default:
-                        break;
-                }
-            });
+            filter = new CoinFilters(symbol, client);
+            filter.logFiltersInfo();
+            baseAssetSymbol = filter.getBaseAssetSymbol();
+            quoteAssetSymbol = filter.getQuoteAssetSymbol();
         } catch (Exception e) {
             app.log("symbol " + symbol + " error. Exiting from thread...");
+            doStop();
             return;
         }
 
         profitsChecker.placeOrUpdatePair(baseAssetSymbol, quoteAssetSymbol, symbol, true);
-
-        app.log(symbol + " filters:");
-        if (filterPrice) {
-            app.log("Price: min="+df8.format(filterMinPrice)+"; max="+df8.format(filterMaxPrice)+"; tick=" + df8.format(filterPriceTickSize));
-        }
-        if (filterQty) {
-            app.log("Quantity: min="+df8.format(filterMinQty)+"; max="+df8.format(filterMaxQty)+"; step=" + df8.format(filterQtyStep));
-        }
-        if (filterNotional) {
-            app.log("Notional: " + df8.format(filterMinNotional));
-        }
-        app.log("");
 
         if (!buyOnStart) {
             doWait(startDelayTime);

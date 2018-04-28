@@ -110,6 +110,10 @@ public class tradeProfitsController {
         return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
     }
 
+    public boolean hasPair(String symbolPair) {
+        return pair_map.containsKey(symbolPair);
+    }
+    
     private void testPayTradeComission(BigDecimal price, String quoteSymbol) {
         boolean use_spec_currency = !tradeComissionCurrency.isEmpty() && !tradeComissionCurrency.equals(quoteSymbol);
         BigDecimal comission_quote = price.multiply(tradeComissionPercent).divide(BigDecimal.valueOf(100));
@@ -144,7 +148,7 @@ public class tradeProfitsController {
         long result = 0;
         currencyPairItem pair = pair_map.get(symbolPair);
         pair.setPrice(buyPrice);
-        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice));
+        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), true);
         if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
             pair.startSellTransaction(sellAmount, sellAmount.multiply(sellPrice));
             if (isTestMode) {
@@ -155,7 +159,18 @@ public class tradeProfitsController {
         return result;
     }
     
+    public void PreBuy(String symbolPair, BigDecimal baseAmount, BigDecimal buyPrice) {
+        currencyPairItem pair = pair_map.get(symbolPair);
+        pair.setPrice(buyPrice);
+        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), false);
+        updatePairText(symbolPair, !isTestMode);
+    }
+    
     public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
+        return Buy(symbolPair, baseAmount, price, true);
+    }
+    
+    public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price, boolean use_transactions) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
@@ -165,30 +180,46 @@ public class tradeProfitsController {
                 SEMAPHORE.release();
                 return -1;
             }
+            if (baseAmount == null) {
+                app.log("Amount for BUY order of " + symbolPair + " is NULL!");
+                SEMAPHORE.release();
+                return -1;
+            }
+            boolean isMarket = (price == null) || !(isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_BUY));
+            if (isMarket) {
+                price = pair.getPrice();
+            }
+            if (price == null) {
+                app.log("Price for BUY order of " + symbolPair + " is NULL!");
+                SEMAPHORE.release();
+                return -1;
+            }
             if (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) < 0) {
                 app.log("Not enough " + pair.getSymbolQuote() + " to buy " + df6.format(baseAmount) + " " + pair.getSymbolBase() + ". Need " + df6.format(baseAmount.multiply(price)) + " but have " + df6.format(pair.getQuoteItem().getFreeValue()), true, true);
                 SEMAPHORE.release();
                 return -1;
             }
             if (!isTestMode) {
-                if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_BUY)) {
-                    //price = price / (1 + 0.01f * tradeComissionPercent);
-                    result = client.order(true, false, symbolPair, baseAmount, price);
-                } else {
+                if (isMarket) {
                     result = client.order(true, true, symbolPair, baseAmount, price);
+                } else {
+                    result = client.order(true, false, symbolPair, baseAmount, price);
                 }
                 if (result > 0) {
-                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
+                    if (use_transactions)
+                        pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
                     app.log("Order id = " + result, false, true);
                     Thread.sleep(550);
                     Order mord = client.getOrderStatus(symbolPair, result);
                     if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
-                        pair.rollbackTransaction();
+                        if (use_transactions)
+                            pair.rollbackTransaction();
                         app.log("Order cancelled!", true, true);
                         SEMAPHORE.release();
                         return -1;
                     } else if (mord.getStatus() == OrderStatus.FILLED) {
-                        pair.confirmTransaction();
+                        if (use_transactions)
+                            pair.confirmTransaction();
                         BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, true);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                             app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
@@ -209,14 +240,17 @@ public class tradeProfitsController {
             } else {
                 pair.setPrice(price);
                 pair.setLastOrderPrice(price);
-                pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
-                pair.confirmTransaction();
+                if (use_transactions) {
+                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
+                    pair.confirmTransaction();
+                }
                 testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
             }
             updatePairText(symbolPair, !isTestMode);
             SEMAPHORE.release();
         } catch (Exception e) {
-            app.log("Error: " + e.getMessage(), true, true);
+            e.printStackTrace(System.out);
+            mainApplication.getInstance().log("EXCEPTION in " + getClass() + " - " + e.getClass() + ": " + e.getLocalizedMessage(), false, true);
             SEMAPHORE.release();
             return -1;
         }
@@ -224,12 +258,30 @@ public class tradeProfitsController {
     }
 
     public long Sell(String symbolPair, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel) {
+        return Sell(symbolPair, baseAmount, price, OrderToCancel, true);
+    }
+    
+    public long Sell(String symbolPair, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel, boolean use_transactions) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
             currencyPairItem pair = pair_map.get(symbolPair);
             if (pair == null) {
                 app.log("Pair " + symbolPair + " not found!");
+                SEMAPHORE.release();
+                return -1;
+            }
+            if (baseAmount == null) {
+                app.log("Amount for SELL order of " + symbolPair + " is NULL!");
+                SEMAPHORE.release();
+                return -1;
+            }
+            boolean isMarket = (price == null) || !(isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_SELL));
+            if (isMarket) {
+                price = pair.getPrice();
+            }
+            if (price == null) {
+                app.log("Price for SELL order of " + symbolPair + " is NULL!");
                 SEMAPHORE.release();
                 return -1;
             }
@@ -246,23 +298,26 @@ public class tradeProfitsController {
                     });
                     Thread.sleep(750);
                 }
-                if (isLimitedOrders && (limitedOrderMode == LimitedOrderMode.LOMODE_SELLANDBUY || limitedOrderMode == LimitedOrderMode.LOMODE_SELL)) {
-                    result = client.order(false, false, symbolPair, baseAmount, price);
-                } else {
+                if (isMarket) {
                     result = client.order(false, true, symbolPair, baseAmount, price);
+                } else {
+                    result = client.order(false, false, symbolPair, baseAmount, price);
                 }
                 if (result > 0) {
-                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
+                    if (use_transactions)
+                        pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
                     app.log("Order id = " + result, false, true);
                     Thread.sleep(550);
                     Order mord = client.getOrderStatus(symbolPair, result);
                     if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
-                        pair.rollbackTransaction();
+                        if (use_transactions)
+                            pair.rollbackTransaction();
                         app.log("Order cancelled!", true, true);
                         SEMAPHORE.release();
                         return -1;
                     } else if (mord.getStatus() == OrderStatus.FILLED) {
-                        pair.confirmTransaction();
+                        if (use_transactions)
+                            pair.confirmTransaction();
                         BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, false);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                             app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
@@ -283,14 +338,17 @@ public class tradeProfitsController {
             } else {
                 pair.setPrice(price);
                 pair.setLastOrderPrice(price);
-                pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
-                pair.confirmTransaction();
+                if (use_transactions) {
+                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
+                    pair.confirmTransaction();
+                }
                 testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
             }
             updatePairText(symbolPair, !isTestMode);
             SEMAPHORE.release();
         } catch (Exception e) {
-            app.log("Error: " + e.getMessage(), true, true);
+            e.printStackTrace(System.out);
+            mainApplication.getInstance().log("EXCEPTION in " + getClass() + " - " + e.getClass() + ": " + e.getLocalizedMessage(), false, true);
             SEMAPHORE.release();
             return -1;
         }

@@ -79,9 +79,12 @@ public class currencyPairItem {
             } else if (in_order_buy_sell_cycle) {
                 txt = txt + "; [ORDER]";
             }
-            if (!order_pending && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
+            if (!order_pending && last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
                 float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
                 txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "% " + symbolQuote;
+            }
+            if (price != null) {
+                txt = txt + "; ["+df6.format(price)+"]";
             }
             txt = txt + ")";
         }
@@ -96,11 +99,13 @@ public class currencyPairItem {
         base_item.setInitialValue(val);
     }
     
-    public void preBuyTransaction(BigDecimal summBase, BigDecimal summQuote) {
+    public void preBuyTransaction(BigDecimal summBase, BigDecimal summQuote, boolean change_initial_values) {
         if (!in_order_buy_sell_cycle) {
             last_order_price = price;
-            base_item.addInitialValue(summBase.multiply(new BigDecimal("-1")));
-            quote_item.addInitialValue(summQuote);
+            if (change_initial_values) {
+                base_item.addInitialValue(summBase.multiply(new BigDecimal("-1")));
+                quote_item.addInitialValue(summQuote);
+            }
             in_order_buy_sell_cycle = true;
             order_pending = false;
             in_sell_order = false;
@@ -181,6 +186,22 @@ public class currencyPairItem {
         order_pending = false;
         base_item.decActiveOrders();
         quote_item.decActiveOrders();
+    }
+    
+    public void simpleBuy(BigDecimal summBase, BigDecimal summQuote) {
+        last_order_price = price;
+        summOrderBase = summBase;
+        summOrderQuote = summQuote;
+        quote_item.addFreeValue(summOrderQuote.multiply(new BigDecimal("-1")));
+        base_item.addFreeValue(summOrderBase);
+    }
+
+    public void simpleSell(BigDecimal summBase, BigDecimal summQuote) {
+        last_order_price = price;
+        summOrderBase = summBase;
+        summOrderQuote = summQuote;
+        quote_item.addFreeValue(summOrderQuote);
+        base_item.addFreeValue(summOrderBase.multiply(new BigDecimal("-1")));
     }
     
     /**
