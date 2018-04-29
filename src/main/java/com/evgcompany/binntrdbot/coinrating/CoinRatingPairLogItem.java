@@ -13,12 +13,9 @@ import com.evgcompany.binntrdbot.tradePairProcess;
  */
 public class CoinRatingPairLogItem {
     public String symbol;
-    public String fullname;
+    public String symbolQuote;
     public tradePairProcess pair = null;
-
-    public int rank = 0;
-    public float market_cap = 0;
-    public int events_count = 0;
+    public CoinRatingLogItem base_rating = new CoinRatingLogItem();
 
     public Float percent_hour = 0f;
     public Float percent_day = 0f;
@@ -41,8 +38,6 @@ public class CoinRatingPairLogItem {
     public Float sort = 0f;
     public int update_counter = 0;
 
-    public String last_event_date;
-    public long last_event_anno_millis = 0;
     public long last_rating_update_millis = 0;
     public double strategies_shouldenter_rate = 0;
     public double strategies_shouldexit_rate = 0;
@@ -52,16 +47,16 @@ public class CoinRatingPairLogItem {
     
     public void calculateRating() {
         rating = 0;
-        rating += events_count / 20;
+        rating += base_rating.events_count / 20;
         rating += volatility * 150;
-        if (last_event_anno_millis < 1*60*60*1000) {
+        if (base_rating.last_event_anno_millis < 1*60*60*1000) {
             rating++;
         }
-        if (last_event_anno_millis < 24*60*60*1000) {
+        if (base_rating.last_event_anno_millis < 24*60*60*1000) {
             rating++;
         }
-        if (market_cap > 20000000) {
-            rating += 0.2 * Math.pow(market_cap / 20000000, 0.333);
+        if (base_rating.market_cap > 20000000) {
+            rating += 0.2 * Math.pow(base_rating.market_cap / 20000000, 0.333);
         }
         if (hour_ago_price > 0 && hour_ago_price < current_price) {
             rating += current_price / hour_ago_price;

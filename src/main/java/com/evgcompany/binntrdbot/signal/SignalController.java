@@ -242,8 +242,8 @@ public class SignalController extends Thread {
                 if (c_rating > min_current_rating) {
                     if (coinRatingController == null || 
                         !coinRatingController.isAlive() ||
-                        coinRatingController.getCoinRatingMap().isEmpty() ||
-                        !coinRatingController.getCoinRatingMap().containsKey(item.getPair())
+                        coinRatingController.getCoinPairRatingMap().isEmpty() ||
+                        !coinRatingController.getCoinPairRatingMap().containsKey(item.getPair())
                     ) {
                         item.updateDoneAndTimeout();
                         if (!item.isDone() && !item.isTimeout()) {
@@ -486,7 +486,7 @@ public class SignalController extends Thread {
         symbol1 = symbol1.toUpperCase();
         symbol2 = symbol2.toUpperCase();
         String symbol_pair = symbol1 + symbol2;
-        if (coinRatingController != null && !coinRatingController.getCoinRatingMap().isEmpty() && !coinRatingController.getCoinRatingMap().containsKey(symbol_pair)) {
+        if (coinRatingController != null && !coinRatingController.getCoinPairRatingMap().isEmpty() && !coinRatingController.getCoinPairRatingMap().containsKey(symbol_pair)) {
             return;
         }
         List<Bar> bars = null;

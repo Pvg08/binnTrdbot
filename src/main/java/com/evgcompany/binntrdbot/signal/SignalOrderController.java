@@ -45,14 +45,14 @@ public class SignalOrderController extends PeriodicProcessThread {
             autoSignalOrder && 
             !coinRatingController.getEntered().containsKey(pair) && 
             !entered.containsKey(pair) && 
-            !coinRatingController.getCoinRatingMap().isEmpty() &&
+            !coinRatingController.getCoinPairRatingMap().isEmpty() &&
             item.getMedianProfitPercent() > 4
         ) {
             if (
                 !pair.isEmpty() && 
                 !paircontroller.hasPair(pair)
             ) {
-                CoinRatingPairLogItem toenter = coinRatingController.getCoinRatingMap().get(pair);
+                CoinRatingPairLogItem toenter = coinRatingController.getCoinPairRatingMap().get(pair);
                 if (toenter != null) {
                     if (autoSignalFastOrder) {
                         mainApplication.getInstance().log("Trying to auto fast-enter signal with pair: " + pair, true, true);

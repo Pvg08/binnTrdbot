@@ -68,9 +68,9 @@ public class SignalItem {
             CoinRatingPairLogItem logItem = null;
             if (mainApplication.getInstance().getCoinRatingController() != null &&
                     mainApplication.getInstance().getCoinRatingController().isAlive() &&
-                    !mainApplication.getInstance().getCoinRatingController().getCoinRatingMap().isEmpty()
+                    !mainApplication.getInstance().getCoinRatingController().getCoinPairRatingMap().isEmpty()
             ) {
-                logItem = mainApplication.getInstance().getCoinRatingController().getCoinRatingMap().get(getPair());
+                logItem = mainApplication.getInstance().getCoinRatingController().getCoinPairRatingMap().get(getPair());
             }
             if (logItem != null) {
                 result = logItem.current_price;
