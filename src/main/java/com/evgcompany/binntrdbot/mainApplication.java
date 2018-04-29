@@ -64,7 +64,7 @@ public class mainApplication extends javax.swing.JFrame {
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         listProfit.setModel(profitsChecker.getListProfitModel());
         listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
-        listRating.setModel(coinRatingController.getListHeroesModel());
+        listRating.setModel(coinRatingController.getCoinRatingModel());
         listBoxAutoStrategies.setModel(new DefaultListModel<String>());
         new StrategiesController().getStrategiesNames().forEach((strategy_name)->{
             ComboBoxMainStrategy.addItem(strategy_name);

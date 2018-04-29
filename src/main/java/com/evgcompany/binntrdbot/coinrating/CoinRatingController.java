@@ -67,7 +67,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private CoinRatingSort sortby = CoinRatingSort.CR_RANK;
     private boolean sortAsc = true;
 
-    Map<String, CoinRatingPairLogItem> heroesMap = new HashMap<>();
+    Map<String, CoinRatingPairLogItem> coinRatingMap = new HashMap<>();
     Map<String, JSONObject> coinRanks = new HashMap<>();
     private GlobalTrendUpdateEvent trendUpdateEvent = null;
 
@@ -80,8 +80,9 @@ public class CoinRatingController extends PeriodicProcessThread {
     private static final DecimalFormat df3p = new DecimalFormat("0.##%");
     private static final DecimalFormat df3 = new DecimalFormat("0.##");
     private static final DecimalFormat df6 = new DecimalFormat("0.#####");
+    private static final DecimalFormat df8 = new DecimalFormat("0.########");
 
-    private final DefaultListModel<String> listHeroesModel = new DefaultListModel<>();
+    private final DefaultListModel<String> coinRatingModel = new DefaultListModel<>();
     private final List<String> accountCoins = new ArrayList<>(0);
 
     private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
@@ -109,7 +110,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         double dnval = 0;
         double upcnt = 0;
         double dncnt = 0;
-        for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
+        for (Entry<String, CoinRatingPairLogItem> entry : coinRatingMap.entrySet()) {
             if (entry.getValue().rank <= globalTrendMaxRank) {
                 rankPairs.add(entry.getKey());
             }
@@ -189,8 +190,8 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     public boolean setPairSignalRating(String pair, float rating) {
-        if (heroesMap.containsKey(pair)) {
-            heroesMap.get(pair).signal_rating = rating;
+        if (coinRatingMap.containsKey(pair)) {
+            coinRatingMap.get(pair).signal_rating = rating;
             updateList();
             return true;
         }
@@ -201,7 +202,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         int non_zero_count = 0;
         int min_counter = -1;
         String min_key = "";
-        for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
+        for (Entry<String, CoinRatingPairLogItem> entry : coinRatingMap.entrySet()) {
             CoinRatingPairLogItem curr = entry.getValue();
             if (min_counter < 0 || min_counter > curr.update_counter) {
                 min_counter = curr.update_counter;
@@ -212,14 +213,14 @@ public class CoinRatingController extends PeriodicProcessThread {
             }
         }
         if (!min_key.isEmpty()) {
-            if (heroesMap.get(min_key).update_counter == 0) {
-                checkPair(heroesMap.get(min_key));
+            if (coinRatingMap.get(min_key).update_counter == 0) {
+                checkPair(coinRatingMap.get(min_key));
             } else {
-                updatePair(heroesMap.get(min_key));
+                updatePair(coinRatingMap.get(min_key));
             }
         }
         if (progressBar != null) {
-            progressBar.setMaximum(heroesMap.size());
+            progressBar.setMaximum(coinRatingMap.size());
             progressBar.setValue(non_zero_count);
         }
         if (min_counter > 0) {
@@ -433,7 +434,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     private void updateList() {
-        for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
+        for (Entry<String, CoinRatingPairLogItem> entry : coinRatingMap.entrySet()) {
             if (null != sortby) switch (sortby) {
                 case CR_RANK:
                     entry.getValue().sort = (float) entry.getValue().rank;
@@ -479,7 +480,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             }
         }
         
-        Map<String, CoinRatingPairLogItem> sortedMapAsc = sortByComparator(heroesMap, sortAsc);
+        Map<String, CoinRatingPairLogItem> sortedMapAsc = sortByComparator(coinRatingMap, sortAsc);
         int index = 0;
         for (Entry<String, CoinRatingPairLogItem> entry : sortedMapAsc.entrySet()) {
             CoinRatingPairLogItem curr = entry.getValue();
@@ -526,21 +527,37 @@ public class CoinRatingController extends PeriodicProcessThread {
                         text+=curr.last_event_date != null && !curr.last_event_date.isEmpty() ? curr.last_event_date : "Unknown date";
                         break;
                     default:
-                        text+=df6.format(curr.current_price);
+                        text+=df8.format(curr.current_price);
                         break;
                 }
                 
-                if (index < listHeroesModel.size()) {
-                    listHeroesModel.set(index, text);
+                if (index < coinRatingModel.size()) {
+                    coinRatingModel.set(index, text);
                 } else {
-                    listHeroesModel.addElement(text);
+                    coinRatingModel.addElement(text);
                 }
                 index++;
             }
         }
-        for (; index < listHeroesModel.size(); index++) {
-            listHeroesModel.remove(index);
+        for (; index < coinRatingModel.size(); index++) {
+            coinRatingModel.remove(index);
         }
+    }
+    
+    public int getCoinRank(String coin) {
+        if (coinRanks.containsKey(coin)) {
+            return Integer.parseInt(coinRanks.get(coin).optString("rank", "9999"));
+        }
+        return 9999;
+    }
+    
+    public double getCoinFirstPairRating(String coin) {
+        for (Entry<String, CoinRatingPairLogItem> entry : coinRatingMap.entrySet()) {
+            if (entry.getValue().symbol.indexOf(coin) == 0) {
+                return entry.getValue().rating;
+            }
+        }
+        return -1;
     }
     
     private void baseOrderEnter(String pair) {
@@ -552,10 +569,10 @@ public class CoinRatingController extends PeriodicProcessThread {
                 !signalOrderController.getEntered().containsKey(pair)
             ) && 
             !entered.containsKey(pair) && 
-            !heroesMap.isEmpty()
+            !coinRatingMap.isEmpty()
         ) {
             if (!pair.isEmpty() && !paircontroller.hasPair(pair)) {
-                CoinRatingPairLogItem toenter = heroesMap.get(pair);
+                CoinRatingPairLogItem toenter = coinRatingMap.get(pair);
                 if (toenter != null) {
                     if (autoFastOrder) {
                         mainApplication.getInstance().log("Trying to auto fast-enter with pair: " + pair, true, true);
@@ -610,10 +627,10 @@ public class CoinRatingController extends PeriodicProcessThread {
 
     private void checkFastEnter() {
         checkOrderExit();
-        if (autoOrder && entered.size() < maxEnter && !heroesMap.isEmpty()) {
+        if (autoOrder && entered.size() < maxEnter && !coinRatingMap.isEmpty()) {
             String pairMax = "";
             float maxR = 0;
-            for (Entry<String, CoinRatingPairLogItem> entry : heroesMap.entrySet()) {
+            for (Entry<String, CoinRatingPairLogItem> entry : coinRatingMap.entrySet()) {
                 CoinRatingPairLogItem curr = entry.getValue();
                 if (
                         curr != null && 
@@ -642,11 +659,11 @@ public class CoinRatingController extends PeriodicProcessThread {
     private void updateCurrentPrices() {
         try {
             SEMAPHORE_UPDATE.acquire();
-            heroesMap.forEach((symbol, curr) -> {
+            coinRatingMap.forEach((symbol, curr) -> {
                 curr.do_remove_flag = true;
             });
             List<TickerPrice> allPrices = client.getAllPrices();
-            if (heroesMap.isEmpty()) {
+            if (coinRatingMap.isEmpty()) {
                 mainApplication.getInstance().log("Found " + allPrices.size() + " pair prices...");
                 mainApplication.getInstance().log("Checking them using pattern: " + coinsPattern);
             }
@@ -655,8 +672,8 @@ public class CoinRatingController extends PeriodicProcessThread {
                     String symbol = price.getSymbol();                    
                     if (symbol.matches(".*(" + coinsPattern + ")$")) {
                         float rprice = Float.parseFloat(price.getPrice());
-                        if (heroesMap.containsKey(symbol)) {
-                            CoinRatingPairLogItem clog = heroesMap.get(symbol);
+                        if (coinRatingMap.containsKey(symbol)) {
+                            CoinRatingPairLogItem clog = coinRatingMap.get(symbol);
                             clog.current_price = rprice;
                             clog.do_remove_flag = false;
                             if (clog.start_price > 0) {
@@ -699,14 +716,14 @@ public class CoinRatingController extends PeriodicProcessThread {
                                 newlog.fullname = symbol;
                             }
 
-                            heroesMap.put(symbol, newlog);
+                            coinRatingMap.put(symbol, newlog);
                         }
                     }
                 }
             });
-            heroesMap.forEach((symbol, curr) -> {
+            coinRatingMap.forEach((symbol, curr) -> {
                 if (curr.do_remove_flag) {
-                    heroesMap.remove(symbol);
+                    coinRatingMap.remove(symbol);
                 }
             });
         } catch (InterruptedException ex) {
@@ -735,7 +752,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             }
         });
 
-        coinCycleController = new CoinCycleController(client, paircontroller, String.join(",", accountCoins));
+        coinCycleController = new CoinCycleController(client, this, String.join(",", accountCoins));
         if (useCycles) {
             coinCycleController.setDelayTime(90);
             coinCycleController.start();
@@ -804,11 +821,8 @@ public class CoinRatingController extends PeriodicProcessThread {
         mainApplication.getInstance().log("CoinRatingController finished.");
     }
 
-    /**
-     * @return the listHeroesModel
-     */
-    public DefaultListModel<String> getListHeroesModel() {
-        return listHeroesModel;
+    public DefaultListModel<String> getCoinRatingModel() {
+        return coinRatingModel;
     }
 
     public void setClient(TradingAPIAbstractInterface _client) {
@@ -959,7 +973,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     public Map<String, CoinRatingPairLogItem> getCoinRatingMap() {
-        return heroesMap;
+        return coinRatingMap;
     }
     
     public Map<String, CoinRatingPairLogItem> getEntered() {
@@ -1046,5 +1060,12 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public void setUseCycles(boolean useCycles) {
         this.useCycles = useCycles;
+    }
+
+    /**
+     * @return the paircontroller
+     */
+    public tradePairProcessController getPaircontroller() {
+        return paircontroller;
     }
 }

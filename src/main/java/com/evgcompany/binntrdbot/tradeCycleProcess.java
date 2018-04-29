@@ -27,7 +27,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
     private boolean isBuy;
-    private List<CoinFilters> filters = new ArrayList<>();
+    private final List<CoinFilters> filters = new ArrayList<>();
     private CoinFilters filter = null;
 
     private final List<String> cycle = new ArrayList<>();
@@ -55,6 +55,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         client = cycleController.getClient();
         profitsChecker = cycleController.getPairProcessController().getProfitsChecker();
         startMillis = System.currentTimeMillis();
+        isBuy = false;
     }
 
     public void addChain(String pair, double price) {
@@ -76,19 +77,34 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             profitsChecker.placeOrUpdatePair(cfilter.getBaseAssetSymbol(), cfilter.getQuoteAssetSymbol(), csymbol, true);
             profitsChecker.setPairPrice(csymbol, prices.get(i));
         }
+        profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+    }
+
+    private void doInitWaitNextStep() {
+        limitOrderId = 0;
+        profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+    }
+    
+    private void doPostStep() {
+        for(int i = 0; i<cycle.size(); i++) {
+            String csymbol = cycle.get(i);
+            csymbol = csymbol.substring(0, csymbol.indexOf(" ")).trim();
+            profitsChecker.removeCurrencyPair(csymbol);
+        }
     }
     
     private void doNextStep() {
         if (limitOrderId != 0) {
             return;
         }
+        if (cycleStep >= 0 && isBuy) {
+            profitsChecker.finishOrder(symbol, true, current_order_price);
+            profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+        }
         if (profitsChecker.isTestMode()) {
             doWait(10000);
         }
         cycleStep++;
-        if (cycleStep > 0 && isBuy) {
-            profitsChecker.finishOrder(symbol, true, current_order_price);
-        }
         if (cycleStep >= cycle.size()) {
             doStop();
             mainApplication.getInstance().log("Cycle "+cycle+" is finished!", true, true);
@@ -127,7 +143,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private void orderSuccessfullyFinish() {
         limitOrderId = 0;
         profitsChecker.finishOrder(symbol, true, last_ordered_price);
-        profitsChecker.updateAllBalances(true);
+        if (!profitsChecker.isTestMode()) {
+            profitsChecker.updateAllBalances(true);
+        } else {
+            profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+        }
     }
     private void orderAbort() {
         if (limitOrderId > 0) {
@@ -146,20 +166,21 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             // @todo
         }
         
-        profitsChecker.updateAllBalances(true);
+        if (!profitsChecker.isTestMode()) {
+            profitsChecker.updateAllBalances(true);
+        }
         doStop();
         mainApplication.getInstance().log("Cycle "+cycle+" is aborted!", true, true);
     }
     
     private void checkOrders() {
         if (limitOrderId <= 0) {
-            if (profitsChecker.isTestMode()) {
-                doNextStep();
-            }
             return;
         }
         Order order = client.getOrderStatus(symbol, limitOrderId);
 
+        System.out.println(order);
+        
         if (order == null) {
             return;
         }
@@ -183,6 +204,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                 orderSuccessfullyFinish();
             } else {
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
+                limitOrderId = 0;
                 orderAbort();
             }
         } else {
@@ -212,7 +234,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Successful!", true, true);
                     lastOrderMillis = System.currentTimeMillis();
                     if (limitOrderId == 0) {
-                        doNextStep();
+                        doInitWaitNextStep();
                     }
                 } else {
                     mainApplication.getInstance().log("Error!", true, true);
@@ -221,7 +243,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     orderAbort();
                 }
             } else {
-                mainApplication.getInstance().log("Can't buy " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")");
+                BigDecimal avail = profitsChecker.getAvailableCount(quoteSymbol);
+                if (avail == null) avail = BigDecimal.valueOf(-1);
+                mainApplication.getInstance().log("Can't buy " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")" + " (avail summ = "+avail+")");
                 last_ordered_amount = tobuy_amount;
                 last_ordered_price = tobuy_price;
                 orderAbort();
@@ -242,8 +266,10 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Successful!", true, true);
                     lastOrderMillis = System.currentTimeMillis();
                     if (limitOrderId == 0) {
-                        profitsChecker.updateAllBalances(true);
-                        doNextStep();
+                        if (!profitsChecker.isTestMode()) {
+                            profitsChecker.updateAllBalances(true);
+                        }
+                        doInitWaitNextStep();
                     }
                 } else {
                     mainApplication.getInstance().log("Error!", true, true);
@@ -252,7 +278,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     orderAbort();
                 }
             } else {
-                mainApplication.getInstance().log("Can't sell " + tosell_amount + " " + symbol_order + "", false, true);
+                BigDecimal avail = profitsChecker.getAvailableCount(baseSymbol);
+                if (avail == null) avail = BigDecimal.valueOf(-1);
+                mainApplication.getInstance().log("Can't sell " + tosell_amount + " " + symbol_order + " (avail summ = "+avail+")", false, true);
                 last_ordered_amount = tosell_amount.multiply(tosell_price);
                 last_ordered_price = tosell_price;
                 orderAbort();
@@ -270,16 +298,17 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         mainApplication.getInstance().log("");
 
         doPreStep();
-        doNextStep();
     }
     
     @Override
     protected void runBody() {
         checkOrders();
+        doNextStep();
     }
 
     @Override
     protected void runFinish() {
+        doPostStep();
         mainApplication.getInstance().log("thread for cycle " + cycle + " is stopped...");
     }
 

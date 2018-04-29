@@ -109,6 +109,11 @@ public class tradeProfitsController {
         currencyPairItem pair = pair_map.get(symbolPair);
         return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
     }
+    public BigDecimal getAvailableCount(String assetSymbol) {
+        currencyItem citem = curr_map.get(assetSymbol);
+        if (citem == null) return null;
+        return citem.getFreeValue();
+    }
 
     public boolean hasPair(String symbolPair) {
         return pair_map.containsKey(symbolPair);
@@ -291,7 +296,7 @@ public class tradeProfitsController {
                 return -1;
             }
             if (!isTestMode) {
-                if (!OrderToCancel.isEmpty()) {
+                if (OrderToCancel != null && !OrderToCancel.isEmpty()) {
                     OrderToCancel.forEach((order_id)->{
                         client.cancelOrder(symbolPair, order_id);
                         app.log("Canceling LimitOrder "+order_id+"!", true, true);
@@ -473,6 +478,13 @@ public class tradeProfitsController {
             }
         }
     }
+    
+    public void updateAllPairTexts(boolean updateBalance) {
+        pair_map.forEach((symbolPair, item) -> {
+            placeOrUpdatePair("", "", symbolPair, updateBalance);
+        });
+    }
+    
     public void updatePairText(String symbolPair, boolean updateBalance) {
         placeOrUpdatePair("", "", symbolPair, updateBalance);
     }
@@ -591,7 +603,7 @@ public class tradeProfitsController {
         tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(2));
     }
 
-    void removeCurrencyPair(String symbolPair) {
+    public void removeCurrencyPair(String symbolPair) {
         if (pair_map.containsKey(symbolPair)) {
             int list_index_to_remove = pair_map.get(symbolPair).getListIndex();
             listCurrenciesModel.remove(list_index_to_remove);

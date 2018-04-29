@@ -32,6 +32,7 @@ public class currencyPairItem {
     
     private static final DecimalFormat df5 = new DecimalFormat("0.#####");
     private static final DecimalFormat df6 = new DecimalFormat("0.######");
+    private static final DecimalFormat df8 = new DecimalFormat("0.########");
     
     public currencyPairItem(currencyItem base_item, currencyItem quote_item, String symbolPair) {
         this.base_item = base_item;
@@ -56,7 +57,8 @@ public class currencyPairItem {
         if (base_item.isPairKey()) {
             txt = txt + " ["+symbolPair+"]";
         }
-        if (base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || in_order_buy_sell_cycle || order_pending) {
+        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || in_order_buy_sell_cycle || order_pending;
+        if (is_changed) {
             txt = txt + " (";
             
             txt = txt + "initially " + df6.format(base_item.getInitialValue());
@@ -71,9 +73,9 @@ public class currencyPairItem {
                 txt = txt + "pair";
             }*/
             
-            if (base_item.getOrdersCount() > 0) {
+            /*if (base_item.getOrdersCount() > 0) {
                 txt = txt + "; " + base_item.getOrdersCount() + " orders";
-            }
+            }*/
             if (order_pending) {
                 txt = txt + "; [PENDING "+(in_sell_order ? "SELL" : "BUY")+"]";
             } else if (in_order_buy_sell_cycle) {
@@ -83,11 +85,18 @@ public class currencyPairItem {
                 float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
                 txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "% " + symbolQuote;
             }
-            if (price != null) {
-                txt = txt + "; ["+df6.format(price)+"]";
-            }
+        }
+        
+        if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
+            txt = txt + "; ["+df8.format(price)+"]";
+        } else {
+            txt = txt + "; [-]";
+        }
+        
+        if (is_changed) {
             txt = txt + ")";
         }
+        
         return txt;
     }
 
@@ -146,6 +155,8 @@ public class currencyPairItem {
             quote_item.addFreeValue(summOrderQuote);
             in_order_buy_sell_cycle = false;
             last_order_price = BigDecimal.ZERO;
+            base_item.incOrderCount();
+            quote_item.incOrderCount();
         } else {
             quote_item.addLimitValue(summOrderQuote.multiply(new BigDecimal("-1")));
             base_item.addFreeValue(summOrderBase);
