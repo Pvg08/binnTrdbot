@@ -79,42 +79,51 @@
                           <Component id="jScrollPane3" max="32767" attributes="0"/>
                           <Component id="jScrollPane4" max="32767" attributes="0"/>
                           <Group type="102" alignment="0" attributes="0">
-                              <Component id="buttonRun" min="-2" pref="85" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonStop" min="-2" pref="85" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="buttonPause" min="-2" pref="85" max="-2" attributes="0"/>
+                              <Component id="jLabel11" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace max="32767" attributes="0"/>
+                              <Component id="labelAccountCost" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel10" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
-                          <Group type="102" alignment="0" attributes="0">
-                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                  <Component id="buttonBuy" max="32767" attributes="0"/>
-                                  <Component id="buttonWebBrowserOpen" pref="80" max="32767" attributes="0"/>
+                          <Group type="102" attributes="0">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="buttonRun" min="-2" pref="85" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="buttonStop" min="-2" pref="85" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="buttonPause" min="-2" pref="85" max="-2" attributes="0"/>
+                                  </Group>
+                                  <Component id="jLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel10" min="-2" max="-2" attributes="0"/>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                          <Component id="buttonBuy" max="32767" attributes="0"/>
+                                          <Component id="buttonWebBrowserOpen" pref="80" max="32767" attributes="0"/>
+                                      </Group>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                          <Component id="buttonNNBTrain" max="32767" attributes="0"/>
+                                          <Component id="buttonSell" max="32767" attributes="0"/>
+                                          <Component id="buttonNNCTrain" alignment="0" pref="80" max="32767" attributes="0"/>
+                                      </Group>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                          <Component id="buttonNNBAdd" max="32767" attributes="0"/>
+                                          <Component id="buttonCancelLimit" min="-2" pref="80" max="-2" attributes="0"/>
+                                          <Component id="buttonNNCAdd" alignment="0" max="32767" attributes="0"/>
+                                      </Group>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                          <Component id="buttonUpdate" pref="80" max="32767" attributes="0"/>
+                                          <Component id="buttonRemove" max="32767" attributes="0"/>
+                                      </Group>
+                                      <EmptySpace min="-2" pref="78" max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                          <Component id="buttonShowPlot" pref="79" max="32767" attributes="0"/>
+                                          <Component id="ButtonStatistics" max="32767" attributes="0"/>
+                                      </Group>
+                                  </Group>
                               </Group>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                  <Component id="buttonNNBTrain" max="32767" attributes="0"/>
-                                  <Component id="buttonSell" max="32767" attributes="0"/>
-                                  <Component id="buttonNNCTrain" alignment="0" pref="80" max="32767" attributes="0"/>
-                              </Group>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                  <Component id="buttonNNBAdd" max="32767" attributes="0"/>
-                                  <Component id="buttonCancelLimit" min="-2" pref="80" max="-2" attributes="0"/>
-                                  <Component id="buttonNNCAdd" alignment="0" max="32767" attributes="0"/>
-                              </Group>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                  <Component id="buttonUpdate" pref="80" max="32767" attributes="0"/>
-                                  <Component id="buttonRemove" max="32767" attributes="0"/>
-                              </Group>
-                              <EmptySpace min="-2" pref="78" max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                  <Component id="buttonShowPlot" pref="79" max="32767" attributes="0"/>
-                                  <Component id="ButtonStatistics" max="32767" attributes="0"/>
-                              </Group>
+                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                           </Group>
                       </Group>
                   </Group>
@@ -189,7 +198,10 @@
                           <Component id="buttonPause" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                      <Component id="jLabel11" min="-2" max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel11" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="labelAccountCost" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
                       <EmptySpace max="-2" attributes="0"/>
                       <Component id="jScrollPane4" min="-2" pref="58" max="-2" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
@@ -1642,6 +1654,11 @@
           <Color blue="66" green="0" red="ff" type="rgb"/>
         </Property>
         <Property name="text" type="java.lang.String" value="DOWN: 0%"/>
+      </Properties>
+    </Component>
+    <Component class="javax.swing.JLabel" name="labelAccountCost">
+      <Properties>
+        <Property name="text" type="java.lang.String" value="Account cost: Unknown"/>
       </Properties>
     </Component>
   </SubComponents>

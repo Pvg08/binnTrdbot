@@ -16,6 +16,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.shortestpath.KShortestPaths;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.DefaultEdge;
@@ -29,7 +31,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph = null;
     DefaultDirectedGraph<String, DefaultEdge> graph_pair = null;
     
-    CoinRatingController coinRatingController = null;
+    private CoinRatingController coinRatingController = null;
     private tradePairProcessController pairProcessController = null;
     private tradeCycleProcess cycleProcess = null;
     
@@ -37,9 +39,10 @@ public class CoinCycleController extends PeriodicProcessThread {
     private final double comissionPercent;
     private boolean initialized = false;
     
-    private final double minProfitPercent = 1.0;
-    private final double maxGlobalRank = 150;
-    private final double minCalculatedRating = 10;
+    private final double minProfitPercent = 1.2;
+    private final double maxGlobalCoinRank = 200;
+    private final double minPairRating = 2;
+    private final double minPairBaseHourVolume = 30;
 
     public CoinCycleController(TradingAPIAbstractInterface client, CoinRatingController coinRatingController) {
         this.client = client;
@@ -83,7 +86,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         graph_pair = new DefaultDirectedGraph<>(DefaultEdge.class);
         coinRatingController.getCoinInfo().getCoinPairs().forEach((pkey, coins)->{
             if (coins.length == 2) {
-                addPairToGraph(coins[0], coins[1], coinRatingController.getCoinInfo().getInitialPrices().get(pkey));
+                addPairToGraph(coins[0], coins[1], coinRatingController.getCoinInfo().getLastPrices().get(pkey));
             }
         });
         mainApplication.getInstance().log("Coin graph built: Vertexes=" + graph.vertexSet().size() + "; Edges=" + graph.edgeSet().size() + "; Straight pairs=" + graph_pair.edgeSet().size());
@@ -99,6 +102,14 @@ public class CoinCycleController extends PeriodicProcessThread {
         return totalWeight;
     }
 
+    public List<String> getRevertPathDescription(String coinLast, String coinBase) {
+        if (coinLast.equals(coinBase)) return null;
+        KShortestPaths pathsF = new KShortestPaths(graph, 100, 4);
+        List<GraphPath<String, DefaultWeightedEdge>> paths = pathsF.getPaths(coinLast, coinBase);
+        if (paths.isEmpty()) return null;
+        return getCycleDescription(paths.get(0).getVertexList());
+    }
+    
     private List<String> getCycleDescription(List<String> cycle) {
         List<String> cycle_description = new ArrayList<>();
         for(int i=1; i < cycle.size(); i++) {
@@ -133,6 +144,12 @@ public class CoinCycleController extends PeriodicProcessThread {
             if (!graph_pair.containsEdge(symbol2, symbol1) && !graph_pair.containsEdge(symbol1, symbol2)) {
                 return false;
             }
+            String symbol;
+            if (graph_pair.containsEdge(symbol2, symbol1)) {
+                symbol = symbol2 + symbol1;
+            } else {
+                symbol = symbol1 + symbol2;
+            }
             if (pairProcessController != null) {
                 if (pairProcessController.hasPair(symbol1 + symbol2) || pairProcessController.hasPair(symbol2 + symbol1)) {
                     return false;
@@ -141,30 +158,28 @@ public class CoinCycleController extends PeriodicProcessThread {
             if (coinRatingController != null) {
                 if (!symbol1.equals(coinRatingController.getCoinInfo().getBaseCoin()) && !coinRatingController.getCoinInfo().getQuoteAssets().contains(symbol1)) {
                     double coinrank = coinRatingController.getCoinRank(symbol1);
-                    if (coinrank > maxGlobalRank) {
-                        System.out.println(symbol1 + ": rank " + coinrank + " > " + maxGlobalRank);
+                    if (coinrank > maxGlobalCoinRank) {
+                        //System.out.println(symbol1 + ": rank " + coinrank + " > " + maxGlobalRank);
                         return false;
-                    }
-                    if (coinRatingController.isAnalyzer()) {
-                        double coinRating = coinRatingController.getCoinFirstPairRating(symbol1);
-                        if (coinRating < minCalculatedRating) {
-                            System.out.println(symbol1 + ": rating " + coinRating + " < " + minCalculatedRating);
-                            return false;
-                        }
                     }
                 }
                 if (!symbol2.equals(coinRatingController.getCoinInfo().getBaseCoin()) && !coinRatingController.getCoinInfo().getQuoteAssets().contains(symbol2)) {
                     double coinrank = coinRatingController.getCoinRank(symbol2);
-                    if (coinrank > maxGlobalRank) {
-                        System.out.println(symbol2 + ": rank " + coinrank + " > " + maxGlobalRank);
+                    if (coinrank > maxGlobalCoinRank) {
+                        //System.out.println(symbol2 + ": rank " + coinrank + " > " + maxGlobalRank);
                         return false;
                     }
-                    if (coinRatingController.isAnalyzer()) {
-                        double coinRating = coinRatingController.getCoinFirstPairRating(symbol2);
-                        if (coinRating < minCalculatedRating) {
-                            System.out.println(symbol2 + ": rating " + coinRating + " < " + minCalculatedRating);
-                            return false;
-                        }
+                }
+                if (coinRatingController.isAnalyzer()) {
+                    double coinPairVolume = coinRatingController.getPairBaseHourVolume(symbol);
+                    if (coinPairVolume < minPairBaseHourVolume) {
+                        System.out.println(symbol + ": volume " + coinPairVolume + " < " + minPairBaseHourVolume);
+                        return false;
+                    }
+                    double coinPairRating = coinRatingController.getPairRating(symbol);
+                    if (coinPairRating < minPairRating) {
+                        System.out.println(symbol + ": rating " + coinPairRating + " < " + minPairRating);
+                        return false;
                     }
                 }
             }
@@ -253,7 +268,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         });
     }
 
-    public void runInit() {
+    private void runInit() {
         initialized = false;
         doWait(1000);
         mainApplication.getInstance().log("Graph thread starting...");
@@ -264,7 +279,6 @@ public class CoinCycleController extends PeriodicProcessThread {
         mainApplication.getInstance().log("Cycle coins to check: " + coinRatingController.getCoinInfo().getCoinsToCheck());
         mainApplication.getInstance().log("Graph init end...");
         doWait(3000);
-        checkCycles();
     }
     
     @Override
@@ -275,7 +289,10 @@ public class CoinCycleController extends PeriodicProcessThread {
     @Override
     protected void runBody() {
         updatePrices();
-        if (cycleProcess == null || !cycleProcess.isAlive()) {
+        if ((cycleProcess == null || !cycleProcess.isAlive()) && (coinRatingController == null || (
+            !coinRatingController.isAnalyzer() ||
+            coinRatingController.isHaveAllCoinsPairsInfo()
+        ))) {
             checkCycles();
         }
     }
@@ -305,5 +322,12 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public tradePairProcessController getPairProcessController() {
         return pairProcessController;
+    }
+
+    /**
+     * @return the coinRatingController
+     */
+    public CoinRatingController getCoinRatingController() {
+        return coinRatingController;
     }
 }

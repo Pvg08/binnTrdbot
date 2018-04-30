@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
@@ -26,6 +27,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
+    private String mainAsset;
     private boolean isBuy;
     private final List<CoinFilters> filters = new ArrayList<>();
     private CoinFilters filter = null;
@@ -45,8 +47,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private BigDecimal current_order_amount;
     private BigDecimal current_order_price;
     
+    private boolean reverting = false;
     private boolean useStopLimited = false;
-    private int stopLimitTimeout = 21600000;
+    private int stopLimitTimeout = 5 * 60 * 1000;//21600000;
     
     private static final DecimalFormat df8 = new DecimalFormat("0.########");
 
@@ -56,6 +59,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         profitsChecker = cycleController.getPairProcessController().getProfitsChecker();
         startMillis = System.currentTimeMillis();
         isBuy = false;
+        mainAsset = "";
     }
 
     public void addChain(String pair, double price) {
@@ -117,6 +121,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         filter = filters.get(cycleStep);
         baseAssetSymbol = filter.getBaseAssetSymbol();
         quoteAssetSymbol = filter.getQuoteAssetSymbol();
+        if (mainAsset.isEmpty()) {
+            mainAsset = isBuy ? quoteAssetSymbol : baseAssetSymbol;
+        }
         symbol = baseAssetSymbol+quoteAssetSymbol;
         
         profitsChecker.placeOrUpdatePair(baseAssetSymbol, quoteAssetSymbol, symbol, true);
@@ -137,7 +144,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             profitsChecker.PreBuy(symbol, current_order_amount, current_order_price);
         }
         
-        doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, cycleStep == 0, current_order_price, current_order_amount);
+        //System.out.println(symbol + " revert paths to "+mainAsset+":");
+        //System.out.println("From " + baseAssetSymbol + ": " + cycleController.getRevertPathDescription(baseAssetSymbol, mainAsset));
+        //System.out.println("From " + quoteAssetSymbol + ": " + cycleController.getRevertPathDescription(quoteAssetSymbol, mainAsset));
+        
+        doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, false, current_order_price, current_order_amount);
     }
     
     private void orderSuccessfullyFinish() {
@@ -151,26 +162,78 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     }
     private void orderAbort() {
         if (limitOrderId > 0) {
-            profitsChecker.cancelOrder(symbol, limitOrderId);
+            if (!profitsChecker.isTestMode()) {
+                profitsChecker.cancelOrder(symbol, limitOrderId);
+            }
             doWait(1000);
         }
         profitsChecker.finishOrder(symbol, false, null);
         limitOrderId = -1;
         
-        if (cycleStep == cycle.size()-1) {
-            //doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, true, current_order_price, current_order_amount);
-            // @todo
-        } else if (cycleStep >= 0) {
-            // @todo
-        } else {
-            // @todo
-        }
+        revertCoinCycle();
         
         if (!profitsChecker.isTestMode()) {
             profitsChecker.updateAllBalances(true);
         }
         doStop();
         mainApplication.getInstance().log("Cycle "+cycle+" is aborted!", true, true);
+    }
+    
+    private void revertCoinCycle() {
+        
+        reverting = true;
+        
+        BigDecimal successPart = last_ordered_amount;
+        BigDecimal failurePart = current_order_amount.subtract(successPart);
+        
+        String successCoin = isBuy ? baseAssetSymbol : quoteAssetSymbol;
+        String failureCoin = isBuy ? quoteAssetSymbol : baseAssetSymbol;
+        
+        List<String> successRevertPath = cycleController.getRevertPathDescription(successCoin, mainAsset);
+        List<String> failureRevertPath = cycleController.getRevertPathDescription(failureCoin, mainAsset);
+        
+        if (successRevertPath != null && successPart.compareTo(BigDecimal.ZERO) > 0) {
+            doRevertOrder(successPart, successRevertPath);
+        }
+        if (failureRevertPath != null && failurePart.compareTo(BigDecimal.ZERO) > 0) {
+            doRevertOrder(failurePart, failureRevertPath);
+        }
+        
+        profitsChecker.finishOrder(symbol, true, last_ordered_price);
+        if (!profitsChecker.isTestMode()) {
+            profitsChecker.updateAllBalances(true);
+        } else {
+            profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+        }
+    }
+    
+    private void doRevertOrder(BigDecimal amount, List<String> path) {
+        System.out.println("Reverting " + amount + " " + path);
+        if (path.isEmpty()) return;
+        if (path.size() > 1) {
+            // @todo
+        }
+        if (cycleStep >= 0 && isBuy) {
+            profitsChecker.finishOrder(symbol, true, current_order_price);
+            profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+        }
+        symbol = path.get(0);
+        isBuy = symbol.matches("^.* BUY$");
+        symbol = symbol.substring(0, symbol.indexOf(" ")).trim();
+        filter = new CoinFilters(symbol, client);
+        filter.logFiltersInfo();
+        profitsChecker.placeOrUpdatePair(filter.getBaseAssetSymbol(), filter.getQuoteAssetSymbol(), symbol, true);
+        baseAssetSymbol = filter.getBaseAssetSymbol();
+        quoteAssetSymbol = filter.getQuoteAssetSymbol();
+        current_order_amount = amount;
+        if (cycleController.getCoinRatingController().getCoinInfo().getLastPrices().containsKey(symbol)) {
+            current_order_price = BigDecimal.valueOf(cycleController.getCoinRatingController().getCoinInfo().getLastPrices().get(symbol));
+        }
+        if (!isBuy) {
+            profitsChecker.PreBuy(symbol, current_order_amount, current_order_price);
+        }
+        doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, true, current_order_price, current_order_amount);
+        doWait(2000);
     }
     
     private void checkOrders() {
@@ -201,9 +264,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             if (order.getStatus() == OrderStatus.FILLED && Double.parseDouble(order.getExecutedQty()) >= Double.parseDouble(order.getOrigQty())) {
                 last_ordered_price = new BigDecimal(order.getPrice());
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
+                if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(last_ordered_price);
                 orderSuccessfullyFinish();
             } else {
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
+                if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
                 limitOrderId = 0;
                 orderAbort();
             }
@@ -211,6 +276,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             if (useStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopLimitTimeout) {
                 mainApplication.getInstance().log("We wait too long. Need to stop this "+symbol+"'s cycle order...");
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
+                if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
                 orderAbort();
             }
         }
@@ -224,7 +290,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             filter.prepareForBuy(profitsChecker);
             BigDecimal tobuy_price = filter.getCurrentPrice();
             BigDecimal tobuy_amount = filter.getCurrentAmount();
-            if (profitsChecker.canBuy(symbol_order, tobuy_amount, tobuy_price)) {
+            if ((reverting || Math.random() < 0.8) && profitsChecker.canBuy(symbol_order, tobuy_amount, tobuy_price)) {
                 mainApplication.getInstance().log("BYING " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")", true, true);
                 long result = profitsChecker.Buy(symbol_order, tobuy_amount, isMarket ? null : tobuy_price);
                 if (result >= 0) {
@@ -234,21 +300,21 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Successful!", true, true);
                     lastOrderMillis = System.currentTimeMillis();
                     if (limitOrderId == 0) {
-                        doInitWaitNextStep();
+                        if (!reverting) doInitWaitNextStep();
                     }
                 } else {
                     mainApplication.getInstance().log("Error!", true, true);
-                    last_ordered_amount = tobuy_amount;
+                    last_ordered_amount = BigDecimal.ZERO;
                     last_ordered_price = tobuy_price;
-                    orderAbort();
+                    if (!reverting) orderAbort();
                 }
             } else {
                 BigDecimal avail = profitsChecker.getAvailableCount(quoteSymbol);
                 if (avail == null) avail = BigDecimal.valueOf(-1);
                 mainApplication.getInstance().log("Can't buy " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")" + " (avail summ = "+avail+")");
-                last_ordered_amount = tobuy_amount;
+                last_ordered_amount = BigDecimal.ZERO;
                 last_ordered_price = tobuy_price;
-                orderAbort();
+                if (!reverting) orderAbort();
             }
         } else {
             filter.setCurrentPrice(price);
@@ -256,7 +322,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             filter.prepareForSell(profitsChecker);
             BigDecimal tosell_price = filter.getCurrentPrice();
             BigDecimal tosell_amount = filter.getCurrentAmount();
-            if (profitsChecker.canSell(symbol_order, tosell_amount)) {
+            if ((reverting || Math.random() < 0.8) && profitsChecker.canSell(symbol_order, tosell_amount)) {
                 mainApplication.getInstance().log("SELLING " + df8.format(tosell_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tosell_price) + ")", true, true);
                 long result = profitsChecker.Sell(symbol_order, tosell_amount, isMarket ? null : tosell_price, null);
                 if (result >= 0) {
@@ -269,21 +335,21 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                         if (!profitsChecker.isTestMode()) {
                             profitsChecker.updateAllBalances(true);
                         }
-                        doInitWaitNextStep();
+                        if (!reverting) doInitWaitNextStep();
                     }
                 } else {
                     mainApplication.getInstance().log("Error!", true, true);
-                    last_ordered_amount = tosell_amount.multiply(tosell_price);
+                    last_ordered_amount = BigDecimal.ZERO;
                     last_ordered_price = tosell_price;
-                    orderAbort();
+                    if (!reverting) orderAbort();
                 }
             } else {
                 BigDecimal avail = profitsChecker.getAvailableCount(baseSymbol);
                 if (avail == null) avail = BigDecimal.valueOf(-1);
                 mainApplication.getInstance().log("Can't sell " + tosell_amount + " " + symbol_order + " (avail summ = "+avail+")", false, true);
-                last_ordered_amount = tosell_amount.multiply(tosell_price);
+                last_ordered_amount = BigDecimal.ZERO;
                 last_ordered_price = tosell_price;
-                orderAbort();
+                if (!reverting) orderAbort();
             }
         }
     }

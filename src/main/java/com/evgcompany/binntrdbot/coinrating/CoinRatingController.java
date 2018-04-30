@@ -5,8 +5,6 @@
  */
 package com.evgcompany.binntrdbot.coinrating;
 
-import com.binance.api.client.domain.general.SymbolInfo;
-import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.*;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
@@ -29,10 +27,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
+import javax.swing.JLabel;
 import javax.swing.JProgressBar;
 import org.json.*;
 import org.ta4j.core.Bar;
@@ -75,7 +75,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private long updateTime = 10;
     private final long updateTrendTime = 450;
     private long updateTrendMillis = 0;
-    private boolean have_all_coins_info = false;
+    private boolean have_all_coins_pairs_info = false;
 
     private static final DecimalFormat df3p = new DecimalFormat("0.##%");
     private static final DecimalFormat df3 = new DecimalFormat("0.##");
@@ -89,7 +89,10 @@ public class CoinRatingController extends PeriodicProcessThread {
     private int secondsOrderEnterWait = 600;
     private float minRatingForOrder = 5;
     private final int globalTrendMaxRank = 40;
+    
     private JProgressBar progressBar = null;
+    private JLabel labelAccountCost = null;
+    private double initialCost = -1;
     
     private double upTrendPercent = 0;
     private double downTrendPercent = 0;
@@ -197,38 +200,94 @@ public class CoinRatingController extends PeriodicProcessThread {
         return false;
     }
     
+    private void showAccountCost() {
+        if (labelAccountCost != null) {
+            double curCost = coinInfo.getBaseAccountCost();
+            if (initialCost < 0) {
+                initialCost = curCost;
+            }
+            if (initialCost >= 0) {
+                String cost_text = "Account cost: " + df8.format(curCost) + " " + coinInfo.getBaseCoin();
+                if (initialCost > 0) {
+                    double changePercent = (curCost - initialCost) / initialCost;
+                    cost_text = cost_text + " ("+df3p.format(changePercent)+")";
+                }
+                labelAccountCost.setText(cost_text);
+            }
+        }
+    }
+    
     private void checkFromTop() {
-        int non_zero_count = 0;
-        int min_counter = -1;
-        String min_key = "";
-        for (Entry<String, CoinRatingPairLogItem> entry : coinPairRatingMap.entrySet()) {
-            CoinRatingPairLogItem curr = entry.getValue();
-            if (min_counter < 0 || min_counter > curr.update_counter) {
-                min_counter = curr.update_counter;
-                min_key = entry.getKey();
+        int non_zero_count_coins = 0;
+        int non_zero_count_pairs = 0;
+        int min_coins_counter = -1;
+        int min_pairs_counter = -1;
+        String min_coin_key = "";
+        String min_pair_key = "";
+        
+        for (Entry<String, CoinRatingLogItem> entry : coinRatingMap.entrySet()) {
+            CoinRatingLogItem curr = entry.getValue();
+            if (min_coins_counter < 0 || min_coins_counter > curr.update_counter) {
+                min_coins_counter = curr.update_counter;
+                min_coin_key = entry.getKey();
             }
             if (curr.update_counter > 0) {
-                non_zero_count++;
+                non_zero_count_coins++;
             }
         }
-        if (!min_key.isEmpty()) {
-            if (coinPairRatingMap.get(min_key).update_counter == 0) {
-                checkPair(coinPairRatingMap.get(min_key));
+
+        for (Entry<String, CoinRatingPairLogItem> entry : coinPairRatingMap.entrySet()) {
+            CoinRatingPairLogItem curr = entry.getValue();
+            if (min_pairs_counter < 0 || min_pairs_counter > curr.update_counter) {
+                min_pairs_counter = curr.update_counter;
+                min_pair_key = entry.getKey();
+            }
+            if (curr.update_counter > 0) {
+                non_zero_count_pairs++;
+            }
+        }
+        
+        if (!min_coin_key.isEmpty()) {
+            if (coinRatingMap.get(min_coin_key).update_counter == 0) {
+                checkCoin(coinRatingMap.get(min_coin_key));
+                min_pair_key = "";
+            }
+        }
+        
+        if (!min_pair_key.isEmpty()) {
+            if (coinPairRatingMap.get(min_pair_key).update_counter == 0) {
+                checkPair(coinPairRatingMap.get(min_pair_key));
+                min_coin_key = "";
+            }
+        }
+
+        if (!min_pair_key.isEmpty() && coinPairRatingMap.get(min_pair_key).update_counter > 0) {
+            if (!min_coin_key.isEmpty() && coinRatingMap.get(min_coin_key).update_counter > 0 && Math.random() > 0.95) {
+                updateCoin(coinRatingMap.get(min_coin_key));
             } else {
-                updatePair(coinPairRatingMap.get(min_key));
+                updatePair(coinPairRatingMap.get(min_pair_key));
             }
         }
+
         if (progressBar != null) {
-            progressBar.setMaximum(coinPairRatingMap.size());
-            progressBar.setValue(non_zero_count);
+            progressBar.setMaximum(coinRatingMap.size() + coinPairRatingMap.size());
+            progressBar.setValue(non_zero_count_coins + non_zero_count_pairs);
         }
-        if (min_counter > 0) {
-            have_all_coins_info = true;
+        if (min_coins_counter > 0 && min_pairs_counter > 0) {
+            have_all_coins_pairs_info = true;
         }
+        showAccountCost();
     }
     
     private void updatePair(CoinRatingPairLogItem curr) {
         curr.update_counter++;
+        
+        if (curr.base_rating==null || curr.base_rating.update_counter <= 0) {
+            if (coinRatingMap.containsKey(curr.symbolBase)) {
+                curr.base_rating = coinRatingMap.get(curr.symbolBase);
+            }
+        }
+        
         List<Bar> bars_h = client.getBars(curr.symbol, "5m");
         List<Bar> bars_d = client.getBars(curr.symbol, "2h", 13, System.currentTimeMillis() - 24*60*60*1000, System.currentTimeMillis() + 100000);
         float volatility_hour = 0, volatility_day = 0;
@@ -245,7 +304,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                 curr.hour_volume += bars_h.get(i).getVolume().floatValue();
             }
             BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
-            client.addSeriesBars(series, bars_h);
+            TradingAPIAbstractInterface.addSeriesBars(series, bars_h);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
             SMAIndicator sma = new SMAIndicator(closePrice, 12);
             StandardDeviationIndicator vol_indicator = new StandardDeviationIndicator(closePrice, 12);
@@ -261,7 +320,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                 curr.day_volume += bars_d.get(i).getVolume().floatValue();
             }
             BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
-            client.addSeriesBars(series, bars_d);
+            TradingAPIAbstractInterface.addSeriesBars(series, bars_d);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
             SMAIndicator sma = new SMAIndicator(closePrice, bars_d.size());
             StandardDeviationIndicator vol_indicator = new StandardDeviationIndicator(closePrice, bars_d.size());
@@ -274,7 +333,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         strategiesController.setGroupName(curr.symbol);
         strategiesController.setBarSeconds(300);
         strategiesController.resetSeries();
-        client.addSeriesBars(strategiesController.getSeries(), bars_h);
+        TradingAPIAbstractInterface.addSeriesBars(strategiesController.getSeries(), bars_h);
         strategiesController.resetStrategies();
         curr.strategies_shouldenter_rate = strategiesController.getStrategiesEnterRate(6);
         curr.strategies_shouldexit_rate = strategiesController.getStrategiesExitRate(6);
@@ -285,12 +344,44 @@ public class CoinRatingController extends PeriodicProcessThread {
         curr.last_rating_update_millis = System.currentTimeMillis();
     }
     
+    private void updateCoin(CoinRatingLogItem curr) {
+        System.out.println("UPDATE " + curr.symbol);
+    }
+    
+    private void checkCoin(CoinRatingLogItem curr) {
+        curr.update_counter++;
+        mainApplication.getInstance().log("-----------------------------------");
+        mainApplication.getInstance().log("Analyzing coin " + curr.symbol + ":");
+        
+        try {
+            JSONObject obj = JsonReader.readJsonFromUrl("https://coindar.org/api/v1/coinEvents?name=" + curr.symbol.toLowerCase());
+            JSONArray events = obj.getJSONArray("DATA");
+            mainApplication.getInstance().log("");
+            mainApplication.getInstance().log("Events count: " + events.length());
+            curr.events_count = events.length();
+            if (events.length() > 0) {
+                mainApplication.getInstance().log("Last event: " + events.getJSONObject(0).optString("caption_ru", "-"));
+                mainApplication.getInstance().log("Last event date: " + events.getJSONObject(0).optString("start_date", "-"));
+                curr.last_event_date = events.getJSONObject(0).optString("start_date", "");
+                String last_anno = events.getJSONObject(0).optString("public_date", "");
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-M-dd HH:mm");
+                Date date = sdf.parse(last_anno);
+                curr.last_event_anno_millis = date.toInstant().toEpochMilli();
+            }
+        } catch (IOException | ParseException | JSONException ex) {
+            Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        curr.calculateRating();
+
+        mainApplication.getInstance().log("Rating = " + df3.format(curr.rating));
+    }
+    
     private void checkPair(CoinRatingPairLogItem curr) {
         curr.update_counter++;
         
         mainApplication.getInstance().log("-----------------------------------");
         mainApplication.getInstance().log("Analyzing pair " + curr.symbol + ":");
-        SymbolInfo pair_sinfo = client.getSymbolInfo(curr.symbol);
         
         int dips_50p = 0;
         int dips_25p = 0;
@@ -307,11 +398,11 @@ public class CoinRatingController extends PeriodicProcessThread {
 
         List<Bar> bars = client.getBars(curr.symbol, "2h");
         
-        mainApplication.getInstance().log("Base = " + pair_sinfo.getBaseAsset());
+        mainApplication.getInstance().log("Base = " + curr.symbolBase);
         mainApplication.getInstance().log("Base name = " + curr.base_rating.fullname);
         mainApplication.getInstance().log("Base rank = " + curr.base_rating.rank);
         mainApplication.getInstance().log("Base marketcap = " + df3.format(curr.base_rating.market_cap) + " USD");
-        mainApplication.getInstance().log("Quote = " + pair_sinfo.getQuoteAsset());
+        mainApplication.getInstance().log("Quote = " + curr.symbolQuote);
         mainApplication.getInstance().log("Current volatility = " + df6.format(curr.volatility));
         
         if (bars.size() > 0) {
@@ -369,32 +460,14 @@ public class CoinRatingController extends PeriodicProcessThread {
             mainApplication.getInstance().log("H BARS = " + h_bars + " last = " + last_hbar_info);
         }
         
-        try {
-            JSONObject obj = JsonReader.readJsonFromUrl("https://coindar.org/api/v1/coinEvents?name=" + pair_sinfo.getBaseAsset().toLowerCase());
-            JSONArray events = obj.getJSONArray("DATA");
-            mainApplication.getInstance().log("");
-            mainApplication.getInstance().log("Events count: " + events.length());
-            curr.base_rating.events_count = events.length();
-            if (events.length() > 0) {
-                mainApplication.getInstance().log("Last event: " + events.getJSONObject(0).optString("caption_ru", "-"));
-                mainApplication.getInstance().log("Last event date: " + events.getJSONObject(0).optString("start_date", "-"));
-                curr.base_rating.last_event_date = events.getJSONObject(0).optString("start_date", "");
-                String last_anno = events.getJSONObject(0).optString("public_date", "");
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-M-dd HH:mm");
-                Date date = sdf.parse(last_anno);
-                curr.base_rating.last_event_anno_millis = date.toInstant().toEpochMilli();
-            }
-        } catch (IOException | ParseException | JSONException ex) {
-            Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        
         curr.calculateRating();
         
         mainApplication.getInstance().log("Volatility = " + df3p.format(curr.volatility));
-        mainApplication.getInstance().log("Hour volume = " + df3.format(curr.hour_volume));
-        mainApplication.getInstance().log("Day volume = " + df3.format(curr.day_volume));
+        mainApplication.getInstance().log("Hour volume = " + df8.format(curr.hour_volume) + " (" + df8.format(getPairBaseHourVolume(curr.symbol)) + " " + coinInfo.getBaseCoin() + ")");
+        mainApplication.getInstance().log("Day volume = " + df8.format(curr.day_volume));
         mainApplication.getInstance().log("Hour change percent = " + df3p.format(curr.percent_hour));
         mainApplication.getInstance().log("Day change percent = " + df3p.format(curr.percent_day));
+        mainApplication.getInstance().log("Rating = " + df3.format(curr.rating));
         
         mainApplication.getInstance().log("-----------------------------------");
     }
@@ -546,19 +619,34 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     public int getCoinRank(String coin) {
-        if (coinJSONRanks.containsKey(coin)) {
-            return Integer.parseInt(coinJSONRanks.get(coin).optString("rank", "9999"));
+        if (coinRatingMap.containsKey(coin)) {
+            return coinRatingMap.get(coin).rank;
         }
         return 9999;
     }
-    
-    public double getCoinFirstPairRating(String coin) {
-        for (Entry<String, CoinRatingPairLogItem> entry : coinPairRatingMap.entrySet()) {
-            if (entry.getValue().symbol.indexOf(coin) == 0) {
-                return entry.getValue().rating;
-            }
+    public float getCoinRating(String coin) {
+        if (coinRatingMap.containsKey(coin)) {
+            return coinRatingMap.get(coin).rating;
         }
         return -1;
+    }
+    public float getPairRating(String pair) {
+        if (coinPairRatingMap.containsKey(pair)) {
+            return coinPairRatingMap.get(pair).rating;
+        }
+        return -1;
+    }
+    public float getPairVolatility(String pair) {
+        if (coinPairRatingMap.containsKey(pair)) {
+            return coinPairRatingMap.get(pair).volatility;
+        }
+        return 0;
+    }
+    public float getPairBaseHourVolume(String pair) {
+        if (coinPairRatingMap.containsKey(pair) && coinInfo.getCoinPairs().containsKey(pair)) {
+            return (float) coinInfo.convertSumm(coinInfo.getCoinPairs().get(pair)[1], coinPairRatingMap.get(pair).hour_volume, coinInfo.getBaseCoin());
+        }
+        return 0;
     }
     
     private void baseOrderEnter(String pair) {
@@ -656,24 +744,72 @@ public class CoinRatingController extends PeriodicProcessThread {
             baseOrderEnter(pairMax);
         }
     }
-
-    private void updateCurrentPrices() {
+    
+    private void updateCurrentCoinsMap() {
         try {
+            coinInfo.getSemaphore().acquire();
+            SEMAPHORE_UPDATE.acquire();
+            coinRatingMap.forEach((symbol, curr) -> {
+                curr.do_remove_flag = true;
+            });
+            Set<String> allCoins = coinInfo.getCoins();
+            if (coinRatingMap.isEmpty()) {
+                mainApplication.getInstance().log("Found " + allCoins.size() + " coins...");
+            }
+            allCoins.forEach((symbol) -> {
+                if (symbol != null && !symbol.isEmpty()) {
+                    if (!coinRatingMap.containsKey(symbol)) {
+                        CoinRatingLogItem newlog = new CoinRatingLogItem();
+                        newlog.symbol = symbol.toUpperCase();
+                        newlog.do_remove_flag = false;
+                        newlog.update_counter = 0;
+                        if (coinJSONRanks.containsKey(symbol)) {
+                            newlog.rank = Integer.parseInt(coinJSONRanks.get(symbol).optString("rank", "9999"));
+                            newlog.market_cap = Float.parseFloat(coinJSONRanks.get(symbol).optString("market_cap_usd", "0"));
+                            newlog.fullname = coinJSONRanks.get(symbol).optString("name", symbol);
+                        } else {
+                            newlog.rank = 9999;
+                            newlog.market_cap = 0;
+                            newlog.fullname = symbol;
+                        }
+                        coinRatingMap.put(symbol, newlog);
+                    } else {
+                        coinRatingMap.get(symbol).do_remove_flag = false;
+                    }
+                }
+            });
+            List<String> listRemove = new ArrayList<>();
+            coinRatingMap.forEach((symbol, curr) -> {
+                if (curr.do_remove_flag) {
+                    listRemove.add(symbol);
+                }
+            });
+            listRemove.forEach((entry) -> {
+                coinRatingMap.remove(entry);
+            });
+        } catch (InterruptedException ex) {
+            Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        SEMAPHORE_UPDATE.release();
+        coinInfo.getSemaphore().release();
+    }
+    
+    private void updateCurrentPairsMap() {
+        try {
+            coinInfo.getSemaphore().acquire();
             SEMAPHORE_UPDATE.acquire();
             coinPairRatingMap.forEach((symbol, curr) -> {
                 curr.do_remove_flag = true;
             });
-            List<TickerPrice> allPrices = client.getAllPrices();
             if (coinPairRatingMap.isEmpty()) {
-                mainApplication.getInstance().log("Found " + allPrices.size() + " pair prices...");
+                mainApplication.getInstance().log("Found " + coinInfo.getLastPrices().size() + " pair prices...");
             }
-            allPrices.forEach((price) -> {
-                if (price != null && !price.getSymbol().isEmpty() && !price.getSymbol().contains("1") && !price.getPrice().isEmpty()) {
-                    String symbol = price.getSymbol();                    
-                    float rprice = Float.parseFloat(price.getPrice());
+            coinInfo.getCoinPairs().forEach((symbol, symbols) -> {
+                if (!symbol.isEmpty()) {
+                    double rprice = coinInfo.getLastPrices().get(symbol);
                     if (coinPairRatingMap.containsKey(symbol)) {
                         CoinRatingPairLogItem clog = coinPairRatingMap.get(symbol);
-                        clog.current_price = rprice;
+                        clog.current_price = (float) rprice;
                         clog.do_remove_flag = false;
                         if (clog.start_price > 0) {
                             clog.percent_from_begin = (clog.current_price - clog.start_price) / clog.start_price;
@@ -687,39 +823,36 @@ public class CoinRatingController extends PeriodicProcessThread {
                     } else {
                         CoinRatingPairLogItem newlog = new CoinRatingPairLogItem();
                         newlog.symbol = symbol.toUpperCase();
-                        newlog.symbolQuote = coinInfo.getCoinPairs().get(newlog.symbol)[1];
+                        newlog.symbolBase = symbols[0];
+                        newlog.symbolQuote = symbols[1];
                         newlog.do_remove_flag = false;
-                        newlog.current_price = rprice;
-                        newlog.start_price = rprice;
+                        newlog.current_price = (float) rprice;
+                        newlog.start_price = (float) rprice;
                         newlog.percent_from_begin = 0f;
                         newlog.update_counter = 0;
                         newlog.pair = null;
                         newlog.fastbuy_skip = false;
-
-                        String psymbol = coinInfo.getCoinPairs().get(newlog.symbol)[0].toUpperCase();
-                        if (coinJSONRanks.containsKey(psymbol)) {
-                            newlog.base_rating.rank = Integer.parseInt(coinJSONRanks.get(psymbol).optString("rank", "9999"));
-                            newlog.base_rating.market_cap = Float.parseFloat(coinJSONRanks.get(psymbol).optString("market_cap_usd", "0"));
-                            newlog.base_rating.fullname = coinJSONRanks.get(psymbol).optString("name", symbol);
-                        } else {
-                            newlog.base_rating.rank = 9999;
-                            newlog.base_rating.market_cap = 0;
-                            newlog.base_rating.fullname = symbol;
+                        if (coinRatingMap.containsKey(newlog.symbolBase)) {
+                            newlog.base_rating = coinRatingMap.get(newlog.symbolBase);
                         }
-
                         coinPairRatingMap.put(symbol, newlog);
                     }
                 }
             });
+            List<String> listRemove = new ArrayList<>();
             coinPairRatingMap.forEach((symbol, curr) -> {
                 if (curr.do_remove_flag) {
-                    coinPairRatingMap.remove(symbol);
+                    listRemove.add(symbol);
                 }
+            });
+            listRemove.forEach((entry) -> {
+                coinPairRatingMap.remove(entry);
             });
         } catch (InterruptedException ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
         }
         SEMAPHORE_UPDATE.release();
+        coinInfo.getSemaphore().release();
     }
     
     @Override
@@ -729,18 +862,24 @@ public class CoinRatingController extends PeriodicProcessThread {
         
         mainApplication.getInstance().log("Collecting coins & pairs info...");
         coinInfo = new CoinInfoAggregator(client);
-        coinInfo.init();
-        
+        coinInfo.start();
+        while (!need_stop && !coinInfo.isInitialised()) {
+            doWait(2000);
+        }
+        showAccountCost();
+
         mainApplication.getInstance().log("Loading rating data...");
         loadRatingData();
         
         need_stop = false;
         paused = false;
-        have_all_coins_info = false;
+        have_all_coins_pairs_info = false;
 
         doWait(1000);
         
-        updateCurrentPrices();
+        mainApplication.getInstance().log("Init coins and pairs...");
+        updateCurrentCoinsMap();
+        updateCurrentPairsMap();
         
         mainApplication.getInstance().log("Checking trend...");
         updateGlobalTrendData();
@@ -769,18 +908,25 @@ public class CoinRatingController extends PeriodicProcessThread {
                 mainApplication.getInstance().systemSound();
             });
         }
+        
+        if (analyzer) {
+            mainApplication.getInstance().log("Start to collect info for coins and pairs rating...");
+        }
     }
     
     @Override
     protected void runBody() {
-        updateCurrentPrices();
+        if (have_all_coins_pairs_info || !analyzer) {
+            updateCurrentCoinsMap();
+            updateCurrentPairsMap();
+        }
 
         if (analyzer) {
             checkFromTop();
         }
         updateList();
 
-        if (analyzer && autoOrder && have_all_coins_info) {
+        if (analyzer && autoOrder && have_all_coins_pairs_info) {
             checkFastEnter();
         } else if (!analyzer && entered.size() > 0) {
             checkOrderExit();
@@ -791,7 +937,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             updateGlobalTrendData();
         }
         
-        if (have_all_coins_info) {
+        if (have_all_coins_pairs_info) {
             delayTime = updateTime;
         }
     }
@@ -1063,5 +1209,26 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public CoinInfoAggregator getCoinInfo() {
         return coinInfo;
+    }
+
+    /**
+     * @return the have_all_coins_pairs_info
+     */
+    public boolean isHaveAllCoinsPairsInfo() {
+        return have_all_coins_pairs_info;
+    }
+
+    /**
+     * @return the labelAccountCost
+     */
+    public JLabel getLabelAccountCost() {
+        return labelAccountCost;
+    }
+
+    /**
+     * @param labelAccountCost the labelAccountCost to set
+     */
+    public void setLabelAccountCost(JLabel labelAccountCost) {
+        this.labelAccountCost = labelAccountCost;
     }
 }

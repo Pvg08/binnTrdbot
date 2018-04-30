@@ -14,6 +14,7 @@ import com.evgcompany.binntrdbot.tradePairProcess;
 public class CoinRatingPairLogItem {
     public String symbol;
     public String symbolQuote;
+    public String symbolBase;
     public tradePairProcess pair = null;
     public CoinRatingLogItem base_rating = new CoinRatingLogItem();
 
