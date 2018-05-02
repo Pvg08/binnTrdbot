@@ -39,6 +39,7 @@ public class CoinRatingPairLogItem {
     public Float sort = 0f;
     public int update_counter = 0;
 
+    public boolean is_new_pair = false;
     public long last_rating_update_millis = 0;
     public double strategies_shouldenter_rate = 0;
     public double strategies_shouldexit_rate = 0;
@@ -82,5 +83,8 @@ public class CoinRatingPairLogItem {
         }
         rating += signal_rating * 1.25;
         rating += rating_inc;
+        if (is_new_pair) {
+            rating *= 0.05;
+        }
     }
 }

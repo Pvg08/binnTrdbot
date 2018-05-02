@@ -39,16 +39,19 @@ public class CoinCycleController extends PeriodicProcessThread {
     private final double comissionPercent;
     private boolean initialized = false;
     
-    private final double minProfitPercent = 1.2;
-    private final double maxGlobalCoinRank = 200;
+    private BigDecimal tradingBalancePercent = null;
+    
+    private final double minProfitPercent = 1.0;
+    private final double maxGlobalCoinRank = 250;
     private final double minPairRating = 2;
-    private final double minPairBaseHourVolume = 30;
+    private final double minPairBaseHourVolume = 18;
 
     public CoinCycleController(TradingAPIAbstractInterface client, CoinRatingController coinRatingController) {
         this.client = client;
         this.coinRatingController = coinRatingController;
         pairProcessController = coinRatingController.getPaircontroller();
         comissionPercent = pairProcessController.getProfitsChecker().getTradeComissionPercent().doubleValue();
+        tradingBalancePercent = BigDecimal.valueOf(pairProcessController.getTradingBalancePercent());
     }
 
     private void addPairToGraph(String symbol1, String symbol2, double price) {
@@ -61,11 +64,11 @@ public class CoinCycleController extends PeriodicProcessThread {
         
         if (!graph.containsEdge(symbol1, symbol2)) graph.addEdge(symbol1, symbol2);
         DefaultWeightedEdge edge1 = graph.getEdge(symbol1, symbol2);
-        graph.setEdgeWeight(edge1, price * (100.0-comissionPercent) / 100.0);
+        graph.setEdgeWeight(edge1, price > 0 ? price : 0);
 
         if (!graph.containsEdge(symbol2, symbol1)) graph.addEdge(symbol2, symbol1);
         DefaultWeightedEdge edge2 = graph.getEdge(symbol2, symbol1);
-        graph.setEdgeWeight(edge2, (1/price) * (100.0-comissionPercent) / 100.0);
+        graph.setEdgeWeight(edge2, price > 0 ? 1/price : 0);
     }
     
     private void setPairPriceToGraph(String symbol1, String symbol2, double price) {
@@ -97,7 +100,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         double totalWeight = 1;
         for(int i = 1; i < cycle.size(); i++){
             double weight = graph.getEdgeWeight(graph.getEdge(cycle.get(i-1), cycle.get(i)));
-            totalWeight *= weight;
+            totalWeight *= weight * ((100.0-comissionPercent) / 100.0);
         }
         return totalWeight;
     }
@@ -238,7 +241,13 @@ public class CoinCycleController extends PeriodicProcessThread {
     private void checkCycles() {
         List<String> best_cycle = getBestCycle();
         if (best_cycle != null) {
+            updatePrices();
             double best_profit = round(getCycleWeight(graph, best_cycle), 3);
+            if (best_profit < 1 + 0.01*minProfitPercent) {
+                mainApplication.getInstance().log("", true, false);
+                mainApplication.getInstance().log("Found cycle: " + best_cycle + " but recheck failed!", true, true);
+                return;
+            }
             mainApplication.getInstance().log("", true, false);
             mainApplication.getInstance().log("Found cycle: " + best_cycle, true, true);
             mainApplication.getInstance().log("Cycle description: " + getCycleDescription(best_cycle), true, false);
@@ -329,5 +338,19 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public CoinRatingController getCoinRatingController() {
         return coinRatingController;
+    }
+
+    /**
+     * @return the tradingBalancePercent
+     */
+    public BigDecimal getTradingBalancePercent() {
+        return tradingBalancePercent;
+    }
+
+    /**
+     * @param tradingBalancePercent the tradingBalancePercent to set
+     */
+    public void setTradingBalancePercent(BigDecimal tradingBalancePercent) {
+        this.tradingBalancePercent = tradingBalancePercent;
     }
 }

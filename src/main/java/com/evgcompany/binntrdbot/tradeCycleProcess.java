@@ -41,7 +41,6 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private long startMillis = 0;
     private long lastOrderMillis = 0;
     
-    private BigDecimal tradingBalancePercent = new BigDecimal("50");
     private BigDecimal last_ordered_amount;
     private BigDecimal last_ordered_price;
     private BigDecimal current_order_amount;
@@ -132,9 +131,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         profitsChecker.setPairPrice(symbol, current_order_price);
         if (cycleStep == 0) {
             if (isBuy) {
-                current_order_amount = profitsChecker.getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent);
+                current_order_amount = profitsChecker.getOrderAssetAmount(quoteAssetSymbol, cycleController.getTradingBalancePercent());
             } else {
-                current_order_amount = profitsChecker.getOrderAssetAmount(baseAssetSymbol, tradingBalancePercent);
+                current_order_amount = profitsChecker.getOrderAssetAmount(baseAssetSymbol, cycleController.getTradingBalancePercent());
             }
         } else {
             current_order_amount = last_ordered_amount;
@@ -270,14 +269,14 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
                 if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
                 limitOrderId = 0;
-                orderAbort();
+                if (!reverting) orderAbort();
             }
         } else {
             if (useStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopLimitTimeout) {
                 mainApplication.getInstance().log("We wait too long. Need to stop this "+symbol+"'s cycle order...");
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
                 if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
-                orderAbort();
+                if (!reverting) orderAbort();
             }
         }
     }
@@ -290,7 +289,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             filter.prepareForBuy(profitsChecker);
             BigDecimal tobuy_price = filter.getCurrentPrice();
             BigDecimal tobuy_amount = filter.getCurrentAmount();
-            if ((reverting || Math.random() < 0.8) && profitsChecker.canBuy(symbol_order, tobuy_amount, tobuy_price)) {
+            if (profitsChecker.canBuy(symbol_order, tobuy_amount, tobuy_price)) {
                 mainApplication.getInstance().log("BYING " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")", true, true);
                 long result = profitsChecker.Buy(symbol_order, tobuy_amount, isMarket ? null : tobuy_price);
                 if (result >= 0) {
@@ -322,7 +321,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             filter.prepareForSell(profitsChecker);
             BigDecimal tosell_price = filter.getCurrentPrice();
             BigDecimal tosell_amount = filter.getCurrentAmount();
-            if ((reverting || Math.random() < 0.8) && profitsChecker.canSell(symbol_order, tosell_amount)) {
+            if (profitsChecker.canSell(symbol_order, tosell_amount)) {
                 mainApplication.getInstance().log("SELLING " + df8.format(tosell_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tosell_price) + ")", true, true);
                 long result = profitsChecker.Sell(symbol_order, tosell_amount, isMarket ? null : tosell_price, null);
                 if (result >= 0) {
@@ -383,20 +382,6 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     }
     public String getQuoteSymbol() {
         return quoteAssetSymbol;
-    }
-    
-    /**
-     * @return the tradingBalancePercent
-     */
-    public BigDecimal getTradingBalancePercent() {
-        return tradingBalancePercent;
-    }
-
-    /**
-     * @param tradingBalancePercent the tradingBalancePercent to set
-     */
-    public void setTradingBalancePercent(int tradingBalancePercent) {
-        this.tradingBalancePercent = new BigDecimal(tradingBalancePercent);
     }
 
     /**
