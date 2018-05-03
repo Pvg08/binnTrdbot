@@ -275,6 +275,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
         if (min_coins_counter > 0 && min_pairs_counter > 0) {
             have_all_coins_pairs_info = true;
+            delayTime = updateTime;
         }
         showAccountCost();
     }
@@ -936,10 +937,6 @@ public class CoinRatingController extends PeriodicProcessThread {
         if (System.currentTimeMillis() > (updateTrendMillis + updateTrendTime*1000)) {
             updateTrendMillis = System.currentTimeMillis();
             updateGlobalTrendData();
-        }
-        
-        if (have_all_coins_pairs_info) {
-            delayTime = updateTime;
         }
     }
     

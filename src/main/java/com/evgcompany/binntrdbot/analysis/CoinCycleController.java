@@ -44,7 +44,10 @@ public class CoinCycleController extends PeriodicProcessThread {
     private final double minProfitPercent = 1.0;
     private final double maxGlobalCoinRank = 250;
     private final double minPairRating = 2;
-    private final double minPairBaseHourVolume = 18;
+    private final double minPairBaseHourVolume = 6;
+    
+    private boolean useStopLimited = true;
+    private int stopLimitTimeout = 6 * 60 * 60;//21600;
 
     public CoinCycleController(TradingAPIAbstractInterface client, CoinRatingController coinRatingController) {
         this.client = client;
@@ -176,12 +179,12 @@ public class CoinCycleController extends PeriodicProcessThread {
                 if (coinRatingController.isAnalyzer()) {
                     double coinPairVolume = coinRatingController.getPairBaseHourVolume(symbol);
                     if (coinPairVolume < minPairBaseHourVolume) {
-                        System.out.println(symbol + ": volume " + coinPairVolume + " < " + minPairBaseHourVolume);
+                        //System.out.println(symbol + ": volume " + coinPairVolume + " < " + minPairBaseHourVolume);
                         return false;
                     }
                     double coinPairRating = coinRatingController.getPairRating(symbol);
                     if (coinPairRating < minPairRating) {
-                        System.out.println(symbol + ": rating " + coinPairRating + " < " + minPairRating);
+                        //System.out.println(symbol + ": rating " + coinPairRating + " < " + minPairRating);
                         return false;
                     }
                 }
@@ -254,6 +257,7 @@ public class CoinCycleController extends PeriodicProcessThread {
             mainApplication.getInstance().log("Profit: " + best_profit, true, false);
             cycleProcess = new tradeCycleProcess(this);
             cycleProcess.setDelayTime(2);
+            cycleProcess.setProfitAim(best_profit);
             addCycleToCycleChain(best_cycle);
             cycleProcess.start();
         }
@@ -352,5 +356,46 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public void setTradingBalancePercent(BigDecimal tradingBalancePercent) {
         this.tradingBalancePercent = tradingBalancePercent;
+    }
+
+    /**
+     * @return the stopLimitTimeout
+     */
+    public int getStopLimitTimeout() {
+        return stopLimitTimeout;
+    }
+
+    /**
+     * @param stopLimitTimeout the stopLimitTimeout to set
+     */
+    public void setStopLimitTimeout(int stopLimitTimeout) {
+        this.stopLimitTimeout = stopLimitTimeout;
+    }
+
+    /**
+     * @return the useStopLimited
+     */
+    public boolean isUseStopLimited() {
+        return useStopLimited;
+    }
+
+    /**
+     * @param useStopLimited the useStopLimited to set
+     */
+    public void setUseStopLimited(boolean useStopLimited) {
+        this.useStopLimited = useStopLimited;
+    }
+
+    public double getAbortProfit(BigDecimal initialOrderQty, BigDecimal qty, String initialSymbol, String baseSymbol, String quoteSymbol) {
+        if (initialOrderQty == null || initialSymbol == null || qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
+            return -1;
+        }
+        double currentMainCoinPrice = coinRatingController.getCoinInfo().convertSumm(baseSymbol, qty.doubleValue(), initialSymbol);
+        double initialPrice = initialOrderQty.doubleValue();
+        double mainCoinProfit = (1 + (currentMainCoinPrice - initialPrice) / initialPrice) * ((100.0-comissionPercent) / 100.0);
+        System.out.println(initialOrderQty + " " + initialSymbol);
+        System.out.println(qty + " " + baseSymbol + "/" + quoteSymbol);
+        System.out.println(currentMainCoinPrice + " " + initialPrice + " " + mainCoinProfit);
+        return mainCoinProfit * 0.995;
     }
 }

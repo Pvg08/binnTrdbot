@@ -11,6 +11,7 @@ import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
     private String mainAsset;
+
     private boolean isBuy;
     private final List<CoinFilters> filters = new ArrayList<>();
     private CoinFilters filter = null;
@@ -46,9 +48,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private BigDecimal current_order_amount;
     private BigDecimal current_order_price;
     
+    private BigDecimal initialQty = null;
+    private String initialAsset = null;
+    private double profitAim;
+    
     private boolean reverting = false;
-    private boolean useStopLimited = false;
-    private int stopLimitTimeout = 5 * 60 * 1000;//21600000;
     
     private static final DecimalFormat df8 = new DecimalFormat("0.########");
 
@@ -271,8 +275,13 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                 limitOrderId = 0;
                 if (!reverting) orderAbort();
             }
+        } else if (cycleStep >= 1 && Double.parseDouble(order.getExecutedQty()) <= 0 && cycleController.getAbortProfit(initialQty, new BigDecimal(order.getOrigQty()), initialAsset, baseAssetSymbol, quoteAssetSymbol) > profitAim) {
+            mainApplication.getInstance().log("We'll have more profit if abort this "+symbol+" cycle order...");
+            last_ordered_amount = new BigDecimal(order.getExecutedQty());
+            if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
+            if (!reverting) orderAbort();
         } else {
-            if (useStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopLimitTimeout) {
+            if (cycleController.isUseStopLimited() && (System.currentTimeMillis()-lastOrderMillis) > cycleController.getStopLimitTimeout() * 1000) {
                 mainApplication.getInstance().log("We wait too long. Need to stop this "+symbol+"'s cycle order...");
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
                 if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
@@ -290,6 +299,12 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             BigDecimal tobuy_price = filter.getCurrentPrice();
             BigDecimal tobuy_amount = filter.getCurrentAmount();
             if (profitsChecker.canBuy(symbol_order, tobuy_amount, tobuy_price)) {
+                
+                if (initialQty == null && initialAsset == null) {
+                    initialAsset = quoteSymbol;
+                    initialQty = tobuy_amount.multiply(tobuy_price);
+                }
+                
                 mainApplication.getInstance().log("BYING " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")", true, true);
                 long result = profitsChecker.Buy(symbol_order, tobuy_amount, isMarket ? null : tobuy_price);
                 if (result >= 0) {
@@ -322,6 +337,12 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             BigDecimal tosell_price = filter.getCurrentPrice();
             BigDecimal tosell_amount = filter.getCurrentAmount();
             if (profitsChecker.canSell(symbol_order, tosell_amount)) {
+                
+                if (initialQty == null && initialAsset == null) {
+                    initialAsset = baseSymbol;
+                    initialQty = tosell_amount;
+                }
+                
                 mainApplication.getInstance().log("SELLING " + df8.format(tosell_amount) + " " + baseSymbol + " for " + quoteSymbol + " (price=" + df8.format(tosell_price) + ")", true, true);
                 long result = profitsChecker.Sell(symbol_order, tosell_amount, isMarket ? null : tosell_price, null);
                 if (result >= 0) {
@@ -383,34 +404,6 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     public String getQuoteSymbol() {
         return quoteAssetSymbol;
     }
-
-    /**
-     * @return the useStopLimited
-     */
-    public boolean isUseStopLimited() {
-        return useStopLimited;
-    }
-
-    /**
-     * @param useStopLimited the useStopLimited to set
-     */
-    public void setUseStopLimited(boolean useStopLimited) {
-        this.useStopLimited = useStopLimited;
-    }
-
-    /**
-     * @return the stopLimitTimeout
-     */
-    public int getStopLimitTimeout() {
-        return stopLimitTimeout;
-    }
-
-    /**
-     * @param stopLimitTimeout the stopLimitTimeout to set
-     */
-    public void setStopLimitTimeout(int stopLimitTimeout) {
-        this.stopLimitTimeout = stopLimitTimeout;
-    }
     
     public boolean isInLimitOrder() {
         return limitOrderId>0;
@@ -421,5 +414,19 @@ public class tradeCycleProcess extends PeriodicProcessThread {
      */
     public long getStartMillis() {
         return startMillis;
+    }
+
+    /**
+     * @return the profitAim
+     */
+    public double getProfitAim() {
+        return profitAim;
+    }
+
+    /**
+     * @param profitAim the profitAim to set
+     */
+    public void setProfitAim(double profitAim) {
+        this.profitAim = profitAim;
     }
 }

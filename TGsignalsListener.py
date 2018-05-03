@@ -213,6 +213,9 @@ def textCheck(txt, title, channel_rating, date, client):
         'CRYPTOR', 
         'TRUSTPL', 
         'CRYPTOW',
+        'LEMONSI',
+        'WHALESC',
+        'ADVANTA',
         'CSTEAM',
         'OK', 
         'SOME'

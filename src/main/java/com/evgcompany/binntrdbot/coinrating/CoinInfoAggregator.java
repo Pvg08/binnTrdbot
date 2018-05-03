@@ -43,11 +43,11 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     
     private boolean init_complete = false;
     private long last_init_millis = 0;
-    private long reinit_millis = 24 * 60 * 60 * 1000;
+    private final long reinit_millis = 24 * 60 * 60 * 1000;
     
     public CoinInfoAggregator(TradingAPIAbstractInterface client) {
         this.client = client;
-        delayTime = 60;
+        delayTime = 30;
     }
     
     public double convertSumm(String symbol1, double price, String symbol2) {
@@ -59,6 +59,10 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             return price / lastPrices.get(symbol2+symbol1);
         }
         return 0;
+    }
+    
+    public double convertSumm(String symbol1, double price) {
+        return convertSumm(symbol1, price, baseCoin);
     }
     
     private double getAccountCost(String coin) {
@@ -88,8 +92,8 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
             if (
-                    (Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) >= 0.00000001 && 
-                    !balance.getAsset().equals("BNB")
+                    (Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) >= 0.00000001 /*&& 
+                    !balance.getAsset().equals("BNB")*/
             ) {
                 coinsToCheck.add(balance.getAsset());
             }
