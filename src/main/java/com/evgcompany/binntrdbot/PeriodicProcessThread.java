@@ -82,7 +82,7 @@ abstract public class PeriodicProcessThread extends Thread {
                 if (exceptions_cnt >= maxExceptionsToStop) {
                     break;
                 }
-                doWait(delayTime * 10000);
+                doWait(delayTime * 1000 * exceptions_cnt * exceptions_cnt);
                 continue;
             }
             doWait(delayTime * 1000);

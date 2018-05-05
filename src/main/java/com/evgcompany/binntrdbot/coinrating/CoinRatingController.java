@@ -51,8 +51,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
     
-    private static final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
-    
     private CoinInfoAggregator coinInfo = null;
     private StrategiesController strategiesController = null;
     private SignalOrderController signalOrderController = null;
@@ -73,7 +71,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private GlobalTrendUpdateEvent trendUpdateEvent = null;
 
     private long updateTime = 10;
-    private final long updateTrendTime = 450;
+    private long updateTrendTime = 450;
     private long updateTrendMillis = 0;
     private boolean have_all_coins_pairs_info = false;
 
@@ -102,8 +100,11 @@ public class CoinRatingController extends PeriodicProcessThread {
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
         strategiesController.setMainStrategy("No strategy");
+        coinInfo = new CoinInfoAggregator(client);
         signalOrderController = new SignalOrderController(this, paircontroller);
         signalOrderController.setDelayTime(2);
+        coinCycleController = new CoinCycleController(client, this);
+        coinCycleController.setDelayTime(90);
     }
 
     public void updateGlobalTrendData() {
@@ -277,7 +278,6 @@ public class CoinRatingController extends PeriodicProcessThread {
             have_all_coins_pairs_info = true;
             delayTime = updateTime;
         }
-        showAccountCost();
     }
     
     private void updatePair(CoinRatingPairLogItem curr) {
@@ -750,7 +750,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     private void updateCurrentCoinsMap() {
         try {
             coinInfo.getSemaphore().acquire();
-            SEMAPHORE_UPDATE.acquire();
             coinRatingMap.forEach((symbol, curr) -> {
                 curr.do_remove_flag = true;
             });
@@ -792,14 +791,12 @@ public class CoinRatingController extends PeriodicProcessThread {
         } catch (InterruptedException ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
         }
-        SEMAPHORE_UPDATE.release();
         coinInfo.getSemaphore().release();
     }
     
     private void updateCurrentPairsMap() {
         try {
             coinInfo.getSemaphore().acquire();
-            SEMAPHORE_UPDATE.acquire();
             coinPairRatingMap.forEach((symbol, curr) -> {
                 curr.do_remove_flag = true;
             });
@@ -853,7 +850,6 @@ public class CoinRatingController extends PeriodicProcessThread {
         } catch (InterruptedException ex) {
             Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
         }
-        SEMAPHORE_UPDATE.release();
         coinInfo.getSemaphore().release();
     }
     
@@ -863,7 +859,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         mainApplication.getInstance().log("CoinRatingController starting...");
         
         mainApplication.getInstance().log("Collecting coins & pairs info...");
-        coinInfo = new CoinInfoAggregator(client);
+        coinInfo.setClient(client);
         coinInfo.start();
         while (!need_stop && !coinInfo.isInitialised()) {
             doWait(2000);
@@ -888,6 +884,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         
         if (useSignals) {
             mainApplication.getInstance().log("Starting signals controller...");
+            signalOrderController.setClient(client);
             signalOrderController.start();
             while (!need_stop && !signalOrderController.isInitialSignalsLoaded()) {
                 doWait(2000);
@@ -895,13 +892,9 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
 
         if (useCycles) {
+            coinCycleController.setClient(client);
             mainApplication.getInstance().log("Starting cycles controller...");
-            coinCycleController = new CoinCycleController(client, this);
-            coinCycleController.setDelayTime(90);
             coinCycleController.start();
-            while (!need_stop && !coinCycleController.isInitializedGraph()) {
-                doWait(2000);
-            }
         }
 
         if (paircontroller != null && paircontroller.getProfitsChecker() != null && !paircontroller.getProfitsChecker().isTestMode()) {
@@ -918,6 +911,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runBody() {
+
         if (have_all_coins_pairs_info || !analyzer) {
             updateCurrentCoinsMap();
             updateCurrentPairsMap();
@@ -926,6 +920,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         if (analyzer) {
             checkFromTop();
         }
+        showAccountCost();
         updateList();
 
         if (analyzer && autoOrder && have_all_coins_pairs_info) {
@@ -960,7 +955,6 @@ public class CoinRatingController extends PeriodicProcessThread {
 
     public void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
-        if (signalOrderController != null) signalOrderController.setClient(client);
     }
     
     /**
@@ -1228,5 +1222,19 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public void setLabelAccountCost(JLabel labelAccountCost) {
         this.labelAccountCost = labelAccountCost;
+    }
+
+    /**
+     * @return the updateTrendTime
+     */
+    public long getUpdateTrendTime() {
+        return updateTrendTime;
+    }
+
+    /**
+     * @param updateTrendTime the updateTrendTime to set
+     */
+    public void setUpdateTrendTime(long updateTrendTime) {
+        this.updateTrendTime = updateTrendTime;
     }
 }

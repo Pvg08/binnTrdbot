@@ -11,6 +11,7 @@ import com.binance.api.client.domain.general.SymbolStatus;
 import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.mainApplication;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -19,12 +20,21 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.shortestpath.KShortestPaths;
+import org.jgrapht.graph.DefaultDirectedGraph;
+import org.jgrapht.graph.DefaultDirectedWeightedGraph;
+import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.DefaultWeightedEdge;
 
 /**
  *
  * @author EVG_adm_T
  */
 public class CoinInfoAggregator extends PeriodicProcessThread {
+    
+    private DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph = null;
+    private DefaultDirectedGraph<String, DefaultEdge> graph_pair = null;
     
     private final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
     
@@ -34,20 +44,72 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     private Set<String> coinsToCheck = null;
     private final Map<String, String[]> coinPairs = new HashMap<>();
     private final Map<String, Double> lastPrices = new HashMap<>();
+    private final Map<String, Double> tempPrices = new HashMap<>();
     
     private TradingAPIAbstractInterface client = null;
     
-    private final String baseCoin = "BTC";
-    private final double baseCoinMinCount = 0.001;
+    private String baseCoin = "BTC";
+    private double baseCoinMinCount = 0.001;
     private double baseAccountCost = 0;
     
     private boolean init_complete = false;
     private long last_init_millis = 0;
-    private final long reinit_millis = 24 * 60 * 60 * 1000;
+    private long reinit_millis = 24 * 60 * 60 * 1000;
     
     public CoinInfoAggregator(TradingAPIAbstractInterface client) {
         this.client = client;
         delayTime = 30;
+    }
+    
+    private void addPairToGraph(String symbol1, String symbol2, double price) {
+        if (!graph.containsVertex(symbol1)) graph.addVertex(symbol1);
+        if (!graph.containsVertex(symbol2)) graph.addVertex(symbol2);
+
+        if (!graph_pair.containsVertex(symbol1)) graph_pair.addVertex(symbol1);
+        if (!graph_pair.containsVertex(symbol2)) graph_pair.addVertex(symbol2);
+        if (!graph_pair.containsEdge(symbol1, symbol2)) graph_pair.addEdge(symbol1, symbol2);
+        
+        if (!graph.containsEdge(symbol1, symbol2)) graph.addEdge(symbol1, symbol2);
+        DefaultWeightedEdge edge1 = graph.getEdge(symbol1, symbol2);
+        graph.setEdgeWeight(edge1, price > 0 ? price : 0);
+
+        if (!graph.containsEdge(symbol2, symbol1)) graph.addEdge(symbol2, symbol1);
+        DefaultWeightedEdge edge2 = graph.getEdge(symbol2, symbol1);
+        graph.setEdgeWeight(edge2, price > 0 ? 1/price : 0);
+    }
+    
+    private void setPairPriceToGraph(String symbol1, String symbol2, double price) {
+        addPairToGraph(symbol1, symbol2, price);
+    }
+    
+    private void addPairToGraph(String pair, double price) {
+        String[] coins = coinPairs.get(pair);
+        if (coins != null) {
+            if (quoteAssets.contains(coins[0]) || quoteAssets.contains(coins[1])) {
+                addPairToGraph(coins[0], coins[1], price);
+            }
+        }
+    }
+    
+    private void initGraph() {
+        graph = new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        graph_pair = new DefaultDirectedGraph<>(DefaultEdge.class);
+        coinPairs.forEach((pkey, pcoins)->{
+            if (pcoins.length == 2) {
+                addPairToGraph(pcoins[0], pcoins[1], lastPrices.get(pkey));
+            }
+        });
+        mainApplication.getInstance().log("Coin graph built: Vertexes=" + graph.vertexSet().size() + "; Edges=" + graph.edgeSet().size() + "; Straight pairs=" + graph_pair.edgeSet().size());
+        mainApplication.getInstance().log("Quote assets: " + quoteAssets);
+    }
+    
+    private double getPathWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle) {
+        double totalWeight = 1;
+        for(int i = 1; i < cycle.size(); i++){
+            double weight = graph.getEdgeWeight(graph.getEdge(cycle.get(i-1), cycle.get(i)));
+            totalWeight *= weight;
+        }
+        return totalWeight;
     }
     
     public double convertSumm(String symbol1, double price, String symbol2) {
@@ -57,8 +119,17 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             return price * lastPrices.get(symbol1+symbol2);
         } else if (lastPrices.containsKey(symbol2+symbol1)) {
             return price / lastPrices.get(symbol2+symbol1);
+        } else if (tempPrices.containsKey(symbol1+symbol2)) {
+            return price * tempPrices.get(symbol1+symbol2);
+        } else if (tempPrices.containsKey(symbol2+symbol1)) {
+            return price / tempPrices.get(symbol2+symbol1);
         }
-        return 0;
+        KShortestPaths pathsF = new KShortestPaths(graph, 4);
+        List<GraphPath<String, DefaultWeightedEdge>> paths = pathsF.getPaths(symbol1, symbol2);
+        if (paths.isEmpty()) return 0;
+        double weight = getPathWeight(graph, paths.get(0).getVertexList());
+        tempPrices.put(symbol1+symbol2, weight);
+        return price * weight;
     }
     
     public double convertSumm(String symbol1, double price) {
@@ -80,11 +151,22 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         baseAccountCost = getAccountCost(baseCoin);
     }
     
-    private void updatePrices() {
-        List<TickerPrice> allPrices = client.getAllPrices();
-        allPrices.forEach((price) -> {
-            lastPrices.put(price.getSymbol(), Double.parseDouble(price.getPrice()));
-        });
+    private void updatePrices(boolean needSync) {
+        try {
+            if (needSync) SEMAPHORE_UPDATE.acquire();
+            List<TickerPrice> allPrices = client.getAllPrices();
+            allPrices.forEach((price) -> {
+                lastPrices.put(price.getSymbol(), Double.parseDouble(price.getPrice()));
+                addPairToGraph(price.getSymbol().toUpperCase(), Double.valueOf(price.getPrice()));
+            });
+            tempPrices.clear();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (needSync) SEMAPHORE_UPDATE.release();
+    }
+    public void updatePrices() {
+        updatePrices(false);
     }
     
     private void doInitCoinsToCheck() {
@@ -92,8 +174,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
             if (
-                    (Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) >= 0.00000001 /*&& 
-                    !balance.getAsset().equals("BNB")*/
+                (Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) > 0.0
             ) {
                 coinsToCheck.add(balance.getAsset());
             }
@@ -143,12 +224,14 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
                     }
                 });
             }
+            tempPrices.clear();
             
-            SEMAPHORE_UPDATE.release();
+            initGraph();
             
         } catch (InterruptedException ex) {
             Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
         }
+        SEMAPHORE_UPDATE.release();
     }
     
     /**
@@ -220,7 +303,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         doMainInit();
         doInitCoinsToCheck();
         updateBaseAccountCost();
-        updatePrices();
+        updatePrices(true);
         init_complete = true;
     }
 
@@ -231,7 +314,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             doMainInit();
             init_complete = true;
         } else {
-            updatePrices();
+            updatePrices(true);
         }
         updateBaseAccountCost();
     }
@@ -257,5 +340,54 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
      */
     public double getBaseAccountCost() {
         return baseAccountCost;
+    }
+
+    /**
+     * @param client the client to set
+     */
+    public void setClient(TradingAPIAbstractInterface client) {
+        this.client = client;
+    }
+
+    /**
+     * @param baseCoin the baseCoin to set
+     */
+    public void setBaseCoin(String baseCoin) {
+        this.baseCoin = baseCoin.toUpperCase().trim();
+    }
+
+    /**
+     * @param baseCoinMinCount the baseCoinMinCount to set
+     */
+    public void setBaseCoinMinCount(double baseCoinMinCount) {
+        this.baseCoinMinCount = baseCoinMinCount;
+    }
+
+    /**
+     * @return the reinit_millis
+     */
+    public long getReinitMillis() {
+        return reinit_millis;
+    }
+
+    /**
+     * @param reinit_millis the reinit_millis to set
+     */
+    public void setReinitMillis(long reinit_millis) {
+        this.reinit_millis = reinit_millis;
+    }
+
+    /**
+     * @return the graph
+     */
+    public DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> getPricesGraph() {
+        return graph;
+    }
+
+    /**
+     * @return the graph_pair
+     */
+    public DefaultDirectedGraph<String, DefaultEdge> getPairsGraph() {
+        return graph_pair;
     }
 }

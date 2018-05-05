@@ -36,14 +36,14 @@ public class ComponentsConfigController {
     }
     
     public void Save() {
-        for (Map.Entry<String, Component> entry : components.entrySet()) {
+        components.entrySet().forEach((entry) -> {
             componentPrefSave(entry.getValue(), entry.getKey());
-        }
+        });
     }
     public void Load() {
-        for (Map.Entry<String, Component> entry : components.entrySet()) {
+        components.entrySet().forEach((entry) -> {
             componentPrefLoad(entry.getValue(), entry.getKey());
-        }
+        });
     }
     
     private void componentPrefLoad(Component cb, String name) {
@@ -52,6 +52,10 @@ public class ComponentsConfigController {
                 ((JCheckBox)cb).setSelected("true".equals(prefs.get(name, ((JCheckBox)cb).isSelected() ? "true" : "false")));
             } else if (cb instanceof JTextField) {
                 ((JTextField)cb).setText(prefs.get(name, ((JTextField)cb).getText()));
+            } else if (cb instanceof JSpinner && ((JSpinner)cb).getValue() instanceof Float) {
+                ((JSpinner)cb).setValue(Float.parseFloat(prefs.get(name, ((Float) ((JSpinner)cb).getValue()).toString())));
+            } else if (cb instanceof JSpinner && ((JSpinner)cb).getValue() instanceof Double) {
+                ((JSpinner)cb).setValue(Double.parseDouble(prefs.get(name, ((Double) ((JSpinner)cb).getValue()).toString())));
             } else if (cb instanceof JSpinner) {
                 ((JSpinner)cb).setValue(Integer.parseInt(prefs.get(name, ((Integer) ((JSpinner)cb).getValue()).toString())));
             } else if (cb instanceof JComboBox) {
@@ -76,6 +80,10 @@ public class ComponentsConfigController {
                 prefs.put(name, ((JCheckBox)cb).isSelected() ? "true" : "false");
             } else if (cb instanceof JTextField) {
                 prefs.put(name, ((JTextField)cb).getText());
+            } else if (cb instanceof JSpinner && ((JSpinner)cb).getValue() instanceof Float) {
+                prefs.put(name, ((Float) ((JSpinner)cb).getValue()).toString());
+            } else if (cb instanceof JSpinner && ((JSpinner)cb).getValue() instanceof Double) {
+                prefs.put(name, ((Double) ((JSpinner)cb).getValue()).toString());
             } else if (cb instanceof JSpinner) {
                 prefs.put(name, ((JSpinner)cb).getValue().toString());
             } else if (cb instanceof JComboBox) {

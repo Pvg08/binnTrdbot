@@ -11,7 +11,6 @@ import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -98,6 +97,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             csymbol = csymbol.substring(0, csymbol.indexOf(" ")).trim();
             profitsChecker.removeCurrencyPair(csymbol);
         }
+    }
+    
+    private void doSwitchStep() {
+        // @todo switch
+        mainApplication.getInstance().log("We wait too long. Need to switch "+symbol+"'s cycle order...");
     }
     
     private void doNextStep() {
@@ -286,6 +290,8 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                 last_ordered_amount = new BigDecimal(order.getExecutedQty());
                 if (order.getSide() == OrderSide.SELL) last_ordered_amount = last_ordered_amount.multiply(new BigDecimal(order.getPrice()));
                 if (!reverting) orderAbort();
+            } else if (cycleStep >= 0 && Double.parseDouble(order.getExecutedQty()) <= 0 && (System.currentTimeMillis()-lastOrderMillis) > cycleController.getSwitchLimitTimeout() * 1000) {
+                doSwitchStep();
             }
         }
     }
