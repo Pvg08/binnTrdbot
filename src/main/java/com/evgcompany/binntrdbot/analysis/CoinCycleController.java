@@ -49,8 +49,12 @@ public class CoinCycleController extends PeriodicProcessThread {
     private Set<String> restrictCoins = new HashSet<>();
     private Set<String> requiredCoins = new HashSet<>();
     private Set<String> mainCoins = new HashSet<>();
+    
+    private int maxSwitchesCount = 3;
+    
     private boolean useStopLimited = true;
     private int stopLimitTimeout = 12 * 60 * 60;
+    private int stopFirstLimitTimeout = 12 * 60;
     private int switchLimitTimeout = 30 * 60;
 
     public CoinCycleController(TradingAPIAbstractInterface client, CoinRatingController coinRatingController) {
@@ -60,15 +64,6 @@ public class CoinCycleController extends PeriodicProcessThread {
         comissionPercent = pairProcessController.getProfitsChecker().getTradeComissionPercent().doubleValue();
         tradingBalancePercent = BigDecimal.valueOf(pairProcessController.getTradingBalancePercent());
         info = coinRatingController.getCoinInfo();
-    }
-
-    private double getCycleWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle) {
-        double totalWeight = 1;
-        for(int i = 1; i < cycle.size(); i++){
-            double weight = graph.getEdgeWeight(graph.getEdge(cycle.get(i-1), cycle.get(i)));
-            totalWeight *= weight * ((100.0-comissionPercent) / 100.0);
-        }
-        return totalWeight;
     }
 
     public List<String> getRevertPathDescription(String coinLast, String coinBase) {
@@ -93,21 +88,16 @@ public class CoinCycleController extends PeriodicProcessThread {
         return cycle_description;
     }
 
-    private void addCycleToCycleChain(List<String> cycle) {
-        for(int i=1; i < cycle.size(); i++) {
-            String symbol1 = cycle.get(i-1);
-            String symbol2 = cycle.get(i);
-            if (info.getPairsGraph().containsEdge(symbol2, symbol1)) { // BUY
-                cycleProcess.addChain(symbol2+symbol1 + " BUY", info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol2, symbol1))); 
-            } else { // SELL
-                cycleProcess.addChain(symbol1+symbol2 + " SELL", info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol1, symbol2)));
+    private boolean pathIsValid(List<String> cycle, int size_from, int size_to, List<String> pre_cycle) {
+        if (cycle.size() < size_from || cycle.size() > size_to) return false;
+        if (pre_cycle != null && pre_cycle.size() > 0) {
+            for(int i=0; i<pre_cycle.size(); i++) {
+                if (!cycle.get(i).equals(pre_cycle.get(i))) {
+                    return false;
+                }
             }
         }
-    }
-
-    private boolean cycleIsValid(List<String> cycle) {
-        if (cycle.size() < 3 || cycle.size() > 5) return false;
-        for(int i=1; i<cycle.size(); i++) {
+        for(int i = pre_cycle != null ? pre_cycle.size() : 1; i<cycle.size(); i++) {
             String symbol1 = cycle.get(i-1);
             String symbol2 = cycle.get(i);
             if (!info.getPairsGraph().containsEdge(symbol2, symbol1) && !info.getPairsGraph().containsEdge(symbol1, symbol2)) {
@@ -163,6 +153,9 @@ public class CoinCycleController extends PeriodicProcessThread {
         }
         return true;
     }
+    private boolean cycleIsValid(List<String> cycle) {
+        return pathIsValid(cycle, 3, 5, null);
+    }
 
     private static double round(double value, int places) {
         if (places < 0) places = 0;
@@ -171,6 +164,18 @@ public class CoinCycleController extends PeriodicProcessThread {
         return bd.doubleValue();
     }
 
+    private double getCycleWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle, int from, double start_weight) {
+        double totalWeight = start_weight;
+        for(int i = from; i < cycle.size(); i++){
+            double weight = graph.getEdgeWeight(graph.getEdge(cycle.get(i-1), cycle.get(i)));
+            totalWeight *= weight * ((100.0-comissionPercent) / 100.0);
+        }
+        return totalWeight;
+    }
+    private double getCycleWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle) {
+        return getCycleWeight(graph, cycle, 1, 1);
+    }
+    
     private List<String> getBestValidCycle(List<List<String>> cycles) {
         double best_profit = 0;
         List<String> best_cycle = null;
@@ -178,7 +183,10 @@ public class CoinCycleController extends PeriodicProcessThread {
         for(List<String> cycle : cycles) {
             if (cycleIsValid(cycle)) {
                 double weight = round(getCycleWeight(info.getPricesGraph(), cycle), 3);
-                if ((weight > min_weight) && ((weight > best_profit || (weight == best_profit && Math.random() < 0.5)))) {
+                if (
+                    (weight > min_weight) && 
+                    ((weight > best_profit || (weight == best_profit && Math.random() < 0.5)))
+                ) {
                     best_cycle = cycle;
                     best_profit = weight;
                 }
@@ -187,7 +195,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         return best_cycle;
     }
     
-    private List<String> getBestValidCoinCycle(String baseCoin) {
+    private List<String> getBestValidCycleForCoin(String baseCoin) {
         TarjanSimpleCyclesFromVertex<String, DefaultWeightedEdge> simple_cycles = new TarjanSimpleCyclesFromVertex<>(info.getPricesGraph());
         List<List<String>> cycles = simple_cycles.findSimpleCycles(baseCoin);
         cycles.forEach((cycle) -> {
@@ -200,7 +208,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         List<List<String>> best_cycles = new ArrayList<>();
         for(String coin : info.getCoinsToCheck()) {
             if (mainCoins.isEmpty() || mainCoins.contains(coin)) {
-                List<String> best_cycle = getBestValidCoinCycle(coin);
+                List<String> best_cycle = getBestValidCycleForCoin(coin);
                 if (best_cycle != null) {
                     best_cycles.add(best_cycle);
                 }
@@ -214,6 +222,33 @@ public class CoinCycleController extends PeriodicProcessThread {
         return null;
     }
 
+    private List<String> getBestValidCycle(List<List<String>> cycles, List<String> pre_cycle, double pre_weight) {
+        double best_profit = 0;
+        List<String> best_cycle = null;
+        double min_weight = 1 + 0.01*minProfitPercent;
+        for(List<String> cycle : cycles) {
+            if (pathIsValid(cycle, 3, 6, pre_cycle)) {
+                double weight = round(getCycleWeight(info.getPricesGraph(), cycle, pre_cycle.size(), pre_weight), 3);
+                if ((weight > min_weight) && ((weight > best_profit || (weight == best_profit && Math.random() < 0.5)))) {
+                    best_cycle = cycle;
+                    best_profit = weight;
+                }
+            }
+        }
+        return best_cycle;
+    }
+    
+    private List<String> getBestCycleStartedWith(List<String> pre_cycle, double pre_weight) {
+        String coin = pre_cycle.get(0);
+        TarjanSimpleCyclesFromVertex<String, DefaultWeightedEdge> simple_cycles = new TarjanSimpleCyclesFromVertex<>(info.getPricesGraph());
+        List<List<String>> cycles = simple_cycles.findSimpleCycles(coin);
+        cycles.forEach((cycle) -> {
+            cycle.add(coin);
+        });
+        List<String> best_cycle = getBestValidCycle(cycles, pre_cycle, pre_weight);
+        return best_cycle;
+    }
+    
     private void checkCycles() {
         try {
             info.getSemaphore().acquire();
@@ -230,9 +265,9 @@ public class CoinCycleController extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Cycle description: " + getCycleDescription(best_cycle), true, false);
                     mainApplication.getInstance().log("Profit: " + best_profit, true, false);
                     cycleProcess = new tradeCycleProcess(this);
-                    cycleProcess.setDelayTime(2);
+                    cycleProcess.setDelayTime(5);
                     cycleProcess.setProfitAim(best_profit);
-                    addCycleToCycleChain(best_cycle);
+                    cycleProcess.addCycleToCycleChain(best_cycle);
                     cycleProcess.start();
                 }
             }
@@ -245,6 +280,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     @Override
     protected void runStart() {
         mainApplication.getInstance().log("Cycle thread starting...");
+        mainApplication.getInstance().log("Cycle main: " + mainCoins);
         mainApplication.getInstance().log("Cycle required: " + requiredCoins);
         mainApplication.getInstance().log("Cycle restricted: " + restrictCoins);
         doWait(3000);
@@ -252,10 +288,14 @@ public class CoinCycleController extends PeriodicProcessThread {
 
     @Override
     protected void runBody() {
-        if ((cycleProcess == null || !cycleProcess.isAlive()) && (coinRatingController == null || (
-            !coinRatingController.isAnalyzer() ||
-            coinRatingController.isHaveAllCoinsPairsInfo()
-        ))) {
+        if (
+                (cycleProcess == null || !cycleProcess.isAlive()) && 
+                (
+                    coinRatingController == null || 
+                    !coinRatingController.isAnalyzer() ||
+                    coinRatingController.isHaveAllCoinsPairsInfo()
+                )
+        ) {
             checkCycles();
         }
     }
@@ -328,19 +368,83 @@ public class CoinCycleController extends PeriodicProcessThread {
         this.useStopLimited = useStopLimited;
     }
 
-    public double getAbortProfit(BigDecimal initialOrderQty, BigDecimal qty, String initialSymbol, String baseSymbol, String quoteSymbol) {
+    public double getAbortMarketApproxProfit(BigDecimal initialOrderQty, BigDecimal qty, String initialSymbol, String baseSymbol, String quoteSymbol) {
         if (initialOrderQty == null || initialSymbol == null || qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
             return -1;
         }
         double currentMainCoinPrice = info.convertSumm(baseSymbol, qty.doubleValue(), initialSymbol);
         double initialPrice = initialOrderQty.doubleValue();
         double mainCoinProfit = (1 + (currentMainCoinPrice - initialPrice) / initialPrice) * ((100.0-comissionPercent) / 100.0);
-        System.out.println(initialOrderQty + " " + initialSymbol);
-        System.out.println(qty + " " + baseSymbol + "/" + quoteSymbol);
-        System.out.println(currentMainCoinPrice + " " + initialPrice + " " + mainCoinProfit);
-        return mainCoinProfit * 0.99;
+        System.out.println(initialOrderQty + " " + initialSymbol + " | " + qty + " " + baseSymbol + "/" + quoteSymbol + " | " + currentMainCoinPrice + " " + initialPrice + " " + mainCoinProfit);
+        return mainCoinProfit * 0.95;
     }
+    
+    public boolean doCycleSwap(tradeCycleProcess process) {
+        if (process.getCycleStep() >= process.getCycle().size()-1) {
+            return false;
+        }
+        
+        boolean result = false;
+        
+        List<String> pre_cycle = new ArrayList<>();
+        double pre_weight = 1;
+        
+        for(int i = 0; i < process.getCycleStep(); i++) {
+            String csymbol = process.getCycle().get(i);
+            boolean isBuy = csymbol.matches("^.* BUY$");
+            String pair = csymbol.substring(0, csymbol.indexOf(" ")).trim();
+            String coins[] = info.getCoinPairs().get(pair);
+            if (isBuy) {
+                if (pre_cycle.isEmpty()) pre_cycle.add(coins[1]);
+                pre_cycle.add(coins[0]);
+            } else {
+                if (pre_cycle.isEmpty()) pre_cycle.add(coins[0]);
+                pre_cycle.add(coins[1]);
+            }
+            if (isBuy) {
+                pre_weight *= (1/process.getPrices().get(i).doubleValue()) * ((100.0-comissionPercent) / 100.0);
+            } else {
+                pre_weight *= (process.getPrices().get(i).doubleValue()) * ((100.0-comissionPercent) / 100.0);
+            }
+        }
+        
+        System.out.println("Pre cycle: " + pre_cycle);
+        System.out.println("Pre weight: " + pre_weight);
+        
+        if (pre_cycle.isEmpty()) {
+            return false;
+        }
+        
+        List<String> cycle = getBestCycleStartedWith(pre_cycle, pre_weight);
+        
+        if (cycle != null && !cycle.isEmpty()) {
+            double new_weight = this.getCycleWeight(info.getPricesGraph(), cycle, pre_cycle.size(), pre_weight);
+            try {
+                info.getSemaphore().acquire();
+                info.updatePrices();
+                if (new_weight < 1 + 0.01*minProfitPercent) {
+                    mainApplication.getInstance().log("", true, false);
+                    mainApplication.getInstance().log("Found cycle: " + cycle + " but recheck failed!", true, true);
+                } else {
+                    mainApplication.getInstance().log("", true, false);
+                    mainApplication.getInstance().log("Found cycle: " + cycle, true, true);
+                    mainApplication.getInstance().log("Cycle description: " + getCycleDescription(cycle), true, false);
+                    mainApplication.getInstance().log("Profit: " + new_weight, true, false);
 
+                    process.setProfitAim(new_weight);
+                    process.cutChain();
+                    process.addCycleToCycleChain(cycle, pre_cycle.size());
+                    result = true;
+                }
+            } catch (InterruptedException ex) {
+                Logger.getLogger(CoinCycleController.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            info.getSemaphore().release();
+        }
+        
+        return result;
+    }
+    
     /**
      * @return the restrictCoins
      */
@@ -458,5 +562,40 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public void setSwitchLimitTimeout(int switchLimitTimeout) {
         this.switchLimitTimeout = switchLimitTimeout;
+    }
+
+    /**
+     * @return the info
+     */
+    public CoinInfoAggregator getInfo() {
+        return info;
+    }
+
+    /**
+     * @return the stopFirstLimitTimeout
+     */
+    public int getStopFirstLimitTimeout() {
+        return stopFirstLimitTimeout;
+    }
+
+    /**
+     * @param stopFirstLimitTimeout the stopFirstLimitTimeout to set
+     */
+    public void setStopFirstLimitTimeout(int stopFirstLimitTimeout) {
+        this.stopFirstLimitTimeout = stopFirstLimitTimeout;
+    }
+
+    /**
+     * @return the maxSwitchesCount
+     */
+    public int getMaxSwitchesCount() {
+        return maxSwitchesCount;
+    }
+
+    /**
+     * @param maxSwitchesCount the maxSwitchesCount to set
+     */
+    public void setMaxSwitchesCount(int maxSwitchesCount) {
+        this.maxSwitchesCount = maxSwitchesCount;
     }
 }
