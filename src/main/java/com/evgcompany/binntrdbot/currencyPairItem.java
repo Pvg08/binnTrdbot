@@ -28,8 +28,11 @@ public class currencyPairItem {
     private BigDecimal last_order_price = BigDecimal.ZERO;
     private BigDecimal price = BigDecimal.ZERO;
     
+    private String marker = "";
+    
     private int listIndex = -1;
     
+    private static final DecimalFormat df3 = new DecimalFormat("0.###");
     private static final DecimalFormat df5 = new DecimalFormat("0.#####");
     private static final DecimalFormat df6 = new DecimalFormat("0.######");
     private static final DecimalFormat df8 = new DecimalFormat("0.########");
@@ -57,14 +60,17 @@ public class currencyPairItem {
         if (base_item.isPairKey()) {
             txt = txt + " ["+symbolPair+"]";
         }
+        txt = txt + "  ";
         boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || in_order_buy_sell_cycle || order_pending;
         if (is_changed) {
-            txt = txt + " (";
             
-            txt = txt + "initially " + df6.format(base_item.getInitialValue());
             if (base_item.getInitialValue().compareTo(BigDecimal.ZERO) > 0) {
+                txt = txt + "[OnBegin: " + df6.format(base_item.getInitialValue());
                 float percent = 100 * (base_item.getValue().floatValue() - base_item.getInitialValue().floatValue()) / base_item.getInitialValue().floatValue();
-                txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "%";
+                if (Math.abs(percent) > 0.0005) {
+                    txt = txt + " " + (percent >= 0 ? "+" : "") + df3.format(percent) + "%";
+                }
+                txt = txt + "]";
             }
             
             /*if (!base_item.isPairKey()) {
@@ -76,25 +82,35 @@ public class currencyPairItem {
             /*if (base_item.getOrdersCount() > 0) {
                 txt = txt + "; " + base_item.getOrdersCount() + " orders";
             }*/
-            if (order_pending) {
-                txt = txt + "; [PENDING "+(in_sell_order ? "SELL" : "BUY")+"]";
-            } else if (in_order_buy_sell_cycle) {
-                txt = txt + "; [ORDER]";
+            
+            if (marker.isEmpty()) {
+                if (order_pending) {
+                    txt = txt + " [PENDING "+(in_sell_order ? "SELL" : "BUY")+"]";
+                } else if (in_order_buy_sell_cycle) {
+                    txt = txt + " [ORDER]";
+                }
             }
-            if (!order_pending && last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
-                float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
-                txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "% " + symbolQuote;
+            
+            if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
+                txt = txt + " [Ord: "+df8.format(last_order_price)+ " " + symbolQuote + "]";
             }
         }
-        
+ 
         if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
-            txt = txt + "; ["+df8.format(price)+"]";
-        } else {
-            txt = txt + "; [-]";
+            txt = txt + " [Cur: "+df8.format(price)+ " " + symbolQuote;
+            
+            if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
+                float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
+                if (Math.abs(percent) > 0.0005) {
+                    txt = txt + " " + (percent >= 0 ? "+" : "") + df3.format(percent) + "%";
+                }
+            }
+            
+            txt = txt + "]";
         }
         
-        if (is_changed) {
-            txt = txt + ")";
+        if (!marker.isEmpty()) {
+            txt = txt + " ["+marker+"]";
         }
         
         return txt;
@@ -290,5 +306,19 @@ public class currencyPairItem {
      */
     public void setLastOrderPrice(BigDecimal last_order_price) {
         this.last_order_price = last_order_price;
+    }
+
+    /**
+     * @return the marker
+     */
+    public String getMarker() {
+        return marker;
+    }
+
+    /**
+     * @param marker the marker to set
+     */
+    public void setMarker(String marker) {
+        this.marker = marker;
     }
 }

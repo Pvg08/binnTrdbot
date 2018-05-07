@@ -14,8 +14,10 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  *
@@ -26,6 +28,8 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     TradingAPIAbstractInterface client = null;
     CoinCycleController cycleController = null;
 
+    private int cycleIndex = 0; 
+    
     private String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
@@ -38,6 +42,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private final List<String> cycle = new ArrayList<>();
     private final List<BigDecimal> prices = new ArrayList<>();
     private final Map<String, BigDecimal> cycleCoins = new HashMap<>();
+    private final Set<String> usedPairs = new HashSet<>();
     private int cycleStep;
 
     private int switchesCount = 0;
@@ -45,6 +50,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private tradeProfitsController profitsChecker = null;
     private long startMillis = 0;
     private long lastOrderMillis = 0;
+    private long lastPriceMillis = 0;
     
     private BigDecimal current_order_amount;
     private BigDecimal current_order_price;
@@ -66,17 +72,19 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         mainAsset = "";
     }
 
-    public void addChain(String pair, double price) {
-        cycle.add(pair);
-        prices.add(BigDecimal.valueOf(price));
-    }
     public void addChain(String pair, BigDecimal price) {
+        usedPairs.add(getChainPair(pair));
         cycle.add(pair);
         prices.add(price);
     }
+    public void addChain(String pair, double price) {
+        addChain(pair, BigDecimal.valueOf(price));
+    }
     public void cutChain() {
-        for(int i=cycle.size()-1; i>= cycleStep; i--) {
-            profitsChecker.removeCurrencyPair(getChainPair(cycle.get(i)));
+        for(int i = cycle.size()-1; i >= cycleStep; i--) {
+            String pair = getChainPair(cycle.get(i));
+            profitsChecker.removeCurrencyPair(pair);
+            usedPairs.remove(pair);
             cycle.remove(i);
             prices.remove(i);
             filters.remove(i);
@@ -114,9 +122,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             profitsChecker.setPairPrice(cpair, prices.get(i));
         }
         profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
+        updateOrderPairPrices();
     }
 
     private void doInitWaitNextStep() {
+        lastPriceMillis = 0;
         limitOrderId = 0;
         profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
     }
@@ -131,8 +141,8 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         if (switchesCount >= cycleController.getMaxSwitchesCount()) {
             return;
         }
-        mainApplication.getInstance().log("We wait too long. Need to switch "+symbol+"'s cycle order...");
         if (cycleController.doCycleSwap(this)) {
+            mainApplication.getInstance().log("We wait too long. Need to switch "+symbol+"'s cycle order...");
             if (limitOrderId > 0) {
                 if (!profitsChecker.isTestMode()) {
                     Order order = client.getOrderStatus(symbol, limitOrderId);
@@ -153,15 +163,11 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             switchesCount++;
             doPreStep(cycleStep);
             initAndOrderStep();
-        } else {
-            mainApplication.getInstance().log("But nothing was found...");
         }
     }
     
     private void initAndOrderStep() {
-        
-System.out.println("COINS: " + cycleCoins);
-        
+        updateOrderPairPrices();
         lastOrderMillis = System.currentTimeMillis();
         symbol = cycle.get(cycleStep);
         isBuy = chainIsBuy(symbol);
@@ -196,9 +202,7 @@ System.out.println("COINS: " + cycleCoins);
         if (!isBuy) {
             profitsChecker.PreBuy(symbol, current_order_amount, current_order_price);
         }
-        //System.out.println(symbol + " revert paths to "+mainAsset+":");
-        //System.out.println("From " + baseAssetSymbol + ": " + cycleController.getRevertPathDescription(baseAssetSymbol, mainAsset));
-        //System.out.println("From " + quoteAssetSymbol + ": " + cycleController.getRevertPathDescription(quoteAssetSymbol, mainAsset));
+        lastPriceMillis = 0;
         doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, false, current_order_price, current_order_amount);
     }
     
@@ -218,6 +222,8 @@ System.out.println("COINS: " + cycleCoins);
         }
         cycleStep++;
         if (cycleStep >= cycle.size()) {
+            lastPriceMillis = 0;
+            updateOrderPairPrices();
             doStop();
             mainApplication.getInstance().log("Cycle "+cycle+" is finished!", true, true);
             return;
@@ -226,6 +232,7 @@ System.out.println("COINS: " + cycleCoins);
     }
     
     private void orderSuccessfullyFinish() {
+        lastPriceMillis = 0;
         limitOrderId = 0;
         profitsChecker.finishOrder(symbol, true, null);
         if (!profitsChecker.isTestMode()) {
@@ -243,6 +250,7 @@ System.out.println("COINS: " + cycleCoins);
         }
         profitsChecker.finishOrder(symbol, false, null);
         limitOrderId = -1;
+        lastPriceMillis = 0;
         
         revertCoinCycle();
         
@@ -322,7 +330,6 @@ System.out.println("COINS: " + cycleCoins);
             cycleCoins.put(orderCoins[0], executed.stripTrailingZeros());
             cycleCoins.put(orderCoins[1], original.subtract(executed).multiply(price).stripTrailingZeros());
         }
-System.out.println("COINS: " + cycleCoins);
     }
     
     private void checkOrders() {
@@ -372,7 +379,7 @@ System.out.println("COINS: " + cycleCoins);
             ) {
                 mainApplication.getInstance().log("We wait too long. Need to stop this "+symbol+"'s cycle order...");
                 if (!reverting) orderAbort();
-            } else if (cycleStep >= 1 && Double.parseDouble(order.getExecutedQty()) <= 0 && (System.currentTimeMillis()-lastOrderMillis) > cycleController.getSwitchLimitTimeout() * 1000) {
+            } else if (cycleStep >= 1 && cycleStep < (cycle.size() - 1) && Double.parseDouble(order.getExecutedQty()) <= 0 && (System.currentTimeMillis()-lastOrderMillis) > cycleController.getSwitchLimitTimeout() * 1000) {
                 if (!reverting) doSwitchStep();
             }
         }
@@ -454,20 +461,57 @@ System.out.println("COINS: " + cycleCoins);
         }
     }
     
+    private void updateOrderPairPrices(int from) {
+        if (from < 0 || from > cycle.size()) {
+            return;
+        }
+        if (lastPriceMillis == cycleController.getInfo().getPricesUpdateTimeMillis()) {
+            return;
+        }
+        lastPriceMillis = cycleController.getInfo().getPricesUpdateTimeMillis();
+        for(int i = 0; i < from; i++) {
+            String cpair = getChainPair(cycle.get(i));
+            currencyPairItem item = profitsChecker.getPair(cpair);
+            if (item != null) {
+                item.setPrice(null);
+                item.setLastOrderPrice(null);
+                item.setMarker("CYCLE " + cycleIndex + " PAIR " + (i+1) + " CLOSED");
+                profitsChecker.updatePairText(cpair, false);
+            }
+        }
+        for(int i = from; i < cycle.size(); i++) {
+            String cpair = getChainPair(cycle.get(i));
+            currencyPairItem item = profitsChecker.getPair(cpair);
+            if (item != null) {
+                item.setPrice(BigDecimal.valueOf(cycleController.getInfo().getLastPrices().get(cpair)));
+                item.setLastOrderPrice(prices.get(i));
+                item.setMarker("CYCLE" + cycleIndex + " PAIR " + (i+1) + (cycleStep == i ? " ACTIVE" : " OPENED"));
+                profitsChecker.updatePairText(cpair, false);
+            }
+        }
+    }
+    private void updateOrderPairPrices() {
+        lastPriceMillis = 0;
+        updateOrderPairPrices(cycleStep);
+    }
+    
     @Override
     protected void runStart() {
         limitOrderId = 0;
         cycleStep = -1;
+        lastPriceMillis = 0;
 
         mainApplication.getInstance().log("thread for cycle " + cycle + " running...");
         mainApplication.getInstance().log("Prices: " + prices);
         mainApplication.getInstance().log("");
 
         doPreStep(0);
+        updateOrderPairPrices(0);
     }
     
     @Override
     protected void runBody() {
+        updateOrderPairPrices(cycleStep);
         checkOrders();
         doNextStep();
     }
@@ -481,10 +525,11 @@ System.out.println("COINS: " + cycleCoins);
     public String getBaseSymbol() {
         return baseAssetSymbol;
     }
+
     public String getQuoteSymbol() {
         return quoteAssetSymbol;
     }
-    
+
     public boolean isInLimitOrder() {
         return limitOrderId>0;
     }
@@ -536,5 +581,27 @@ System.out.println("COINS: " + cycleCoins);
      */
     public Map<String, BigDecimal> getCycleCoins() {
         return cycleCoins;
+    }
+
+    /**
+     * @return the usedPairs
+     */
+    public Set<String> getUsedPairs() {
+        return usedPairs;
+    }
+
+    /**
+     * @return the cycleIndex
+     */
+    public int getCycleIndex() {
+        return cycleIndex;
+    }
+
+    /**
+     * @param cycleIndex the cycleIndex to set
+     */
+    public void setCycleIndex(int cycleIndex) {
+        this.cycleIndex = cycleIndex;
+        lastPriceMillis = 0;
     }
 }

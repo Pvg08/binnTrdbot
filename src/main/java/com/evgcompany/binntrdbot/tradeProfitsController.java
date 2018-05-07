@@ -377,6 +377,14 @@ public class tradeProfitsController {
             updatePairText(symbolPair, false);
         }
     }
+    public void setPairPrices(String symbolPair, BigDecimal price, BigDecimal order_price) {
+        currencyPairItem pair = pair_map.get(symbolPair);
+        if (pair != null) {
+            pair.setPrice(price);
+            pair.setLastOrderPrice(order_price);
+            updatePairText(symbolPair, false);
+        }
+    }
 
     public void finishOrder(String symbolPair, boolean isok, BigDecimal sold_price) {
         currencyPairItem pair = pair_map.get(symbolPair);
@@ -614,6 +622,10 @@ public class tradeProfitsController {
         }
     }
 
+    public currencyPairItem getPair(String pair) {
+        return pair_map.get(pair);
+    }
+    
     /**
      * @return the isLimitedOrders
      */

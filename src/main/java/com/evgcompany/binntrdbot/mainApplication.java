@@ -137,6 +137,7 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerCycleMinBaseVolume, "cycle_minbase_volume");
         config.addComponent(spinnerCycleSwitchTime, "cycle_switch_time");
         config.addComponent(spinnerCycleMaxSwitches, "cycle_switch_maxcount");
+        config.addComponent(spinnerCycleMaxEnterCount, "cycle_maxcount");
         config.Load();
     }
     
@@ -347,6 +348,8 @@ public class mainApplication extends javax.swing.JFrame {
         spinnerCycleFirstAbortTime = new javax.swing.JSpinner();
         jLabel42 = new javax.swing.JLabel();
         spinnerCycleMaxSwitches = new javax.swing.JSpinner();
+        jLabel43 = new javax.swing.JLabel();
+        spinnerCycleMaxEnterCount = new javax.swing.JSpinner();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane6 = new javax.swing.JScrollPane();
         jTextArea1 = new javax.swing.JTextArea();
@@ -1167,6 +1170,10 @@ public class mainApplication extends javax.swing.JFrame {
 
         spinnerCycleMaxSwitches.setValue(3);
 
+        jLabel43.setText("Max concurrent cycles:");
+
+        spinnerCycleMaxEnterCount.setValue(2);
+
         javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
         jPanel6.setLayout(jPanel6Layout);
         jPanel6Layout.setHorizontalGroup(
@@ -1218,7 +1225,11 @@ public class mainApplication extends javax.swing.JFrame {
                                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
                                         .addComponent(jLabel37)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                        .addComponent(spinnerCycleMinBaseVolume, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))))))
+                                        .addComponent(spinnerCycleMinBaseVolume, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
+                                        .addComponent(jLabel43)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(spinnerCycleMaxEnterCount, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))))))
                     .addGroup(jPanel6Layout.createSequentialGroup()
                         .addGap(23, 23, 23)
                         .addComponent(checkBoxUseCycles)
@@ -1281,15 +1292,20 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(jLabel36)
                             .addComponent(spinnerCycleMinPairRating, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(spinnerCycleMinBaseVolume, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel37)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(spinnerCycleMaxSwitches, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel42))
+                    .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(spinnerCycleMinBaseVolume, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jLabel37)
+                        .addComponent(jLabel42)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(spinnerCyclePercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel30))
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(spinnerCyclePercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jLabel30))
+                    .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(jLabel43)
+                        .addComponent(spinnerCycleMaxEnterCount, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(54, Short.MAX_VALUE))
         );
 
@@ -1859,6 +1875,7 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.getCoinCycleController().setMaxGlobalCoinRank((Integer) spinnerCycleMaxCoinRank.getValue());
         coinRatingController.getCoinCycleController().setMinPairRating(((Number) spinnerCycleMinPairRating.getValue()).doubleValue());
         coinRatingController.getCoinCycleController().setMinPairBaseHourVolume(((Number) spinnerCycleMinBaseVolume.getValue()).doubleValue());
+        coinRatingController.getCoinCycleController().setMaxActiveCyclesCount((Integer) spinnerCycleMaxEnterCount.getValue());
         coinRatingController.setUpdateTrendTime((Integer) spinnerScanTrendUpdateTime.getValue());
         coinRatingController.setLowHold(checkBoxLowHold.isSelected());
         coinRatingController.setAutoOrder(checkboxAutoOrder.isSelected());
@@ -2088,6 +2105,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel40;
     private javax.swing.JLabel jLabel41;
     private javax.swing.JLabel jLabel42;
+    private javax.swing.JLabel jLabel43;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
@@ -2124,6 +2142,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JSpinner spinnerCycleDelay;
     private javax.swing.JSpinner spinnerCycleFirstAbortTime;
     private javax.swing.JSpinner spinnerCycleMaxCoinRank;
+    private javax.swing.JSpinner spinnerCycleMaxEnterCount;
     private javax.swing.JSpinner spinnerCycleMaxSwitches;
     private javax.swing.JSpinner spinnerCycleMinBaseVolume;
     private javax.swing.JSpinner spinnerCycleMinPairRating;

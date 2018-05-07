@@ -73,6 +73,9 @@ public class CoinRatingController extends PeriodicProcessThread {
     private long updateTime = 10;
     private long updateTrendTime = 450;
     private long updateTrendMillis = 0;
+    private long updateRanksTime = 7200;
+    private long updateRanksMillis = 0;
+    private long updateCoinsMillis = 0;
     private boolean have_all_coins_pairs_info = false;
 
     private static final DecimalFormat df3p = new DecimalFormat("0.##%");
@@ -108,6 +111,9 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     public void updateGlobalTrendData() {
+        
+        updateTrendMillis = System.currentTimeMillis();
+        
         List<String> rankPairs = new ArrayList<>(0);
         double upval = 0;
         double dnval = 0;
@@ -347,6 +353,17 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     private void updateCoin(CoinRatingLogItem curr) {
+        curr.update_counter++;
+        if (coinJSONRanks.containsKey(curr.symbol)) {
+            curr.rank = Integer.parseInt(coinJSONRanks.get(curr.symbol).optString("rank", "9999"));
+            curr.market_cap = Float.parseFloat(coinJSONRanks.get(curr.symbol).optString("market_cap_usd", "0"));
+            curr.fullname = coinJSONRanks.get(curr.symbol).optString("name", curr.symbol);
+        } else {
+            curr.rank = 9999;
+            curr.market_cap = 0;
+            curr.fullname = curr.symbol;
+        }
+        curr.calculateRating();
         System.out.println("UPDATE " + curr.symbol);
     }
     
@@ -475,6 +492,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     private void loadRatingData() {
+        updateRanksMillis = System.currentTimeMillis();
         try {
             JSONObject obj = JsonReader.readJsonFromUrl("https://api.coinmarketcap.com/v1/ticker/?limit=1500");
             JSONArray coins = obj.getJSONArray("DATA");
@@ -646,7 +664,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     public float getPairBaseHourVolume(String pair) {
         if (coinPairRatingMap.containsKey(pair) && coinInfo.getCoinPairs().containsKey(pair)) {
-            return (float) coinInfo.convertSumm(coinInfo.getCoinPairs().get(pair)[1], coinPairRatingMap.get(pair).hour_volume, coinInfo.getBaseCoin());
+            return (float) coinInfo.convertSumm(coinInfo.getCoinPairs().get(pair)[0], coinPairRatingMap.get(pair).hour_volume, coinInfo.getBaseCoin());
         }
         return 0;
     }
@@ -748,6 +766,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     private void updateCurrentCoinsMap() {
+        updateCoinsMillis = coinInfo.getCoinsUpdateTimeMillis();
         try {
             coinInfo.getSemaphore().acquire();
             coinRatingMap.forEach((symbol, curr) -> {
@@ -913,11 +932,16 @@ public class CoinRatingController extends PeriodicProcessThread {
     protected void runBody() {
 
         if (have_all_coins_pairs_info || !analyzer) {
-            updateCurrentCoinsMap();
+            if (updateCoinsMillis != coinInfo.getCoinsUpdateTimeMillis()) {
+                updateCurrentCoinsMap();
+            }
             updateCurrentPairsMap();
         }
 
         if (analyzer) {
+            if ((System.currentTimeMillis() - updateRanksMillis) > updateRanksTime * 1000) {
+                loadRatingData();
+            }
             checkFromTop();
         }
         showAccountCost();
@@ -930,7 +954,6 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
 
         if (System.currentTimeMillis() > (updateTrendMillis + updateTrendTime*1000)) {
-            updateTrendMillis = System.currentTimeMillis();
             updateGlobalTrendData();
         }
     }
@@ -1236,5 +1259,19 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public void setUpdateTrendTime(long updateTrendTime) {
         this.updateTrendTime = updateTrendTime;
+    }
+
+    /**
+     * @return the updateRanksTime
+     */
+    public long getUpdateRanksTime() {
+        return updateRanksTime;
+    }
+
+    /**
+     * @param updateRanksTime the updateRanksTime to set
+     */
+    public void setUpdateRanksTime(long updateRanksTime) {
+        this.updateRanksTime = updateRanksTime;
     }
 }

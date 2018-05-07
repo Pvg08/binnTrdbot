@@ -56,6 +56,9 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     private long last_init_millis = 0;
     private long reinit_millis = 24 * 60 * 60 * 1000;
     
+    private long pricesUpdateTimeMillis = 0;
+    private long coinsUpdateTimeMillis = 0;
+    
     public CoinInfoAggregator(TradingAPIAbstractInterface client) {
         this.client = client;
         delayTime = 30;
@@ -160,6 +163,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
                 addPairToGraph(price.getSymbol().toUpperCase(), Double.valueOf(price.getPrice()));
             });
             tempPrices.clear();
+            pricesUpdateTimeMillis = System.currentTimeMillis();
         } catch (InterruptedException ex) {
             Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -170,19 +174,17 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     }
     
     private void doInitCoinsToCheck() {
-        coinsToCheck = new HashSet<>();
+        Set<String> tmpCoinsToCheck = new HashSet<>();
         List<AssetBalance> allBalances = client.getAllBalances();
         allBalances.forEach((balance) -> {
             if (
                 (Float.parseFloat(balance.getFree()) + Float.parseFloat(balance.getLocked())) > 0.0
             ) {
-                coinsToCheck.add(balance.getAsset());
+                tmpCoinsToCheck.add(balance.getAsset());
             }
         });
-
-        Set<String> oldCoinsToCheck = coinsToCheck;
         coinsToCheck = new HashSet<>();
-        oldCoinsToCheck.forEach((checkCoin) -> {
+        tmpCoinsToCheck.forEach((checkCoin) -> {
             AssetBalance balance = client.getAssetBalance(checkCoin);
             if (balance != null && !balance.getAsset().isEmpty()) {
                 double full_balance = Double.parseDouble(balance.getFree()) + Double.parseDouble(balance.getLocked());
@@ -225,6 +227,8 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
                 });
             }
             tempPrices.clear();
+            pricesUpdateTimeMillis = System.currentTimeMillis();
+            coinsUpdateTimeMillis = System.currentTimeMillis();
             
             initGraph();
             
@@ -302,6 +306,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         init_complete = false;
         doMainInit();
         doInitCoinsToCheck();
+        mainApplication.getInstance().log("Enough amount coins: " + coinsToCheck);
         updateBaseAccountCost();
         updatePrices(true);
         init_complete = true;
@@ -389,5 +394,19 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
      */
     public DefaultDirectedGraph<String, DefaultEdge> getPairsGraph() {
         return graph_pair;
+    }
+
+    /**
+     * @return the pricesUpdateTimeMillis
+     */
+    public long getPricesUpdateTimeMillis() {
+        return pricesUpdateTimeMillis;
+    }
+
+    /**
+     * @return the coinsUpdateTimeMillis
+     */
+    public long getCoinsUpdateTimeMillis() {
+        return coinsUpdateTimeMillis;
     }
 }
