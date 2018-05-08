@@ -13,6 +13,10 @@ import com.evgcompany.binntrdbot.CoinFilters;
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.mainApplication;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,14 +45,15 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     private AccountCostUpdateEvent accountCostUpdate = null;
     
     private final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
+    private final String serialize_filename = "coinsInfo_serialized.bin";
     
     private Set<String> quoteAssets = null;
     private Set<String> baseAssets = null;
     private Set<String> coins = null;
     private Set<String> coinsToCheck = null;
-    private final Map<String, String[]> coinPairs = new HashMap<>();
-    private final Map<String, CoinFilters> pairFilters = new HashMap<>();
-    private final Map<String, Double> lastPrices = new HashMap<>();
+    private Map<String, String[]> coinPairs = null;
+    private Map<String, CoinFilters> pairFilters = null;
+    private Map<String, Double> lastPrices = null;
     private final Map<String, Double> tempPrices = new HashMap<>();
     
     private TradingAPIAbstractInterface client = null;
@@ -64,6 +69,8 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     
     private long pricesUpdateTimeMillis = 0;
     private long coinsUpdateTimeMillis = 0;
+    
+    private DepthCacheProcess depthProc = null;
     
     private CoinInfoAggregator() {
         delayTime = 30;
@@ -95,6 +102,91 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             SEMAPHORE_UPDATE.acquire();
         } catch(InterruptedException exx) {}
         SEMAPHORE_UPDATE.release();
+    }
+    
+    public void startDepthCheckForPair(String pair) {
+        if (depthProc != null) {
+            depthProc.stopDepthEventStreaming();
+        }
+        depthProc = new DepthCacheProcess(pair);
+    }
+    
+    public void saveToFile(String fname) {
+        ObjectOutputStream out = null;
+        try {
+            FileOutputStream bout = new FileOutputStream(fname);
+            out = new ObjectOutputStream(bout);
+            Long L_last_init_millis = last_init_millis;
+            Long L_coinsUpdateTimeMillis = coinsUpdateTimeMillis;
+            out.writeObject(L_last_init_millis);
+            out.writeObject(L_coinsUpdateTimeMillis);
+            out.writeObject(graph);
+            out.writeObject(graph_pair);
+            out.writeObject(quoteAssets);
+            out.writeObject(baseAssets);
+            out.writeObject(coins);
+            out.writeObject(coinPairs);
+            out.writeObject(lastPrices);
+            out.writeObject(pairFilters);
+            out.flush();
+        } catch (Exception ex) {
+            Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            try {
+                if (out != null) out.close();
+            } catch (Exception ex) {
+                Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+    
+    public boolean loadFromFile(String fname) {
+        try {
+            FileInputStream bin = new FileInputStream(fname);
+            ObjectInputStream in = new ObjectInputStream(bin);
+            Long L_last_init_millis;
+            Long L_coinsUpdateTimeMillis;
+            L_last_init_millis = (Long) in.readObject();
+            if ((System.currentTimeMillis() - L_last_init_millis) > reinit_millis) {
+                return false;
+            }
+            L_coinsUpdateTimeMillis = (Long) in.readObject();
+            last_init_millis = L_last_init_millis;
+            coinsUpdateTimeMillis = L_coinsUpdateTimeMillis;
+            graph = (DefaultDirectedWeightedGraph<String, DefaultWeightedEdge>) in.readObject();
+            graph_pair = (DefaultDirectedGraph<String, DefaultEdge>) in.readObject();
+            quoteAssets = (Set<String>) in.readObject();
+            baseAssets = (Set<String>) in.readObject();
+            coins = (Set<String>) in.readObject();
+            coinPairs = (Map<String, String[]>) in.readObject();
+            lastPrices = (Map<String, Double>) in.readObject();
+            pairFilters = (Map<String, CoinFilters>) in.readObject();
+            if (
+                L_last_init_millis != null && 
+                L_coinsUpdateTimeMillis != null && 
+                graph != null &&
+                graph_pair != null &&
+                quoteAssets != null &&
+                baseAssets != null &&
+                coins != null &&
+                coinPairs != null &&
+                lastPrices != null &&
+                pairFilters != null
+            ) {
+                return true;
+            }
+        } catch(Exception e) {}
+        last_init_millis = 0;
+        coinsUpdateTimeMillis = 0;
+        graph = null;
+        graph_pair = null;
+        quoteAssets = null;
+        baseAssets = null;
+        coins = null;
+        coinPairs = null;
+        lastPrices = null;
+        pairFilters = null;
+        return false;
     }
     
     private void addPairToGraph(String symbol1, String symbol2, double price) {
@@ -241,37 +333,49 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         
         try {
             SEMAPHORE_UPDATE.acquire();
-            
-            last_init_millis = System.currentTimeMillis();
-        
-            baseAssets = new HashSet<>();
-            quoteAssets = new HashSet<>();
-            coins = new HashSet<>();
 
-            List<TickerPrice> allPrices = client.getAllPrices();
-            if (allPrices!= null && !allPrices.isEmpty()) {
-                allPrices.forEach((price) -> {
-                    if (price != null && !price.getSymbol().isEmpty()) {
-                        lastPrices.put(price.getSymbol(), Double.parseDouble(price.getPrice()));
-                        SymbolInfo info = client.getSymbolInfo(price.getSymbol().toUpperCase());
-                        if (info != null && info.getStatus() == SymbolStatus.TRADING) {
-                            coinPairs.put(info.getBaseAsset() + info.getQuoteAsset(), new String[]{info.getBaseAsset(), info.getQuoteAsset()});
-                            pairFilters.put(info.getBaseAsset() + info.getQuoteAsset(), new CoinFilters(info.getBaseAsset(), info.getQuoteAsset(), info.getFilters()));
-                            lastPrices.put(info.getBaseAsset() + info.getQuoteAsset(), Double.parseDouble(price.getPrice()));
-                            quoteAssets.add(info.getQuoteAsset());
-                            baseAssets.add(info.getBaseAsset());
-                            coins.add(info.getBaseAsset());
-                            coins.add(info.getQuoteAsset());
-                        }
-                    }
-                });
+            boolean dataNeedToSet = true;
+            
+            if (initial) {
+                if (loadFromFile(serialize_filename)) {
+                    mainApplication.getInstance().log("coins & pairs data was loaded from "+serialize_filename+"...");
+                    dataNeedToSet = false;
+                }
             }
-            tempPrices.clear();
-            pricesUpdateTimeMillis = System.currentTimeMillis();
-            coinsUpdateTimeMillis = System.currentTimeMillis();
             
-            initGraph();
-            
+            if (dataNeedToSet) {
+                last_init_millis = System.currentTimeMillis();
+                if (coinPairs == null) coinPairs = new HashMap<>();
+                if (pairFilters == null) pairFilters = new HashMap<>();
+                if (lastPrices == null) lastPrices = new HashMap<>();
+                quoteAssets = new HashSet<>();
+                baseAssets = new HashSet<>();
+                coins = new HashSet<>();
+                List<TickerPrice> allPrices = client.getAllPrices();
+                if (allPrices!= null && !allPrices.isEmpty()) {
+                    allPrices.forEach((price) -> {
+                        if (price != null && !price.getSymbol().isEmpty()) {
+                            lastPrices.put(price.getSymbol(), Double.parseDouble(price.getPrice()));
+                            SymbolInfo info = client.getSymbolInfo(price.getSymbol().toUpperCase());
+                            if (info != null && info.getStatus() == SymbolStatus.TRADING) {
+                                coinPairs.put(info.getBaseAsset() + info.getQuoteAsset(), new String[]{info.getBaseAsset(), info.getQuoteAsset()});
+                                pairFilters.put(info.getBaseAsset() + info.getQuoteAsset(), new CoinFilters(info.getBaseAsset(), info.getQuoteAsset(), info.getFilters()));
+                                lastPrices.put(info.getBaseAsset() + info.getQuoteAsset(), Double.parseDouble(price.getPrice()));
+                                quoteAssets.add(info.getQuoteAsset());
+                                baseAssets.add(info.getBaseAsset());
+                                coins.add(info.getBaseAsset());
+                                coins.add(info.getQuoteAsset());
+                            }
+                        }
+                    });
+                }
+                tempPrices.clear();
+                pricesUpdateTimeMillis = System.currentTimeMillis();
+                coinsUpdateTimeMillis = System.currentTimeMillis();
+                initGraph();
+                saveToFile(serialize_filename);
+            }
+
             if (initial) {
                 doInitCoinsToCheck();
                 updatePrices();
@@ -373,6 +477,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         mainApplication.getInstance().log("Stopping coins update thread...");
+        saveToFile(serialize_filename);
     }
 
     public boolean isInitialised() {

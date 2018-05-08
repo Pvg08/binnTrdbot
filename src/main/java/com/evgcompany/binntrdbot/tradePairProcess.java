@@ -88,8 +88,8 @@ public class tradePairProcess extends PeriodicProcessThread {
     private boolean base_strategy_sell_ignored = false;
     private boolean do_remove_flag = false;
     
-    private static DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static DecimalFormat df8 = new DecimalFormat("0.########");
+    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
+    private static final DecimalFormat df8 = new DecimalFormat("0.########");
     
     private boolean useBuyStopLimited = false;
     private int stopBuyLimitTimeout = 120;
@@ -460,15 +460,20 @@ public class tradePairProcess extends PeriodicProcessThread {
     public void doNetworkAction(String train, String base) {
         if (strategiesController.getMainStrategy().equals("Neural Network")) {
             predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "");
-            if (train.equals("TRAIN")) {
-                predictor.start();
-            } else if (train.equals("ADDSET")) {
-                predictor.setSaveTrainData(true);
-                predictor.appendTrainingData(series);
-            } else if (train.equals("STOP")) {
-                if (predictor.getLearningRule() != null) {
-                    predictor.getLearningRule().stopLearning();
-                }
+            switch (train) {
+                case "TRAIN":
+                    predictor.start();
+                    break;
+                case "ADDSET":
+                    predictor.setSaveTrainData(true);
+                    predictor.appendTrainingData(series);
+                    break;
+                case "STOP":
+                    if (predictor.getLearningRule() != null) {
+                        predictor.getLearningRule().stopLearning();
+                    }   break;
+                default:
+                    break;
             }
         }
     }
@@ -485,6 +490,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         app.log("");
         
         info.StartAndWaitForInit();
+        info.startDepthCheckForPair(symbol);
         
         try {
             filter = info.getPairFilters().get(symbol);

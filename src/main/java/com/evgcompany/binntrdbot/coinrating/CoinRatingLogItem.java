@@ -9,7 +9,7 @@ package com.evgcompany.binntrdbot.coinrating;
  *
  * @author EVG_adm_T
  */
-public class CoinRatingLogItem {
+public class CoinRatingLogItem implements java.io.Serializable {
     public String symbol;
     public String fullname;
 

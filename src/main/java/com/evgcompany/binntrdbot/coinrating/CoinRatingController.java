@@ -12,7 +12,11 @@ import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.io.Closeable;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.ParseException;
@@ -49,6 +53,8 @@ public class CoinRatingController extends PeriodicProcessThread {
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
     
+    private final String serialize_filename = "coinsRating_serialized.bin";
+    
     private CoinInfoAggregator coinInfo = null;
     private StrategiesController strategiesController = null;
     private SignalOrderController signalOrderController = null;
@@ -63,8 +69,8 @@ public class CoinRatingController extends PeriodicProcessThread {
     private CoinRatingSort sortby = CoinRatingSort.CR_RANK;
     private boolean sortAsc = true;
 
-    private final Map<String, CoinRatingPairLogItem> coinPairRatingMap = new HashMap<>();
-    private final Map<String, CoinRatingLogItem> coinRatingMap = new HashMap<>();
+    private Map<String, CoinRatingPairLogItem> coinPairRatingMap = null;
+    private Map<String, CoinRatingLogItem> coinRatingMap = null;
     private final Map<String, JSONObject> coinJSONRanks = new HashMap<>();
     private GlobalTrendUpdateEvent trendUpdateEvent = null;
 
@@ -74,6 +80,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private long updateRanksTime = 7200;
     private long updateRanksMillis = 0;
     private long updateCoinsMillis = 0;
+    private long updateLoadRejectTime = 86400;
     private boolean have_all_coins_pairs_info = false;
 
     private static final DecimalFormat df3p = new DecimalFormat("0.##%");
@@ -90,7 +97,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private final int globalTrendMaxRank = 40;
     
     private JProgressBar progressBar = null;
-    private double initialCost = -1;
+    private final double initialCost = -1;
     
     private double upTrendPercent = 0;
     private double downTrendPercent = 0;
@@ -108,6 +115,59 @@ public class CoinRatingController extends PeriodicProcessThread {
         coinCycleController.setDelayTime(90);
     }
 
+    public void saveToFile(String fname) {
+        ObjectOutputStream out = null;
+        try {
+            FileOutputStream bout = new FileOutputStream(fname);
+            out = new ObjectOutputStream(bout);
+            Long LcurMillis = System.currentTimeMillis();
+            Long LupdateRanksMillis = updateRanksMillis;
+            Long LupdateCoinsMillis = updateCoinsMillis;
+            out.writeObject(LcurMillis);
+            out.writeObject(LupdateRanksMillis);
+            out.writeObject(LupdateCoinsMillis);
+            out.writeObject(coinPairRatingMap);
+            out.writeObject(coinRatingMap);
+            out.flush();
+        } catch (Exception ex) {
+            Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            try {
+                if (out != null) out.close();
+            } catch (Exception ex) {
+                Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+    
+    public boolean loadFromFile(String fname) {
+        try {
+            FileInputStream bin = new FileInputStream(fname);
+            ObjectInputStream in = new ObjectInputStream(bin);
+            Long LcurMillis = (Long) in.readObject();
+            if ((System.currentTimeMillis() - LcurMillis) > updateLoadRejectTime * 1000) {
+                return false;
+            }
+            Long LupdateRanksMillis = (Long) in.readObject();
+            Long LupdateCoinsMillis = (Long) in.readObject();
+            coinPairRatingMap = (Map<String, CoinRatingPairLogItem>) in.readObject();
+            coinRatingMap = (Map<String, CoinRatingLogItem>) in.readObject();
+            if (
+                LupdateRanksMillis != null && 
+                LupdateCoinsMillis != null && 
+                coinPairRatingMap != null &&
+                coinRatingMap != null
+            ) {
+                return true;
+            }
+        } catch(Exception e) {}
+        updateRanksMillis = 0;
+        updateCoinsMillis = 0;
+        coinPairRatingMap = null;
+        coinRatingMap = null;
+        return false;
+    }
+    
     public void updateGlobalTrendData() {
         
         updateTrendMillis = System.currentTimeMillis();
@@ -268,8 +328,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     private void updatePair(CoinRatingPairLogItem curr) {
-        curr.update_counter++;
-        
+
         if (curr.base_rating==null || curr.base_rating.update_counter <= 0) {
             if (coinRatingMap.containsKey(curr.symbolBase)) {
                 curr.base_rating = coinRatingMap.get(curr.symbolBase);
@@ -331,10 +390,11 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
         curr.calculateRating();
         curr.last_rating_update_millis = System.currentTimeMillis();
+        curr.update_counter++;
+        System.out.println("UPDATE " + curr.symbol);
     }
     
     private void updateCoin(CoinRatingLogItem curr) {
-        curr.update_counter++;
         if (coinJSONRanks.containsKey(curr.symbol)) {
             curr.rank = Integer.parseInt(coinJSONRanks.get(curr.symbol).optString("rank", "9999"));
             curr.market_cap = Float.parseFloat(coinJSONRanks.get(curr.symbol).optString("market_cap_usd", "0"));
@@ -345,6 +405,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             curr.fullname = curr.symbol;
         }
         curr.calculateRating();
+        curr.update_counter++;
         System.out.println("UPDATE " + curr.symbol);
     }
     
@@ -473,6 +534,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
     
     private void loadRatingData() {
+        System.out.println("Loading RatingData...");
         updateRanksMillis = System.currentTimeMillis();
         try {
             JSONObject obj = JsonReader.readJsonFromUrl("https://api.coinmarketcap.com/v1/ticker/?limit=1500");
@@ -509,6 +571,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     private void updateList() {
+        if (!isAlive()) return;
         for (Entry<String, CoinRatingPairLogItem> entry : coinPairRatingMap.entrySet()) {
             if (null != sortby) switch (sortby) {
                 case CR_RANK:
@@ -861,25 +924,28 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
-
+        
+        need_stop = false;
+        paused = false;
+        have_all_coins_pairs_info = false;
+        
         mainApplication.getInstance().log("CoinRatingController starting...");
         
         if (coinInfo.getClient() == null) coinInfo.setClient(client);
         coinInfo.StartAndWaitForInit();
 
-        mainApplication.getInstance().log("Loading rating data...");
-        loadRatingData();
-        
-        need_stop = false;
-        paused = false;
-        have_all_coins_pairs_info = false;
+        if (!loadFromFile(serialize_filename)) {
+            coinPairRatingMap = new HashMap<>();
+            coinRatingMap = new HashMap<>();
+            mainApplication.getInstance().log("Loading rating data...");
+            loadRatingData();
+            mainApplication.getInstance().log("Init coins and pairs...");
+            updateCurrentCoinsMap();
+            updateCurrentPairsMap();
+        } else {
+            mainApplication.getInstance().log("Rating data was loaded from "+serialize_filename+"...");
+        }
 
-        doWait(1000);
-        
-        mainApplication.getInstance().log("Init coins and pairs...");
-        updateCurrentCoinsMap();
-        updateCurrentPairsMap();
-        
         mainApplication.getInstance().log("Checking trend...");
         updateGlobalTrendData();
         
@@ -941,6 +1007,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runFinish() {
+        saveToFile(serialize_filename);
         if (signalOrderController != null && signalOrderController.isAlive()) signalOrderController.doStop();
         if (coinCycleController != null && coinCycleController.isAlive()) coinCycleController.doStop();
         if (orderEvent != null) {
@@ -1233,5 +1300,19 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public void setUpdateRanksTime(long updateRanksTime) {
         this.updateRanksTime = updateRanksTime;
+    }
+
+    /**
+     * @return the updateLoadRejectTime
+     */
+    public long getUpdateLoadRejectTime() {
+        return updateLoadRejectTime;
+    }
+
+    /**
+     * @param updateLoadRejectTime the updateLoadRejectTime to set
+     */
+    public void setUpdateLoadRejectTime(long updateLoadRejectTime) {
+        this.updateLoadRejectTime = updateLoadRejectTime;
     }
 }

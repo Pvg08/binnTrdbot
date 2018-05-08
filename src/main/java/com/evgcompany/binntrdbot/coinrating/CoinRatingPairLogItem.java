@@ -11,7 +11,7 @@ import com.evgcompany.binntrdbot.tradePairProcess;
  *
  * @author EVG_adm_T
  */
-public class CoinRatingPairLogItem {
+public class CoinRatingPairLogItem implements java.io.Serializable {
     public String symbol;
     public String symbolQuote;
     public String symbolBase;

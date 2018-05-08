@@ -97,10 +97,11 @@ public class CoinCycleController extends PeriodicProcessThread {
     private boolean pathIsValid(List<String> cycle, List<String> pre_cycle) {
         if (cycle.size() < minCycleLength || cycle.size() > maxCycleLength) return false;
         if (pre_cycle != null && pre_cycle.size() > 0) {
-            for(int i=0; i<pre_cycle.size(); i++) {
-                if (!cycle.get(i).equals(pre_cycle.get(i))) {
-                    return false;
-                }
+            if (!cycle.get(0).equals(pre_cycle.get(0))) {
+                return false;
+            }
+            if (!cycle.get(pre_cycle.size()-1).equals(pre_cycle.get(pre_cycle.size()-1))) {
+                return false;
             }
         }
         for(int i = pre_cycle != null ? pre_cycle.size() : 1; i < cycle.size(); i++) {

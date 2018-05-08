@@ -18,7 +18,7 @@ import java.util.List;
  *
  * @author EVG_Adminer
  */
-public class CoinFilters {
+public class CoinFilters implements java.io.Serializable {
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
     
