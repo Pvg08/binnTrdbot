@@ -19,8 +19,8 @@ import java.util.List;
  * @author EVG_Adminer
  */
 public class CoinFilters {
-    private final String baseAssetSymbol;
-    private final String quoteAssetSymbol;
+    private String baseAssetSymbol;
+    private String quoteAssetSymbol;
     
     private boolean filterPrice = false;
     private BigDecimal filterPriceTickSize = BigDecimal.ZERO;
@@ -36,12 +36,9 @@ public class CoinFilters {
     private BigDecimal currentPrice = null;
     private BigDecimal currentAmount = null;
     
-    public CoinFilters(String symbol, TradingAPIAbstractInterface rclient) {
-        ExchangeInfo info = rclient.getExchangeInfo();
-        SymbolInfo pair_sinfo = info.getSymbolInfo(symbol);
-        baseAssetSymbol = pair_sinfo.getBaseAsset();
-        quoteAssetSymbol = pair_sinfo.getQuoteAsset();
-        List<SymbolFilter> filters = pair_sinfo.getFilters();        
+    private void do_init(String baseAsset, String quoteAsset, List<SymbolFilter> filters) {
+        baseAssetSymbol = baseAsset;
+        quoteAssetSymbol = quoteAsset;
         filters.forEach((filter)->{
             if (null != filter.getFilterType()) switch (filter.getFilterType()) {
                 case PRICE_FILTER:
@@ -64,6 +61,16 @@ public class CoinFilters {
                     break;
             }
         });
+    }
+    
+    public CoinFilters(String baseAsset, String quoteAsset, List<SymbolFilter> filters) {
+        do_init(baseAsset, quoteAsset, filters);
+    }
+    
+    public CoinFilters(String symbol, TradingAPIAbstractInterface rclient) {
+        ExchangeInfo info = rclient.getExchangeInfo();
+        SymbolInfo pair_sinfo = info.getSymbolInfo(symbol);
+        do_init(pair_sinfo.getBaseAsset(), pair_sinfo.getQuoteAsset(), pair_sinfo.getFilters());
     }
 
     public BigDecimal normalizeQuantity(BigDecimal qty, boolean qty_down_only) {

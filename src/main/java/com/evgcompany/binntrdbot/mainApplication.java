@@ -42,7 +42,9 @@ public class mainApplication extends javax.swing.JFrame {
     
     private static volatile mainApplication instance = null;
     
+    private static final DecimalFormat df8 = new DecimalFormat("0.########");
     private static final DecimalFormat df3 = new DecimalFormat("0.##");
+    private static final DecimalFormat df3p = new DecimalFormat("0.###%");
     
     public static mainApplication getInstance() {
         return instance;
@@ -74,6 +76,19 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.setTrendUpdateEvent((upt, dnt) -> {
             labelUpTrend.setText("UP: " + df3.format(upt) + "%");
             labelDownTrend.setText("DOWN: " + df3.format(dnt) + "%");
+        });
+        
+        CoinInfoAggregator.getInstance().setAccountCostUpdate((agg)->{
+            double initialCost = agg.getInitialAccountCost();
+            if (initialCost >= 0) {
+                double curCost = agg.getBaseAccountCost();
+                String cost_text = "Account cost: " + df8.format(curCost) + " " + agg.getBaseCoin();
+                if (initialCost > 0) {
+                    double changePercent = (curCost - initialCost) / initialCost;
+                    cost_text = cost_text + " ("+df3p.format(changePercent)+")";
+                }
+                labelAccountCost.setText(cost_text);
+            }
         });
         
         config.addComponent(instance, "window");
@@ -187,7 +202,11 @@ public class mainApplication extends javax.swing.JFrame {
             client.connect();
             profitsChecker.setClient(client);
             coinRatingController.setClient(client);
+            CoinInfoAggregator.getInstance().setClient(client);
         }
+        CoinInfoAggregator.getInstance().setBaseCoin(textFieldBaseCoin.getText());
+        CoinInfoAggregator.getInstance().setBaseCoinMinCount(((Number) spinnerRatingMinBaseVolume.getValue()).doubleValue());
+        CoinInfoAggregator.getInstance().setDelayTime((Integer) spinnerPricesUpdateDelay.getValue());
     }
     
     private void setPairParams() {
@@ -1359,7 +1378,7 @@ public class mainApplication extends javax.swing.JFrame {
             }
         });
 
-        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "% from prog start", "% last hour", "% 24hr", "Events count", "Last event anno date", "Volatility", "Strategies to enter value", "Strategies to exit value", "Strategies value", "Signals rating", "Calculated rating" }));
+        comboBoxRatingSortby.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Rank", "Market cap", "Hour Volume", "% from prog start", "% last hour", "% 24hr", "Events count", "Last event anno date", "Volatility", "Strategies to enter value", "Strategies to exit value", "Strategies value", "Signals rating", "Calculated rating" }));
         comboBoxRatingSortby.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxRatingSortbyActionPerformed(evt);
@@ -1685,6 +1704,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCTrain.setEnabled(false);
         buttonRemove.setEnabled(false);
         labelAccountCost.setEnabled(true);
+        if (coinRatingController.isStop()) CoinInfoAggregator.getInstance().doStop();
     }//GEN-LAST:event_buttonStopActionPerformed
 
     private void buttonClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonClearActionPerformed
@@ -1859,9 +1879,6 @@ public class mainApplication extends javax.swing.JFrame {
 
     private void buttonRatingStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRatingStartActionPerformed
         initAPI();
-        coinRatingController.getCoinInfo().setBaseCoin(textFieldBaseCoin.getText());
-        coinRatingController.getCoinInfo().setBaseCoinMinCount(((Number) spinnerRatingMinBaseVolume.getValue()).doubleValue());
-        coinRatingController.getCoinInfo().setDelayTime((Integer) spinnerPricesUpdateDelay.getValue());
         coinRatingController.getCoinCycleController().setRestrictCoins(textFieldRestrictedCoins.getText());
         coinRatingController.getCoinCycleController().setRequiredCoins(textFieldRequiredCoins.getText());
         coinRatingController.getCoinCycleController().setMainCoins(textFieldCycleMainCoins.getText());
@@ -1895,7 +1912,6 @@ public class mainApplication extends javax.swing.JFrame {
         coinRatingController.getSignalOrderController().setMaxEnter((Integer) spinnerMaxSignalOrders.getValue());
         coinRatingController.setSecondsOrderEnterWait((Integer) spinnerRatingMaxOrderWait.getValue());
         coinRatingController.setProgressBar(progressBarRatingAnalPercent);
-        coinRatingController.setLabelAccountCost(labelAccountCost);
         comboBoxRatingSortActionPerformed(null);
         comboBoxRatingSortbyActionPerformed(null);
         coinRatingController.getSignalOrderController().getSignalController().setApiId(textFieldAPIID.getText());
@@ -1912,6 +1928,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonRatingStart.setEnabled(true);
         buttonRatingCheck.setEnabled(false);
         buttonRatingStop.setEnabled(false);
+        if (buttonRun.isEnabled()) CoinInfoAggregator.getInstance().doStop();
     }//GEN-LAST:event_buttonRatingStopActionPerformed
 
     private void comboBoxRatingSortActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxRatingSortActionPerformed

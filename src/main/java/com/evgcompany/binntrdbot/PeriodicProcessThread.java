@@ -90,4 +90,11 @@ abstract public class PeriodicProcessThread extends Thread {
         }
         runFinish();
     }
+
+    /**
+     * @return the need_stop
+     */
+    public boolean isStop() {
+        return !isAlive() || need_stop;
+    }
 }

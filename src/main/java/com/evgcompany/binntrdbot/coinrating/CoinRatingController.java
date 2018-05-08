@@ -28,11 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
-import javax.swing.JLabel;
 import javax.swing.JProgressBar;
 import org.json.*;
 import org.ta4j.core.Bar;
@@ -92,7 +90,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     private final int globalTrendMaxRank = 40;
     
     private JProgressBar progressBar = null;
-    private JLabel labelAccountCost = null;
     private double initialCost = -1;
     
     private double upTrendPercent = 0;
@@ -103,7 +100,8 @@ public class CoinRatingController extends PeriodicProcessThread {
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
         strategiesController.setMainStrategy("No strategy");
-        coinInfo = new CoinInfoAggregator(client);
+        coinInfo = CoinInfoAggregator.getInstance();
+        coinInfo.setClient(client);
         signalOrderController = new SignalOrderController(this, paircontroller);
         signalOrderController.setDelayTime(2);
         coinCycleController = new CoinCycleController(client, this);
@@ -205,23 +203,6 @@ public class CoinRatingController extends PeriodicProcessThread {
             return true;
         }
         return false;
-    }
-    
-    private void showAccountCost() {
-        if (labelAccountCost != null) {
-            double curCost = coinInfo.getBaseAccountCost();
-            if (initialCost < 0) {
-                initialCost = curCost;
-            }
-            if (initialCost >= 0) {
-                String cost_text = "Account cost: " + df8.format(curCost) + " " + coinInfo.getBaseCoin();
-                if (initialCost > 0) {
-                    double changePercent = (curCost - initialCost) / initialCost;
-                    cost_text = cost_text + " ("+df3p.format(changePercent)+")";
-                }
-                labelAccountCost.setText(cost_text);
-            }
-        }
     }
     
     private void checkFromTop() {
@@ -536,6 +517,9 @@ public class CoinRatingController extends PeriodicProcessThread {
                 case CR_MARKET_CAP:
                     entry.getValue().sort = (float) entry.getValue().base_rating.market_cap;
                     break;
+                case CR_VOLUME_HOUR:
+                    entry.getValue().sort = (float) entry.getValue().hour_volume;
+                    break;
                 case CR_PROGSTART_PRICEUP:
                     entry.getValue().sort = (float) entry.getValue().percent_from_begin;
                     break;
@@ -586,6 +570,9 @@ public class CoinRatingController extends PeriodicProcessThread {
                 if (null != sortby) switch (sortby) {
                     case CR_MARKET_CAP:
                         text += df3.format(curr.base_rating.market_cap);
+                        break;
+                    case CR_VOLUME_HOUR:
+                        text += df8.format(curr.hour_volume);
                         break;
                     case CR_PROGSTART_PRICEUP:
                         text += df3p.format(curr.percent_from_begin);
@@ -877,13 +864,8 @@ public class CoinRatingController extends PeriodicProcessThread {
 
         mainApplication.getInstance().log("CoinRatingController starting...");
         
-        mainApplication.getInstance().log("Collecting coins & pairs info...");
-        coinInfo.setClient(client);
-        coinInfo.start();
-        while (!need_stop && !coinInfo.isInitialised()) {
-            doWait(2000);
-        }
-        showAccountCost();
+        if (coinInfo.getClient() == null) coinInfo.setClient(client);
+        coinInfo.StartAndWaitForInit();
 
         mainApplication.getInstance().log("Loading rating data...");
         loadRatingData();
@@ -944,7 +926,6 @@ public class CoinRatingController extends PeriodicProcessThread {
             }
             checkFromTop();
         }
-        showAccountCost();
         updateList();
 
         if (analyzer && autoOrder && have_all_coins_pairs_info) {
@@ -1220,31 +1201,10 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     /**
-     * @return the coinInfo
-     */
-    public CoinInfoAggregator getCoinInfo() {
-        return coinInfo;
-    }
-
-    /**
      * @return the have_all_coins_pairs_info
      */
     public boolean isHaveAllCoinsPairsInfo() {
         return have_all_coins_pairs_info;
-    }
-
-    /**
-     * @return the labelAccountCost
-     */
-    public JLabel getLabelAccountCost() {
-        return labelAccountCost;
-    }
-
-    /**
-     * @param labelAccountCost the labelAccountCost to set
-     */
-    public void setLabelAccountCost(JLabel labelAccountCost) {
-        this.labelAccountCost = labelAccountCost;
     }
 
     /**

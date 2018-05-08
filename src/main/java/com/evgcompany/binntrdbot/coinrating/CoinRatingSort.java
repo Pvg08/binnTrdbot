@@ -12,6 +12,7 @@ package com.evgcompany.binntrdbot.coinrating;
 public enum CoinRatingSort {
     CR_RANK,
     CR_MARKET_CAP,
+    CR_VOLUME_HOUR,
     CR_PROGSTART_PRICEUP,
     CR_LAST_HOUR_PRICEUP,
     CR_24HR_PRICEUP,

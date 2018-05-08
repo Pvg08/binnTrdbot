@@ -10,6 +10,7 @@ import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -36,8 +37,8 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private String mainAsset;
 
     private boolean isBuy;
-    private final List<CoinFilters> filters = new ArrayList<>();
     private CoinFilters filter = null;
+    private CoinInfoAggregator info = null;
 
     private final List<String> cycle = new ArrayList<>();
     private final List<BigDecimal> prices = new ArrayList<>();
@@ -70,6 +71,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         startMillis = System.currentTimeMillis();
         isBuy = false;
         mainAsset = "";
+        info = CoinInfoAggregator.getInstance();
     }
 
     public void addChain(String pair, BigDecimal price) {
@@ -87,17 +89,16 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             usedPairs.remove(pair);
             cycle.remove(i);
             prices.remove(i);
-            filters.remove(i);
         }
     }
     public void addCycleToCycleChain(List<String> new_cycle, int from) {
         for(int i=from; i < new_cycle.size(); i++) {
             String symbol1 = new_cycle.get(i-1);
             String symbol2 = new_cycle.get(i);
-            if (cycleController.getInfo().getPairsGraph().containsEdge(symbol2, symbol1)) { // BUY
-                addChain(symbol2+symbol1 + " BUY", cycleController.getInfo().getPricesGraph().getEdgeWeight(cycleController.getInfo().getPricesGraph().getEdge(symbol2, symbol1))); 
+            if (info.getPairsGraph().containsEdge(symbol2, symbol1)) { // BUY
+                addChain(symbol2+symbol1 + " BUY", info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol2, symbol1))); 
             } else { // SELL
-                addChain(symbol1+symbol2 + " SELL", cycleController.getInfo().getPricesGraph().getEdgeWeight(cycleController.getInfo().getPricesGraph().getEdge(symbol1, symbol2)));
+                addChain(symbol1+symbol2 + " SELL", info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol1, symbol2)));
             }
         }
     }
@@ -115,10 +116,8 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private void doPreStep(int from) {
         for(int i = from; i<cycle.size(); i++) {
             String cpair = getChainPair(cycle.get(i));
-            CoinFilters cfilter = new CoinFilters(cpair, client);
-            cfilter.logFiltersInfo();
-            filters.add(cfilter);
-            profitsChecker.placeOrUpdatePair(cfilter.getBaseAssetSymbol(), cfilter.getQuoteAssetSymbol(), cpair, true);
+            String[] coins = info.getCoinPairs().get(cpair);
+            profitsChecker.placeOrUpdatePair(coins[0], coins[1], cpair, true);
             profitsChecker.setPairPrice(cpair, prices.get(i));
         }
         profitsChecker.updateAllPairTexts(!profitsChecker.isTestMode());
@@ -172,7 +171,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         symbol = cycle.get(cycleStep);
         isBuy = chainIsBuy(symbol);
         symbol = getChainPair(symbol);
-        filter = filters.get(cycleStep);
+        filter = info.getPairFilters().get(symbol);
         baseAssetSymbol = filter.getBaseAssetSymbol();
         quoteAssetSymbol = filter.getQuoteAssetSymbol();
         if (mainAsset.isEmpty()) {
@@ -308,8 +307,8 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         baseAssetSymbol = filter.getBaseAssetSymbol();
         quoteAssetSymbol = filter.getQuoteAssetSymbol();
         current_order_amount = amount;
-        if (cycleController.getCoinRatingController().getCoinInfo().getLastPrices().containsKey(symbol)) {
-            current_order_price = BigDecimal.valueOf(cycleController.getCoinRatingController().getCoinInfo().getLastPrices().get(symbol));
+        if (info.getLastPrices().containsKey(symbol)) {
+            current_order_price = BigDecimal.valueOf(info.getLastPrices().get(symbol));
         }
         if (!isBuy) {
             profitsChecker.PreBuy(symbol, current_order_amount, current_order_price);
@@ -319,7 +318,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     }
     
     private void setOrderCoins(Order order) {
-        String orderCoins[] = cycleController.getInfo().getCoinPairs().get(order.getSymbol());
+        String orderCoins[] = info.getCoinPairs().get(order.getSymbol());
         BigDecimal executed = new BigDecimal(order.getExecutedQty());
         BigDecimal original = new BigDecimal(order.getOrigQty());
         BigDecimal price = new BigDecimal(order.getPrice());
@@ -465,17 +464,17 @@ public class tradeCycleProcess extends PeriodicProcessThread {
         if (from < 0 || from > cycle.size()) {
             return;
         }
-        if (lastPriceMillis == cycleController.getInfo().getPricesUpdateTimeMillis()) {
+        if (lastPriceMillis == info.getPricesUpdateTimeMillis()) {
             return;
         }
-        lastPriceMillis = cycleController.getInfo().getPricesUpdateTimeMillis();
+        lastPriceMillis = info.getPricesUpdateTimeMillis();
         for(int i = 0; i < from; i++) {
             String cpair = getChainPair(cycle.get(i));
             currencyPairItem item = profitsChecker.getPair(cpair);
             if (item != null) {
                 item.setPrice(null);
                 item.setLastOrderPrice(null);
-                item.setMarker("CYCLE " + cycleIndex + " PAIR " + (i+1) + " CLOSED");
+                item.setMarker("CYCLE" + cycleIndex + " PAIR" + (i+1) + " CLOSED");
                 profitsChecker.updatePairText(cpair, false);
             }
         }
@@ -483,9 +482,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             String cpair = getChainPair(cycle.get(i));
             currencyPairItem item = profitsChecker.getPair(cpair);
             if (item != null) {
-                item.setPrice(BigDecimal.valueOf(cycleController.getInfo().getLastPrices().get(cpair)));
+                item.setPrice(BigDecimal.valueOf(info.getLastPrices().get(cpair)));
                 item.setLastOrderPrice(prices.get(i));
-                item.setMarker("CYCLE" + cycleIndex + " PAIR " + (i+1) + (cycleStep == i ? " ACTIVE" : " OPENED"));
+                item.setMarker("CYCLE" + cycleIndex + " PAIR" + (i+1) + (cycleStep == i ? " ACTIVE" : " WAIT"));
                 profitsChecker.updatePairText(cpair, false);
             }
         }
@@ -497,6 +496,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
+        info.StartAndWaitForInit();
         limitOrderId = 0;
         cycleStep = -1;
         lastPriceMillis = 0;
@@ -511,9 +511,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     
     @Override
     protected void runBody() {
-        updateOrderPairPrices(cycleStep);
-        checkOrders();
         doNextStep();
+        checkOrders();
+        updateOrderPairPrices(cycleStep);
     }
 
     @Override

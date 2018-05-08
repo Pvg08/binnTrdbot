@@ -13,6 +13,7 @@ import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
@@ -50,6 +51,7 @@ public class tradePairProcess extends PeriodicProcessThread {
     private String quoteAssetSymbol;
     private tradeProfitsController profitsChecker = null;
     private StrategiesController strategiesController = null;
+    private CoinInfoAggregator info = null;
     
     private final mainApplication app;
     
@@ -111,6 +113,8 @@ public class tradePairProcess extends PeriodicProcessThread {
         profitsChecker = rprofitsChecker;
         strategiesController = new StrategiesController(symbol, app, profitsChecker);
         startMillis = System.currentTimeMillis();
+        info = CoinInfoAggregator.getInstance();
+        if (info.getClient() == null) info.setClient(client);
         setBarInterval("1m");
     }
 
@@ -480,8 +484,10 @@ public class tradePairProcess extends PeriodicProcessThread {
         app.log("thread for " + symbol + " running...");
         app.log("");
         
+        info.StartAndWaitForInit();
+        
         try {
-            filter = new CoinFilters(symbol, client);
+            filter = info.getPairFilters().get(symbol);
             filter.logFiltersInfo();
             baseAssetSymbol = filter.getBaseAssetSymbol();
             quoteAssetSymbol = filter.getQuoteAssetSymbol();

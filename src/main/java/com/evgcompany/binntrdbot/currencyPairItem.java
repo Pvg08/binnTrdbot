@@ -65,7 +65,7 @@ public class currencyPairItem {
         if (is_changed) {
             
             if (base_item.getInitialValue().compareTo(BigDecimal.ZERO) > 0) {
-                txt = txt + "[OnBegin: " + df6.format(base_item.getInitialValue());
+                txt = txt + "[Init: " + df6.format(base_item.getInitialValue());
                 float percent = 100 * (base_item.getValue().floatValue() - base_item.getInitialValue().floatValue()) / base_item.getInitialValue().floatValue();
                 if (Math.abs(percent) > 0.0005) {
                     txt = txt + " " + (percent >= 0 ? "+" : "") + df3.format(percent) + "%";

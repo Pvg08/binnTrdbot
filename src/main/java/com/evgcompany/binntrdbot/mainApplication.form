@@ -1943,20 +1943,21 @@
     <Component class="javax.swing.JComboBox" name="comboBoxRatingSortby">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="13">
+          <StringArray count="14">
             <StringItem index="0" value="Rank"/>
             <StringItem index="1" value="Market cap"/>
-            <StringItem index="2" value="% from prog start"/>
-            <StringItem index="3" value="% last hour"/>
-            <StringItem index="4" value="% 24hr"/>
-            <StringItem index="5" value="Events count"/>
-            <StringItem index="6" value="Last event anno date"/>
-            <StringItem index="7" value="Volatility"/>
-            <StringItem index="8" value="Strategies to enter value"/>
-            <StringItem index="9" value="Strategies to exit value"/>
-            <StringItem index="10" value="Strategies value"/>
-            <StringItem index="11" value="Signals rating"/>
-            <StringItem index="12" value="Calculated rating"/>
+            <StringItem index="2" value="Hour Volume"/>
+            <StringItem index="3" value="% from prog start"/>
+            <StringItem index="4" value="% last hour"/>
+            <StringItem index="5" value="% 24hr"/>
+            <StringItem index="6" value="Events count"/>
+            <StringItem index="7" value="Last event anno date"/>
+            <StringItem index="8" value="Volatility"/>
+            <StringItem index="9" value="Strategies to enter value"/>
+            <StringItem index="10" value="Strategies to exit value"/>
+            <StringItem index="11" value="Strategies value"/>
+            <StringItem index="12" value="Signals rating"/>
+            <StringItem index="13" value="Calculated rating"/>
           </StringArray>
         </Property>
       </Properties>

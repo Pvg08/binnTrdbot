@@ -59,7 +59,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     private int stopFirstLimitTimeout = 12 * 60;
     private int switchLimitTimeout = 30 * 60;
     
-    private int minCycleLength = 3;
+    private int minCycleLength = 2;
     private int maxCycleLength = 5;
 
     public CoinCycleController(TradingAPIAbstractInterface client, CoinRatingController coinRatingController) {
@@ -68,7 +68,8 @@ public class CoinCycleController extends PeriodicProcessThread {
         pairProcessController = coinRatingController.getPaircontroller();
         comissionPercent = pairProcessController.getProfitsChecker().getTradeComissionPercent().doubleValue();
         tradingBalancePercent = BigDecimal.valueOf(pairProcessController.getTradingBalancePercent());
-        info = coinRatingController.getCoinInfo();
+        info = CoinInfoAggregator.getInstance();
+        if (info.getClient() == null) info.setClient(client);
     }
 
     public List<String> getRevertPathDescription(String coinLast, String coinBase) {
@@ -221,11 +222,10 @@ public class CoinCycleController extends PeriodicProcessThread {
         double min_weight = 1 + 0.01*minProfitPercent;
         double max_rating = Double.MIN_VALUE;
         for(List<String> cycle : valid_cycles) {
-            double weight = round(getCycleWeight(info.getPricesGraph(), cycle, pre_cycle != null ? pre_cycle.size() : 1, pre_weight), 3);
+            double weight = round(getCycleWeight(info.getPricesGraph(), cycle, pre_cycle != null ? pre_cycle.size() : 1, pre_weight), 4);
             if (weight > min_weight) {
                 double rating = Math.pow(weight, 3) * (999.5 + Math.random()) * 0.001;
-                if (cycle.size() <= 3) rating*=1.15;
-                if (cycle.size() == 4) rating*=1.1;
+                if (cycle.size() <= 4) rating*=1.1;
                 if (cycle.size() == 5) rating*=1.05;
                 if (cycle.size() == 6) rating*=1.025;
                 
@@ -249,15 +249,15 @@ public class CoinCycleController extends PeriodicProcessThread {
                             if (logitem != null) {
                                 rating *= Math.pow(logitem.rating, 0.05);
                                 if (isBuy) {
-                                    if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 1)) {
+                                    if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 3)) {
                                         rating *= Math.sqrt(2);
-                                    } else if ((logitem.strategies_shouldexit_rate + 1) < logitem.strategies_shouldenter_rate) {
+                                    } else if ((logitem.strategies_shouldexit_rate + 3) < logitem.strategies_shouldenter_rate) {
                                         rating *= Math.sqrt(0.5);
                                     }
                                 } else {
-                                    if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 1)) {
+                                    if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 3)) {
                                         rating *= Math.sqrt(0.5);
-                                    } else if ((logitem.strategies_shouldexit_rate + 1) < logitem.strategies_shouldenter_rate) {
+                                    } else if ((logitem.strategies_shouldexit_rate + 3) < logitem.strategies_shouldenter_rate) {
                                         rating *= Math.sqrt(2);
                                     }
                                 }
@@ -304,7 +304,7 @@ public class CoinCycleController extends PeriodicProcessThread {
             info.getSemaphore().acquire();
             List<String> best_cycle = getBestCyclesForEnter();
             if (best_cycle != null) {
-                double best_profit = round(getCycleWeight(info.getPricesGraph(), best_cycle), 3);
+                double best_profit = round(getCycleWeight(info.getPricesGraph(), best_cycle), 4);
                 if (best_profit < 1 + 0.01*minProfitPercent) {
                     mainApplication.getInstance().log("", true, false);
                     mainApplication.getInstance().log("Found cycle: " + best_cycle + " but recheck failed!", true, true);
@@ -638,13 +638,6 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public void setSwitchLimitTimeout(int switchLimitTimeout) {
         this.switchLimitTimeout = switchLimitTimeout;
-    }
-
-    /**
-     * @return the info
-     */
-    public CoinInfoAggregator getInfo() {
-        return info;
     }
 
     /**
