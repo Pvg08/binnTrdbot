@@ -1,6 +1,5 @@
 package com.binance.api.client.domain.account.request;
 
-import com.binance.api.client.SyncedTime;
 import com.binance.api.client.constant.BinanceApiConstants;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
@@ -17,7 +16,7 @@ public class OrderRequest {
 
   public OrderRequest(String symbol) {
     this.symbol = symbol;
-    this.timestamp = SyncedTime.getInstance(-1).currentTimeMillis();
+    this.timestamp = System.currentTimeMillis();
     this.recvWindow = BinanceApiConstants.DEFAULT_RECEIVING_WINDOW;
   }
 

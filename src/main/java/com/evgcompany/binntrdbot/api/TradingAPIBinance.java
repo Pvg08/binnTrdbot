@@ -8,7 +8,6 @@ package com.evgcompany.binntrdbot.api;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
-import com.binance.api.client.SyncedTime;
 import com.binance.api.client.domain.TimeInForce;
 import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
@@ -78,7 +77,7 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
 
     @Override
     public long getAlignedCurrentTimeMillis() {
-        return SyncedTime.getInstance(-1).currentTimeMillis();
+        return System.currentTimeMillis();
     }
 
     @Override
