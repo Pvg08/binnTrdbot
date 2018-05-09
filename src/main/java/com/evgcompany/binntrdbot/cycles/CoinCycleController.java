@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.analysis;
+package com.evgcompany.binntrdbot.cycles;
 
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
@@ -12,8 +12,8 @@ import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingPairLogItem;
 import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.mainApplication;
-import com.evgcompany.binntrdbot.tradeCycleProcess;
-import com.evgcompany.binntrdbot.tradePairProcessController;
+import com.evgcompany.binntrdbot.TradePairProcessController;
+import com.evgcompany.binntrdbot.analysis.TarjanSimpleCyclesFromVertex;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -35,12 +35,12 @@ import org.jgrapht.graph.DefaultWeightedEdge;
  */
 public class CoinCycleController extends PeriodicProcessThread {
     private CoinRatingController coinRatingController = null;
-    private tradePairProcessController pairProcessController = null;
+    private TradePairProcessController pairProcessController = null;
     private final List<tradeCycleProcess> cycleProcesses = new ArrayList<>();
     private CoinInfoAggregator info = null;
     
     private TradingAPIAbstractInterface client = null;
-    private final double comissionPercent;
+    private double comissionPercent = 0.0;
     
     private BigDecimal tradingBalancePercent = null;
     
@@ -77,7 +77,6 @@ public class CoinCycleController extends PeriodicProcessThread {
         this.client = client;
         this.coinRatingController = coinRatingController;
         pairProcessController = coinRatingController.getPaircontroller();
-        comissionPercent = pairProcessController.getProfitsChecker().getTradeComissionPercent().doubleValue();
         tradingBalancePercent = BigDecimal.valueOf(pairProcessController.getTradingBalancePercent());
         info = CoinInfoAggregator.getInstance();
         if (info.getClient() == null) info.setClient(client);
@@ -474,6 +473,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
+        comissionPercent = client.getTradeComissionPercent().doubleValue();
         mainApplication.getInstance().log("Cycle thread starting...");
         mainApplication.getInstance().log("Cycle main: " + mainCoins + " ("+mainCoins.size()+")");
         mainApplication.getInstance().log("Cycle required: " + requiredCoins + " ("+requiredCoins.size()+")");
@@ -512,7 +512,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     /**
      * @return the pairProcessController
      */
-    public tradePairProcessController getPairProcessController() {
+    public TradePairProcessController getPairProcessController() {
         return pairProcessController;
     }
 

@@ -11,15 +11,15 @@ import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
  *
  * @author EVG_Adminer
  */
-public class tradePairWaveProcess extends tradePairProcess {
+public class TradePairWaveProcess extends TradePairProcess {
     
     private double wavesPrimaryBuy = 10;
     private boolean wavesPrimaryBasePercent = true;
     private double wavesSecondaryPercent = 25;
     private double wavesIncKoef = 59;
     
-    public tradePairWaveProcess(TradingAPIAbstractInterface rclient, tradeProfitsController rprofitsChecker, String pair) {
-        super(rclient, rprofitsChecker, pair);
+    public TradePairWaveProcess(TradingAPIAbstractInterface rclient, OrdersController ordersController, String pair) {
+        super(rclient, ordersController, pair);
     }
 
     /**

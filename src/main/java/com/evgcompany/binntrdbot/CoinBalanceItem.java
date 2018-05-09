@@ -12,7 +12,7 @@ import java.math.BigDecimal;
  *
  * @author EVG_Adminer
  */
-public class currencyItem {
+public class CoinBalanceItem {
     private String symbol = "";
     
     private BigDecimal free_value = BigDecimal.ZERO;
@@ -26,7 +26,7 @@ public class currencyItem {
     
     private int listIndex = -1;
     
-    public currencyItem(String symbol) {
+    public CoinBalanceItem(String symbol) {
         this.symbol = symbol;
         orders_count = 0;
         free_value = BigDecimal.ZERO;

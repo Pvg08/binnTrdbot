@@ -11,7 +11,7 @@ import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
 import com.evgcompany.binntrdbot.analysis.TrailingStopLossRule;
 import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
-import com.evgcompany.binntrdbot.tradeProfitsController;
+import com.evgcompany.binntrdbot.OrdersController;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
@@ -38,13 +38,13 @@ import org.ta4j.core.trading.rules.StopLossRule;
 public abstract class StrategyItem {
     protected String StrategyName;
     protected StrategyDatasetInitializer initializer = null;
-    protected tradeProfitsController profitsChecker = null;
+    protected OrdersController ordersController = null;
     protected StrategiesController controller = null;
     protected StrategyConfig config = null;
     
     public StrategyItem(StrategiesController controller) {
         this.controller = controller;
-        this.profitsChecker = controller != null ? controller.getProfitsChecker() : null;
+        this.ordersController = controller != null ? controller.getOrdersController() : null;
         this.config = new StrategyConfig();
         StrategyName = "NoName";
     }
@@ -59,8 +59,8 @@ public abstract class StrategyItem {
 
             TimeSeriesManager sliceManager = new TimeSeriesManager(series);
             AnalysisCriterion profitCriterion;
-            if (profitsChecker != null)
-                profitCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
+            if (ordersController != null)
+                profitCriterion = new ProfitWithoutComissionCriterion(0.01f * ordersController.getClient().getTradeComissionPercent().doubleValue());
             else 
                 profitCriterion = new TotalProfitCriterion();
 
@@ -87,15 +87,15 @@ public abstract class StrategyItem {
     }
     
     protected Rule addStopLossGain(Rule rule, TimeSeries series) {
-        if (profitsChecker != null) {
-            /*if (profitsChecker.isLowHold()) {
-                rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getTradeMinProfitPercent())));
+        if (ordersController != null) {
+            /*if (ordersController.isLowHold()) {
+                rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(ordersController.getTradeMinProfitPercent())));
             }*/
-            if (profitsChecker.getStopLossPercent() != null) {
-                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopLossPercent()), Decimal.ZERO));
+            if (ordersController.getStopLossPercent() != null) {
+                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(ordersController.getStopLossPercent()), Decimal.ZERO));
             }
-            if (profitsChecker.getStopGainPercent() != null) {
-                rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(profitsChecker.getStopGainPercent())));
+            if (ordersController.getStopGainPercent() != null) {
+                rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(ordersController.getStopGainPercent())));
             }
         }
         return rule;
@@ -139,9 +139,9 @@ public abstract class StrategyItem {
     }
 
     /**
-     * @param profitsChecker the profitsChecker to set
+     * @param ordersController the ordersController to set
      */
-    public void setProfitsChecker(tradeProfitsController profitsChecker) {
-        this.profitsChecker = profitsChecker;
+    public void setOrdersController(OrdersController ordersController) {
+        this.ordersController = ordersController;
     }
 }

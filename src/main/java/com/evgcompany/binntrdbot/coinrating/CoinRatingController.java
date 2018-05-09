@@ -6,8 +6,8 @@
 package com.evgcompany.binntrdbot.coinrating;
 
 import com.evgcompany.binntrdbot.*;
-import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.cycles.CoinCycleController;
 import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
@@ -49,7 +49,7 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  */
 public class CoinRatingController extends PeriodicProcessThread {
 
-    private final tradePairProcessController paircontroller;
+    private final TradePairProcessController paircontroller;
     private TradingAPIAbstractInterface client = null;
     private Closeable orderEvent = null;
     
@@ -98,7 +98,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private double downTrendPercent = 0;
     private boolean noAutoBuysOnDowntrend = false;
 
-    public CoinRatingController(mainApplication application, tradePairProcessController paircontroller) {
+    public CoinRatingController(mainApplication application, TradePairProcessController paircontroller) {
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
         strategiesController.setMainStrategy("No strategy");
@@ -372,11 +372,10 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
         curr.is_new_pair = ((bars_d.size() > 0 || bars_h.size() > 0) && bars_d.size() < 12);
         curr.volatility = volatility_hour * 0.7f + volatility_day * 0.3f;
-        if (strategiesController.getProfitsChecker() == null) {
-            strategiesController.setProfitsChecker(mainApplication.getInstance().getProfitsChecker());
+        if (strategiesController.getOrdersController() == null) {
+            strategiesController.setOrdersController(mainApplication.getInstance().getOrdersController());
         }
         strategiesController.setGroupName(curr.symbol);
-        strategiesController.setBarSeconds(300);
         strategiesController.resetSeries();
         TradingAPIAbstractInterface.addSeriesBars(strategiesController.getSeries(), bars_h);
         strategiesController.resetStrategies();
@@ -967,7 +966,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             coinCycleController.start();
         }
 
-        if (paircontroller != null && paircontroller.getProfitsChecker() != null && !paircontroller.getProfitsChecker().isTestMode()) {
+        if (paircontroller != null && paircontroller.getOrdersController() != null && !paircontroller.getOrdersController().isTestMode()) {
             orderEvent = client.OnOrderEvent(null, event -> {
                 mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
                 mainApplication.getInstance().systemSound();
@@ -1266,7 +1265,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     /**
      * @return the paircontroller
      */
-    public tradePairProcessController getPaircontroller() {
+    public TradePairProcessController getPaircontroller() {
         return paircontroller;
     }
 

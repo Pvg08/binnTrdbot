@@ -12,9 +12,9 @@ import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.RateLimit;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.market.TickerPrice;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.io.Closeable;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -29,8 +29,10 @@ import org.ta4j.core.TimeSeries;
  */
 public abstract class TradingAPIAbstractInterface {
     
-    String secret, key;
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
+    protected String secret, key;
+    protected BigDecimal tradeComissionPercent = new BigDecimal("0.1");
+    protected BigDecimal tradeComissionCurrencyPercent = null;
+    protected String tradeComissionCurrency = null;
     
     public TradingAPIAbstractInterface(String secret, String key) {
         this.secret = secret;
@@ -41,7 +43,7 @@ public abstract class TradingAPIAbstractInterface {
     abstract public boolean disconnect();
     
     protected String format_num(BigDecimal num) {
-        return df8.format(num).replace(".","").replace(",",".").replace(" ","");
+        return NumberFormatter.df8.format(num).replace(".","").replace(",",".").replace(" ","");
     }
     
     public long getServerTime() {
@@ -50,6 +52,27 @@ public abstract class TradingAPIAbstractInterface {
     
     public long getAlignedCurrentTimeMillis() {
         return System.currentTimeMillis();
+    }
+    
+    /**
+     * @return the tradeComissionPercent
+     */
+    public BigDecimal getTradeComissionPercent() {
+        return tradeComissionPercent;
+    }
+
+    /**
+     * @return the tradeComissionCurrency
+     */
+    public String getTradeComissionCurrency() {
+        return tradeComissionCurrency;
+    }
+    
+    /**
+     * @return the tradeComissionCurrencyPercent
+     */
+    public BigDecimal getTradeComissionCurrencyPercent() {
+        return tradeComissionCurrencyPercent;
     }
     
     public int barIntervalToSeconds(String _barInterval) {

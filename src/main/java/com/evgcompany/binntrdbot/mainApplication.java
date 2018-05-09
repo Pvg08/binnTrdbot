@@ -34,9 +34,9 @@ public class mainApplication extends javax.swing.JFrame {
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
     private final ComponentsConfigController config = new ComponentsConfigController(this);
-    private final tradeProfitsController profitsChecker = new tradeProfitsController(this);
-    private final tradePairProcessController pairController = new tradePairProcessController(profitsChecker);
-    private final CoinRatingController coinRatingController = new CoinRatingController(this, pairController);
+    private final OrdersController ordersController = new OrdersController();
+    private final TradePairProcessController pairProcessController = new TradePairProcessController(ordersController);
+    private final CoinRatingController coinRatingController = new CoinRatingController(this, pairProcessController);
     
     private boolean is_paused = false;
     
@@ -60,8 +60,8 @@ public class mainApplication extends javax.swing.JFrame {
         initComponents();
         DefaultCaret caret = (DefaultCaret)logTextarea.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-        listProfit.setModel(profitsChecker.getListProfitModel());
-        listCurrencies.setModel(profitsChecker.getListCurrenciesModel());
+        listProfit.setModel(ordersController.getListProfitModel());
+        listCurrencies.setModel(ordersController.getListCurrenciesModel());
         listRating.setModel(coinRatingController.getCoinRatingModel());
         listBoxAutoStrategies.setModel(new DefaultListModel<>());
         new StrategiesController().getStrategiesNames().forEach((strategy_name)->{
@@ -182,12 +182,12 @@ public class mainApplication extends javax.swing.JFrame {
         log(txt, is_main, false);
     }
     
-    public tradeProfitsController getProfitsChecker() {
-        return profitsChecker;
+    public OrdersController getOrdersController() {
+        return ordersController;
     }
     
-    public tradePairProcessController getPairController() {
-        return pairController;
+    public TradePairProcessController getPairProcessController() {
+        return pairProcessController;
     }
     
     public CoinRatingController getCoinRatingController() {
@@ -198,7 +198,7 @@ public class mainApplication extends javax.swing.JFrame {
         if (client == null) {
             client = new TradingAPIBinance(textFieldApiSecret.getText(), textFieldApiKey.getText());
             client.connect();
-            profitsChecker.setClient(client);
+            ordersController.setClient(client);
             coinRatingController.setClient(client);
             CoinInfoAggregator.getInstance().setClient(client);
         }
@@ -210,21 +210,21 @@ public class mainApplication extends javax.swing.JFrame {
     private void setPairParams() {
         int str_index = ComboBoxMainStrategy.getSelectedIndex();
         if (str_index < 0) str_index = 0;
-        pairController.setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
+        pairProcessController.setMainStrategy(ComboBoxMainStrategy.getItemAt(str_index));
         int bq_index = comboBoxBarsCount.getSelectedIndex();
         if (bq_index < 0) bq_index = 0;
-        pairController.setBarAdditionalCount(Integer.parseInt(comboBoxBarsCount.getItemAt(bq_index)) / 500);
+        pairProcessController.setBarAdditionalCount(Integer.parseInt(comboBoxBarsCount.getItemAt(bq_index)) / 500);
         int interval_index = comboBoxBarsInterval.getSelectedIndex();
         if (interval_index < 0) interval_index = 0;
-        pairController.setBarsInterval(comboBoxBarsInterval.getItemAt(interval_index));
-        pairController.setTradingBalancePercent((Integer) spinnerBuyPercent.getValue());
-        pairController.setBuyStop(checkBoxBuyStopLimited.isSelected());
-        pairController.setSellStop(checkBoxSellStopLimited.isSelected());
-        pairController.setBuyStopLimitedTimeout((Integer) spinnerBuyStopLimited.getValue());
-        pairController.setSellStopLimitedTimeout((Integer) spinnerSellStopLimited.getValue());
-        pairController.setUpdateDelay((Integer) spinnerUpdateDelay.getValue());
-        pairController.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
-        pairController.setAllPairsWavesUsage(checkBoxWavesUse.isSelected());
+        pairProcessController.setBarsInterval(comboBoxBarsInterval.getItemAt(interval_index));
+        pairProcessController.setTradingBalancePercent((Integer) spinnerBuyPercent.getValue());
+        pairProcessController.setBuyStop(checkBoxBuyStopLimited.isSelected());
+        pairProcessController.setSellStop(checkBoxSellStopLimited.isSelected());
+        pairProcessController.setBuyStopLimitedTimeout((Integer) spinnerBuyStopLimited.getValue());
+        pairProcessController.setSellStopLimitedTimeout((Integer) spinnerSellStopLimited.getValue());
+        pairProcessController.setUpdateDelay((Integer) spinnerUpdateDelay.getValue());
+        pairProcessController.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
+        pairProcessController.setAllPairsWavesUsage(checkBoxWavesUse.isSelected());
     }
     
     /**
@@ -1675,20 +1675,21 @@ public class mainApplication extends javax.swing.JFrame {
         buttonRun.setEnabled(false);
         try {
             initAPI();
-            profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
-            profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
-            profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
-            profitsChecker.setTestMode(checkboxTestMode.isSelected());
-            profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
-            profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
-            profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
-            profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
-            profitsChecker.setLowHold(checkBoxLowHold.isSelected());
-            profitsChecker.showTradeComissionCurrency();
+            ordersController.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
+            ordersController.setAutoWalkForward(checkBoxWalkForward.isSelected());
+            ordersController.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
+            ordersController.setTestMode(checkboxTestMode.isSelected());
+            ordersController.setLimitedOrders(checkBoxLimitedOrders.isSelected());
+            ordersController.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? OrdersController.LimitedOrderMode.LOMODE_SELL : OrdersController.LimitedOrderMode.LOMODE_SELLANDBUY);
+            ordersController.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
+            ordersController.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
+            ordersController.setLowHold(checkBoxLowHold.isSelected());
+            ordersController.setDelayTime((Integer) spinnerUpdateDelay.getValue());
+            ordersController.start();
 
             log("", true);
             setPairParams();
-            pairController.initBasePairs(textFieldTradePairs.getText());
+            pairProcessController.initBasePairs(textFieldTradePairs.getText());
             checkboxTestMode.setEnabled(false);
             buttonStop.setEnabled(true);
             buttonPause.setEnabled(true);
@@ -1716,7 +1717,6 @@ public class mainApplication extends javax.swing.JFrame {
         is_paused = false;
         buttonStop.setEnabled(false);
         buttonPause.setEnabled(false);
-        pairController.stopPairs();
         buttonRun.setEnabled(true);
         checkboxTestMode.setEnabled(true);
         buttonBuy.setEnabled(false);
@@ -1733,6 +1733,8 @@ public class mainApplication extends javax.swing.JFrame {
         buttonNNCTrain.setEnabled(false);
         buttonRemove.setEnabled(false);
         labelAccountCost.setEnabled(true);
+        pairProcessController.stopPairs();
+        ordersController.doStop();
         if (coinRatingController.isStop()) CoinInfoAggregator.getInstance().doStop();
     }//GEN-LAST:event_buttonStopActionPerformed
 
@@ -1754,7 +1756,7 @@ public class mainApplication extends javax.swing.JFrame {
         buttonCancelLimit.setEnabled(checkBoxLimitedOrders.isSelected());
         buttonShowPlot.setEnabled(true);
         log(is_paused ? "Paused..." : "Unpaused");
-        pairController.pausePairs(is_paused);
+        pairProcessController.pausePairs(is_paused);
         coinRatingController.doSetPaused(is_paused);
         ButtonStatistics.setEnabled(true);
         buttonWebBrowserOpen.setEnabled(true);
@@ -1767,42 +1769,42 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_buttonPauseActionPerformed
 
     private void buttonBuyActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonBuyActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "BUY");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "BUY");
     }//GEN-LAST:event_buttonBuyActionPerformed
 
     private void buttonSellActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSellActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "SELL");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "SELL");
     }//GEN-LAST:event_buttonSellActionPerformed
 
     private void buttonSetPairsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonSetPairsActionPerformed
-        profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
-        profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
-        profitsChecker.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
-        profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
-        profitsChecker.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
-        profitsChecker.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
-        profitsChecker.setLowHold(checkBoxLowHold.isSelected());
+        ordersController.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
+        ordersController.setAutoWalkForward(checkBoxWalkForward.isSelected());
+        ordersController.setAutoStrategies(listBoxAutoStrategies.getSelectedValuesList());
+        ordersController.setLimitedOrders(checkBoxLimitedOrders.isSelected());
+        ordersController.setStopGainPercent(checkBoxStopGain.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopGain.getValue()) : null);
+        ordersController.setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
+        ordersController.setLowHold(checkBoxLowHold.isSelected());
         setPairParams();
-        pairController.initBasePairs(textFieldTradePairs.getText());
+        pairProcessController.initBasePairs(textFieldTradePairs.getText());
     }//GEN-LAST:event_buttonSetPairsActionPerformed
 
     private void buttonUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonUpdateActionPerformed
-        if (profitsChecker != null) {
-            profitsChecker.updateAllBalances();
+        if (ordersController != null) {
+            ordersController.updateAllBalances();
         }
     }//GEN-LAST:event_buttonUpdateActionPerformed
 
     private void buttonCancelLimitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonCancelLimitActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "CANCEL");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "CANCEL");
     }//GEN-LAST:event_buttonCancelLimitActionPerformed
 
     private void buttonShowPlotActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonShowPlotActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "PLOT");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "PLOT");
     }//GEN-LAST:event_buttonShowPlotActionPerformed
 
     private void checkBoxLimitedOrdersStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxLimitedOrdersStateChanged
-        if (profitsChecker != null) {
-            profitsChecker.setLimitedOrders(checkBoxLimitedOrders.isSelected());
+        if (ordersController != null) {
+            ordersController.setLimitedOrders(checkBoxLimitedOrders.isSelected());
         }
     }//GEN-LAST:event_checkBoxLimitedOrdersStateChanged
 
@@ -1854,8 +1856,8 @@ public class mainApplication extends javax.swing.JFrame {
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
         config.Save();
         if (coinRatingController != null && coinRatingController.isAlive()) {
-            if (pairController != null) {
-                pairController.pausePairs(true);
+            if (pairProcessController != null) {
+                pairProcessController.pausePairs(true);
             }
             coinRatingController.doStop();
             coinRatingController.getSignalOrderController().doStop();
@@ -1887,11 +1889,11 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkBoxSellStopLimitedStateChanged
 
     private void ButtonStatisticsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ButtonStatisticsActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "STATISTICS");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "STATISTICS");
     }//GEN-LAST:event_ButtonStatisticsActionPerformed
 
     private void buttonWebBrowserOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonWebBrowserOpenActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "BROWSER");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "BROWSER");
     }//GEN-LAST:event_buttonWebBrowserOpenActionPerformed
 
     private void checkBoxLimitedOrdersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxLimitedOrdersActionPerformed
@@ -1899,7 +1901,7 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkBoxLimitedOrdersActionPerformed
 
     private void comboBoxLimitedModeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_comboBoxLimitedModeActionPerformed
-        profitsChecker.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? tradeProfitsController.LimitedOrderMode.LOMODE_SELL : tradeProfitsController.LimitedOrderMode.LOMODE_SELLANDBUY);
+        ordersController.setLimitedOrderMode(comboBoxLimitedMode.getSelectedIndex() == 0 ? OrdersController.LimitedOrderMode.LOMODE_SELL : OrdersController.LimitedOrderMode.LOMODE_SELLANDBUY);
     }//GEN-LAST:event_comboBoxLimitedModeActionPerformed
 
     private void checkboxAutoOrderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoOrderActionPerformed
@@ -1977,23 +1979,23 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_spinnerScanRatingDelayTimeStateChanged
 
     private void buttonNNBTrainActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNBTrainActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNBTRAIN");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "NNBTRAIN");
     }//GEN-LAST:event_buttonNNBTrainActionPerformed
 
     private void buttonNNCTrainActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNCTrainActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNCTRAIN");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "NNCTRAIN");
     }//GEN-LAST:event_buttonNNCTrainActionPerformed
 
     private void buttonNNBAddActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNBAddActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNBADD");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "NNBADD");
     }//GEN-LAST:event_buttonNNBAddActionPerformed
 
     private void buttonNNCAddActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonNNCAddActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "NNCADD");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "NNCADD");
     }//GEN-LAST:event_buttonNNCAddActionPerformed
 
     private void buttonRemoveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_buttonRemoveActionPerformed
-        pairController.pairAction(listCurrencies.getSelectedIndex(), "REMOVE");
+        pairProcessController.pairAction(listCurrencies.getSelectedIndex(), "REMOVE");
     }//GEN-LAST:event_buttonRemoveActionPerformed
 
     private void checkboxAutoFastorderActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkboxAutoFastorderActionPerformed
@@ -2017,11 +2019,11 @@ public class mainApplication extends javax.swing.JFrame {
     }//GEN-LAST:event_checkboxAutoSignalFastorderActionPerformed
 
     private void checkBoxWalkForwardActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxWalkForwardActionPerformed
-        profitsChecker.setAutoWalkForward(checkBoxWalkForward.isSelected());
+        ordersController.setAutoWalkForward(checkBoxWalkForward.isSelected());
     }//GEN-LAST:event_checkBoxWalkForwardActionPerformed
 
     private void checkBoxAutoStrategyParamsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxAutoStrategyParamsActionPerformed
-        profitsChecker.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
+        ordersController.setAutoPickStrategyParams(checkBoxAutoStrategyParams.isSelected());
     }//GEN-LAST:event_checkBoxAutoStrategyParamsActionPerformed
 
     private void checkBoxDowntrendNoAutoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkBoxDowntrendNoAutoActionPerformed

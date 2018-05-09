@@ -20,10 +20,10 @@ import java.util.stream.Collectors;
  *
  * @author EVG_Adminer
  */
-public class tradePairProcessController {
+public class TradePairProcessController {
     
-    private tradeProfitsController profitsChecker = null;
-    private final List<tradePairProcess> pairs = new ArrayList<>(0);
+    private OrdersController ordersController = null;
+    private final List<TradePairProcess> pairs = new ArrayList<>(0);
     
     private String mainStrategy;
     private String barsInterval;
@@ -37,8 +37,8 @@ public class tradePairProcessController {
     private int buyStopLimitedTimeout;
     private int sellStopLimitedTimeout;
     
-    public tradePairProcessController(tradeProfitsController profitsChecker) {
-        this.profitsChecker = profitsChecker;
+    public TradePairProcessController(OrdersController ordersController) {
+        this.ordersController = ordersController;
     }
     
     private int searchCurrencyFirstPair(String currencyPair) {
@@ -50,7 +50,7 @@ public class tradePairProcessController {
         return -1;
     }
     
-    public List<tradePairProcess> getPairs() {
+    public List<TradePairProcess> getPairs() {
         return pairs;
     }
     
@@ -58,19 +58,19 @@ public class tradePairProcessController {
         return searchCurrencyFirstPair(currencyPair) >= 0;
     }
     
-    private tradePairProcess initializePair(String symbol, boolean run) {
+    private TradePairProcess initializePair(String symbol, boolean run) {
         boolean has_wave = symbol.contains("~");
         boolean has_plus = symbol.contains("+");
         boolean has_2plus = symbol.contains("++");
         boolean has_minus = !has_plus && symbol.contains("-");
         symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "").replaceAll("\\~", "");
         int pair_index = searchCurrencyFirstPair(symbol);
-        tradePairProcess nproc;
+        TradePairProcess nproc;
         if (pair_index < 0) {
             if (has_wave || allPairsWavesUsage) {
-                nproc = new tradePairWaveProcess(profitsChecker.getClient(), profitsChecker, symbol);
+                nproc = new TradePairWaveProcess(ordersController.getClient(), ordersController, symbol);
             } else {
-                nproc = new tradePairProcess(profitsChecker.getClient(), profitsChecker, symbol);
+                nproc = new TradePairProcess(ordersController.getClient(), ordersController, symbol);
             }
             nproc.setStartDelay(pairs.size() * 1000 + 500);
             nproc.setTryingToSellUp(has_plus);
@@ -122,17 +122,17 @@ public class tradePairProcessController {
         }
     }
     
-    public tradePairProcess addPair(tradePairProcess newProc) {
+    public TradePairProcess addPair(TradePairProcess newProc) {
         pairs.add(newProc);
         newProc.start();
         return newProc;
     }
-    public tradePairProcess addPair(String newPair) {
+    public TradePairProcess addPair(String newPair) {
         return initializePair(newPair, true);
     }
-    public tradePairProcess addPairFastRun(String newPair) {
+    public TradePairProcess addPairFastRun(String newPair) {
         if (!hasPair(newPair)) {
-            tradePairProcess nproc = initializePair(newPair, false);
+            TradePairProcess nproc = initializePair(newPair, false);
             nproc.setTryingToSellUp(false);
             nproc.setSellUpAll(false);
             nproc.setTryingToBuyDip(false);
@@ -179,13 +179,13 @@ public class tradePairProcessController {
     
     private void removePair(int pairIndex) {
         pairs.get(pairIndex).doStop();
-        profitsChecker.removeCurrencyPair(pairs.get(pairIndex).getSymbol());
+        ordersController.removeCurrencyPair(pairs.get(pairIndex).getSymbol());
         pairs.remove(pairIndex);
     }
     
     public void pairAction(int index, String action) {
         if (pairs.size() > 0 && index >= 0) {
-            String currencyPair = profitsChecker.getNthCurrencyPair(index);
+            String currencyPair = ordersController.getNthCurrencyPair(index);
             int pair_index = searchCurrencyFirstPair(currencyPair);
             if (pair_index >= 0 && pair_index < pairs.size()) {
                 switch (action) {
@@ -376,8 +376,8 @@ public class tradePairProcessController {
         this.sellStopLimitedTimeout = sellStopLimitedTimeout;
     }
     
-    public tradeProfitsController getProfitsChecker() {
-        return profitsChecker;
+    public OrdersController getOrdersController() {
+        return ordersController;
     }
 
     /**

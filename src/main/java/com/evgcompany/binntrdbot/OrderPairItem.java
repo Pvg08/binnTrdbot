@@ -12,12 +12,12 @@ import java.math.BigDecimal;
  *
  * @author EVG_Adminer
  */
-public class currencyPairItem {
+public class OrderPairItem {
     private String symbolBase = "";
     private String symbolPair = "";
     private String symbolQuote = "";
-    private currencyItem base_item = null;
-    private currencyItem quote_item = null;
+    private CoinBalanceItem base_item = null;
+    private CoinBalanceItem quote_item = null;
     
     private BigDecimal summOrderBase = BigDecimal.ZERO;
     private BigDecimal summOrderQuote = BigDecimal.ZERO;
@@ -32,7 +32,7 @@ public class currencyPairItem {
     
     private int listIndex = -1;
     
-    public currencyPairItem(currencyItem base_item, currencyItem quote_item, String symbolPair) {
+    public OrderPairItem(CoinBalanceItem base_item, CoinBalanceItem quote_item, String symbolPair) {
         this.base_item = base_item;
         this.quote_item = quote_item;
         symbolBase = base_item.getSymbol();
@@ -229,14 +229,14 @@ public class currencyPairItem {
     /**
      * @return the base_item
      */
-    public currencyItem getBaseItem() {
+    public CoinBalanceItem getBaseItem() {
         return base_item;
     }
 
     /**
      * @return the quote_item
      */
-    public currencyItem getQuoteItem() {
+    public CoinBalanceItem getQuoteItem() {
         return quote_item;
     }
 

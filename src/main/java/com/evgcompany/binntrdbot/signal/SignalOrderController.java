@@ -22,7 +22,7 @@ public class SignalOrderController extends PeriodicProcessThread {
 
     private final CoinRatingController coinRatingController;
     private SignalController signalcontroller = null;
-    private final tradePairProcessController paircontroller;
+    private final TradePairProcessController paircontroller;
 
     private boolean autoSignalOrder = false;
     private boolean autoSignalFastOrder = false;
@@ -32,7 +32,7 @@ public class SignalOrderController extends PeriodicProcessThread {
     private int maxEnter = 10;
     private int secondsOrderEnterWait = 28800;
     
-    public SignalOrderController(CoinRatingController coinRatingController, tradePairProcessController paircontroller) {
+    public SignalOrderController(CoinRatingController coinRatingController, TradePairProcessController paircontroller) {
         this.coinRatingController = coinRatingController;
         signalcontroller = new SignalController();
         signalcontroller.setCoinRatingController(coinRatingController);

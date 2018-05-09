@@ -5,7 +5,7 @@
  */
 package com.evgcompany.binntrdbot.coinrating;
 
-import com.evgcompany.binntrdbot.tradePairProcess;
+import com.evgcompany.binntrdbot.TradePairProcess;
 
 /**
  *
@@ -15,7 +15,7 @@ public class CoinRatingPairLogItem implements java.io.Serializable {
     public String symbol;
     public String symbolQuote;
     public String symbolBase;
-    public tradePairProcess pair = null;
+    public TradePairProcess pair = null;
     public CoinRatingLogItem base_rating = new CoinRatingLogItem();
 
     public Float percent_hour = 0f;

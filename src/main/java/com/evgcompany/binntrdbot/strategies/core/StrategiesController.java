@@ -10,7 +10,7 @@ import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.*;
-import com.evgcompany.binntrdbot.tradeProfitsController;
+import com.evgcompany.binntrdbot.OrdersController;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -41,7 +41,7 @@ public class StrategiesController {
     }
     
     private mainApplication app = null;
-    private tradeProfitsController profitsChecker = null;
+    private OrdersController ordersController = null;
     private TimeSeries series = null;
     private final HashMap<String, Strategy> strategies = new HashMap<>();
     private final List<StrategyItem> strategy_items = new ArrayList<>();
@@ -51,30 +51,25 @@ public class StrategiesController {
 
     private String mainStrategy = "Auto";
     private int strategyItemIndex = -1;
-    private int barSeconds;
     private String groupName;
     private final List<StrategyMarker> markers = new ArrayList<>();
     private TradingRecord tradingRecord = null;
     
-    public StrategiesController(String groupName, mainApplication app, tradeProfitsController profitsChecker) {
+    public StrategiesController(String groupName, OrdersController ordersController) {
         this.groupName = groupName;
-        this.app = app;
-        this.profitsChecker = profitsChecker;
+        this.app = mainApplication.getInstance();
+        this.ordersController = ordersController;
         this.tradingRecord = new BaseTradingRecord();
     }
     public StrategiesController() {
         this.groupName = null;
-        this.app = null;
-        this.profitsChecker = null;
+        this.app = mainApplication.getInstance();
+        this.ordersController = null;
         this.tradingRecord = null;
     }
     
     public void setGroupName(String groupName) {
         this.groupName = groupName;
-    }
-    
-    public void setBarSeconds(int barSeconds) {
-        this.barSeconds = barSeconds;
     }
     
     public TimeSeries getSeries() {
@@ -85,8 +80,8 @@ public class StrategiesController {
         return markers;
     }
     
-    public tradeProfitsController getProfitsChecker() {
-        return profitsChecker;
+    public OrdersController getOrdersController() {
+        return ordersController;
     }
     
     /**
@@ -124,10 +119,10 @@ public class StrategiesController {
     }
     
     public void addStrategyMarker(boolean is_enter, String strategy_name) {
-        if (profitsChecker != null) {
+        if (ordersController != null) {
             StrategyMarker newm = new StrategyMarker();
             newm.label = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
-            newm.timeStamp = profitsChecker.getClient().getAlignedCurrentTimeMillis();
+            newm.timeStamp = ordersController.getClient().getAlignedCurrentTimeMillis();
             if (strategy_name.equals(mainStrategy)) {
                 newm.typeIndex = is_enter ? 0 : 1;
             } else {
@@ -185,8 +180,8 @@ public class StrategiesController {
         app.log("Current "+groupName+" strategy ("+mainStrategy+") criterias:");
         TotalProfitCriterion totalProfit = new TotalProfitCriterion();
         app.log("Total profit: " + totalProfit.calculate(series, tradingRecordC));
-        if (profitsChecker != null)
-            app.log("Total transaction cost: " + new LinearTransactionCostCriterion(1, 0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
+        if (ordersController != null)
+            app.log("Total transaction cost: " + new LinearTransactionCostCriterion(1, 0.01f * ordersController.getClient().getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
         app.log("Average profit (per tick): " + new AverageProfitCriterion().calculate(series, tradingRecordC));
         app.log("Maximum drawdown: " + new MaximumDrawdownCriterion().calculate(series, tradingRecordC));
         app.log("Reward-risk ratio: " + new RewardRiskRatioCriterion().calculate(series, tradingRecordC));
@@ -194,8 +189,8 @@ public class StrategiesController {
         app.log("");
         app.log("Number of trades: " + new NumberOfTradesCriterion().calculate(series, tradingRecordC));
         app.log("Profitable trades ratio: " + new AverageProfitableTradesCriterion().calculate(series, tradingRecordC));
-        if (profitsChecker != null)
-            app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
+        if (ordersController != null)
+            app.log("Profit without comission: " + new ProfitWithoutComissionCriterion(0.01f * ordersController.getClient().getTradeComissionPercent().doubleValue()).calculate(series, tradingRecordC));
         app.log("Custom strategy profit vs buy-and-hold strategy profit: " + new VersusBuyAndHoldCriterion(totalProfit).calculate(series, tradingRecordC));
         app.log("");app.log("");
     }
@@ -237,8 +232,8 @@ public class StrategiesController {
             Strategy nstrategy;
             if (
                     mainStrategy.equals(entry.getStrategyName()) && 
-                    profitsChecker != null && 
-                    profitsChecker.isAutoPickStrategyParams()
+                    ordersController != null && 
+                    ordersController.isAutoPickStrategyParams()
             ) {
                 nstrategy = entry.buildStrategyWithBestParams(series);
             } else {
@@ -246,14 +241,14 @@ public class StrategiesController {
             }
             strategies.put(entry.getStrategyName(), nstrategy);
         });
-        if (profitsChecker != null) {
-            strategy_auto = profitsChecker.getAutoStrategies();
-            autoWalkForward = profitsChecker.isAutoWalkForward();
+        if (ordersController != null) {
+            strategy_auto = ordersController.getAutoStrategies();
+            autoWalkForward = ordersController.isAutoWalkForward();
         }
         if (mainStrategy.equals("Auto")) {
             mainStrategy = findOptimalStrategy();
             if (app != null) app.log("Optimal strategy for " + groupName + " is " + mainStrategy, true, false);
-            need_main_optimize = profitsChecker != null && profitsChecker.isAutoPickStrategyParams();
+            need_main_optimize = ordersController != null && ordersController.isAutoPickStrategyParams();
         }
         if (!strategies.containsKey(mainStrategy)) {
             List<String> keysAsArray = new ArrayList<>(strategies.keySet());
@@ -319,9 +314,9 @@ public class StrategiesController {
     }
 
     private List<String> getAutoListString() {
-        if ((strategy_auto == null || strategy_auto.isEmpty()) && profitsChecker != null) {
-            strategy_auto = profitsChecker.getAutoStrategies();
-            autoWalkForward = profitsChecker.isAutoWalkForward();
+        if ((strategy_auto == null || strategy_auto.isEmpty()) && ordersController != null) {
+            strategy_auto = ordersController.getAutoStrategies();
+            autoWalkForward = ordersController.isAutoWalkForward();
         }
         if (strategy_auto != null && !strategy_auto.isEmpty()) {
             return strategy_auto;
@@ -330,9 +325,9 @@ public class StrategiesController {
     }
 
     private List<Strategy> getAutoListStrategies() {
-        if ((strategy_auto == null || strategy_auto.isEmpty()) && profitsChecker != null) {
-            strategy_auto = profitsChecker.getAutoStrategies();
-            autoWalkForward = profitsChecker.isAutoWalkForward();
+        if ((strategy_auto == null || strategy_auto.isEmpty()) && ordersController != null) {
+            strategy_auto = ordersController.getAutoStrategies();
+            autoWalkForward = ordersController.isAutoWalkForward();
         }
         if (strategy_auto != null && !strategy_auto.isEmpty()) {
             List<Strategy> slist = new ArrayList<>();
@@ -383,8 +378,8 @@ public class StrategiesController {
         }
 
         AnalysisCriterion profitCriterion;
-        if (profitsChecker != null)
-            profitCriterion = new ProfitWithoutComissionCriterion(0.01f * profitsChecker.getTradeComissionPercent().doubleValue());
+        if (ordersController != null)
+            profitCriterion = new ProfitWithoutComissionCriterion(0.01f * ordersController.getClient().getTradeComissionPercent().doubleValue());
         else 
             profitCriterion = new TotalProfitCriterion();
         Map<String, Double> successMap = new HashMap<>();
@@ -638,9 +633,9 @@ public class StrategiesController {
     }
 
     /**
-     * @param profitsChecker the profitsChecker to set
+     * @param ordersController the ordersController to set
      */
-    public void setProfitsChecker(tradeProfitsController profitsChecker) {
-        this.profitsChecker = profitsChecker;
+    public void setOrdersController(OrdersController ordersController) {
+        this.ordersController = ordersController;
     }
 }

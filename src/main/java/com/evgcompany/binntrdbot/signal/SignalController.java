@@ -148,8 +148,8 @@ public class SignalController extends Thread {
     
     @Override
     public void run() {
-        if (mainApplication.getInstance().getProfitsChecker() != null && mainApplication.getInstance().getProfitsChecker().getStopLossPercent() != null) {
-            STOPLOSS_PERCENT = mainApplication.getInstance().getProfitsChecker().getStopLossPercent().intValue();
+        if (mainApplication.getInstance().getOrdersController() != null && mainApplication.getInstance().getOrdersController().getStopLossPercent() != null) {
+            STOPLOSS_PERCENT = mainApplication.getInstance().getOrdersController().getStopLossPercent().intValue();
         }
         initialSignalsIsLoaded = false;
         while (signalsProcess != null && signalsProcess.getProcess().isAlive()) {
@@ -434,7 +434,7 @@ public class SignalController extends Thread {
     
     private Strategy getSignalStrategy(TimeSeries series, boolean is_fast, BigDecimal price1, BigDecimal price2, BigDecimal price_target, BigDecimal price_stop) {
         StrategySignal sig = new StrategySignal(null);
-        sig.setProfitsChecker(mainApplication.getInstance().getProfitsChecker());
+        sig.setOrdersController(mainApplication.getInstance().getOrdersController());
         sig.getConfig().setParam("Price1", price1);
         sig.getConfig().setParam("Price2", price2);
         sig.getConfig().setParam("PriceTarget", price_target);

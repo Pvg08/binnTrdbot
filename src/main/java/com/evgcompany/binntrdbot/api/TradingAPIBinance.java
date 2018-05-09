@@ -49,6 +49,9 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
 
     public TradingAPIBinance(String secret, String key) {
         super(secret, key);
+        tradeComissionPercent = new BigDecimal("0.1");
+        tradeComissionCurrencyPercent = new BigDecimal("0.05");
+        tradeComissionCurrency = "BNB";
     }
 
     @Override

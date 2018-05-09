@@ -74,7 +74,7 @@
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="buttonSetPairs" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <Component id="jTabbedPane2" pref="536" max="32767" attributes="0"/>
+                          <Component id="jTabbedPane2" max="32767" attributes="0"/>
                           <Component id="jScrollPane3" max="32767" attributes="0"/>
                           <Component id="jScrollPane4" max="32767" attributes="0"/>
                           <Group type="102" alignment="0" attributes="0">

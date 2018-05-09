@@ -214,13 +214,13 @@ public class CoinFilters implements java.io.Serializable {
         mainApplication.getInstance().log("");
     }
 
-    public void prepareForBuy(tradeProfitsController profitsChecker) {
+    public void prepareForBuy(OrdersController ordersController) {
         BigDecimal tobuy_price = normalizePrice(currentPrice);
         BigDecimal tobuy_amount = currentAmount;
         tobuy_amount = normalizeQuantity(tobuy_amount.divide(tobuy_price, RoundingMode.HALF_DOWN), true);
         tobuy_amount = normalizeNotionalQuantity(tobuy_amount, tobuy_price);
-        if (profitsChecker != null && profitsChecker.hasPair(baseAssetSymbol+quoteAssetSymbol)) {
-            if (!profitsChecker.canBuy(baseAssetSymbol+quoteAssetSymbol, tobuy_amount, tobuy_price) && filterQtyStep != null && tobuy_amount.compareTo(filterQtyStep) > 0) {
+        if (ordersController != null && ordersController.hasPair(baseAssetSymbol+quoteAssetSymbol)) {
+            if (!ordersController.canBuy(baseAssetSymbol+quoteAssetSymbol, tobuy_amount, tobuy_price) && filterQtyStep != null && tobuy_amount.compareTo(filterQtyStep) > 0) {
                 tobuy_amount = tobuy_amount.subtract(filterQtyStep);
             }
         }
@@ -228,12 +228,12 @@ public class CoinFilters implements java.io.Serializable {
         currentAmount = tobuy_amount;
     }
     
-    public void prepareForSell(tradeProfitsController profitsChecker) {
+    public void prepareForSell(OrdersController ordersController) {
         BigDecimal tosell_price = normalizePrice(currentPrice);
         BigDecimal tosell_amount = normalizeQuantity(currentAmount, true);
         tosell_amount = normalizeNotionalQuantity(tosell_amount, tosell_price);
-        if (profitsChecker != null && profitsChecker.hasPair(baseAssetSymbol+quoteAssetSymbol)) {
-            if (!profitsChecker.canSell(baseAssetSymbol+quoteAssetSymbol, tosell_amount) && filterQtyStep != null && tosell_amount.compareTo(filterQtyStep) > 0) {
+        if (ordersController != null && ordersController.hasPair(baseAssetSymbol+quoteAssetSymbol)) {
+            if (!ordersController.canSell(baseAssetSymbol+quoteAssetSymbol, tosell_amount) && filterQtyStep != null && tosell_amount.compareTo(filterQtyStep) > 0) {
                 tosell_amount = tosell_amount.subtract(filterQtyStep);
             }
         }

@@ -9,8 +9,8 @@ import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
-import java.text.DecimalFormat;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
@@ -24,18 +24,20 @@ import java.util.Map;
  *
  * @author EVG_Adminer
  */
-public class tradeProfitsController {
+public class OrdersController extends PeriodicProcessThread {
 
     public enum LimitedOrderMode {
         LOMODE_SELL, LOMODE_BUY, LOMODE_SELLANDBUY
     }
     
     private final mainApplication app;
+    private CoinInfoAggregator info = null;
+    
     private static final Semaphore SEMAPHORE = new Semaphore(1, true);
     private static final Semaphore SEMAPHORE_ADDCOIN = new Semaphore(1, true);
 
-    private final Map<String, currencyItem> curr_map = new HashMap<>();
-    private final Map<String, currencyPairItem> pair_map = new HashMap<>();
+    private final Map<String, CoinBalanceItem> coins = new HashMap<>();
+    private final Map<String, OrderPairItem> pairOrders = new HashMap<>();
 
     private final DefaultListModel<String> listProfitModel = new DefaultListModel<>();
     private final DefaultListModel<String> listCurrenciesModel = new DefaultListModel<>();
@@ -44,9 +46,7 @@ public class tradeProfitsController {
     private boolean isLimitedOrders = false;
     private LimitedOrderMode limitedOrderMode = LimitedOrderMode.LOMODE_SELLANDBUY;
 
-    private BigDecimal tradeComissionPercent = new BigDecimal("0.05");
     private BigDecimal tradeMinProfitPercent;
-    private final String tradeComissionCurrency = "BNB";
     
     private BigDecimal stopLossPercent = null;
     private BigDecimal stopGainPercent = null;
@@ -58,31 +58,31 @@ public class tradeProfitsController {
 
     private TradingAPIAbstractInterface client = null;
 
-    public tradeProfitsController(mainApplication _app) {
-        app = _app;
-        tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(3));
+    public OrdersController() {
+        app = mainApplication.getInstance();
+        info = CoinInfoAggregator.getInstance();
     }
     
-    public currencyItem getProfitData(String symbolAsset) {
-        return curr_map.get(symbolAsset);
+    public CoinBalanceItem getCoinBalanceInfo(String symbolAsset) {
+        return coins.get(symbolAsset);
     }
     
-    public void showTradeComissionCurrency() {
-        if (tradeComissionCurrency.isEmpty() || client == null) {
+    private void showTradeComissionCurrency() {
+        if (client.getTradeComissionCurrency() == null || client == null) {
             return;
         }
-        currencyItem cbase = curr_map.get(tradeComissionCurrency);
+        CoinBalanceItem cbase = coins.get(client.getTradeComissionCurrency());
         if (cbase == null) {
-            cbase = addCurrItem(tradeComissionCurrency);
+            cbase = addCurrItem(client.getTradeComissionCurrency());
             cbase.setListIndex(listProfitModel.size());
-            curr_map.put(tradeComissionCurrency, cbase);
+            coins.put(client.getTradeComissionCurrency(), cbase);
             updateAllBalances(false);
             listProfitModel.addElement(cbase.toString());
         }
     }
     
     public BigDecimal getOrderAssetAmount(String symbolAsset, BigDecimal percent) {
-        currencyItem quote = curr_map.get(symbolAsset);
+        CoinBalanceItem quote = coins.get(symbolAsset);
         if (quote != null) {
             BigDecimal quoteBalance;
             if (quote.getInitialValue().compareTo(quote.getValue()) >= 0) {
@@ -100,40 +100,41 @@ public class tradeProfitsController {
     }
     
     public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && price.compareTo(BigDecimal.ZERO) > 0 && (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) >= 0);
     }
     public boolean canSell(String symbolPair, BigDecimal baseAmount) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
     }
     public BigDecimal getAvailableCount(String assetSymbol) {
-        currencyItem citem = curr_map.get(assetSymbol);
+        CoinBalanceItem citem = coins.get(assetSymbol);
         if (citem == null) return null;
         return citem.getFreeValue();
     }
 
     public boolean hasPair(String symbolPair) {
-        return pair_map.containsKey(symbolPair);
+        return pairOrders.containsKey(symbolPair);
     }
     
     private void testPayTradeComission(BigDecimal price, String quoteSymbol) {
-        boolean use_spec_currency = !tradeComissionCurrency.isEmpty() && !tradeComissionCurrency.equals(quoteSymbol);
-        BigDecimal comission_quote = price.multiply(tradeComissionPercent).divide(BigDecimal.valueOf(100));
+        boolean use_spec_currency = client.getTradeComissionCurrency() != null && !client.getTradeComissionCurrency().equals(quoteSymbol);
+        BigDecimal comission_quote;
         if (use_spec_currency) {
-            String comission_pair = (tradeComissionCurrency + quoteSymbol).toUpperCase();
+            comission_quote = price.multiply(client.getTradeComissionCurrencyPercent()).divide(BigDecimal.valueOf(100));
+            String comission_pair = (client.getTradeComissionCurrency() + quoteSymbol).toUpperCase();
             BigDecimal pair_price = null;
-            if (pair_map.containsKey(comission_pair)) {
-                pair_price = pair_map.get(comission_pair).getPrice();
+            if (pairOrders.containsKey(comission_pair)) {
+                pair_price = pairOrders.get(comission_pair).getPrice();
             } else {
                 pair_price = client.getCurrentPrice(comission_pair);
             }
             if (pair_price != null && pair_price.compareTo(BigDecimal.ZERO) > 0) {
-                currencyItem ccomm = curr_map.get(tradeComissionCurrency);
+                CoinBalanceItem ccomm = coins.get(client.getTradeComissionCurrency());
                 BigDecimal trade_com = comission_quote.divide(pair_price, RoundingMode.HALF_DOWN);
                 if (ccomm != null && ccomm.getFreeValue().compareTo(trade_com) > 0) {
                     ccomm.addFreeValue(trade_com.multiply(BigDecimal.valueOf(-1)));
-                    updateBaseSymbolText(tradeComissionCurrency, false);
+                    updateBaseSymbolText(client.getTradeComissionCurrency(), false);
                 } else {
                     use_spec_currency = false;
                 }
@@ -142,14 +143,15 @@ public class tradeProfitsController {
             }
         }
         if (!use_spec_currency) {
-            currencyItem cquote = curr_map.get(quoteSymbol);
+            comission_quote = price.multiply(client.getTradeComissionPercent()).divide(BigDecimal.valueOf(100));
+            CoinBalanceItem cquote = coins.get(quoteSymbol);
             cquote.addFreeValue(comission_quote.multiply(BigDecimal.valueOf(-1)));
         }
     }
     
     public long PreBuySell(String symbolPair, BigDecimal baseAmount, BigDecimal buyPrice, BigDecimal sellAmount, BigDecimal sellPrice) {
         long result = 0;
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         pair.setPrice(buyPrice);
         pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), true);
         if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
@@ -163,7 +165,7 @@ public class tradeProfitsController {
     }
     
     public void PreBuy(String symbolPair, BigDecimal baseAmount, BigDecimal buyPrice) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         pair.setPrice(buyPrice);
         pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), false);
         updatePairText(symbolPair, !isTestMode);
@@ -177,7 +179,7 @@ public class tradeProfitsController {
         long result = 0;
         try {
             SEMAPHORE.acquire();
-            currencyPairItem pair = pair_map.get(symbolPair);
+            OrderPairItem pair = pairOrders.get(symbolPair);
             if (pair == null) {
                 app.log("Pair " + symbolPair + " not found!");
                 SEMAPHORE.release();
@@ -268,7 +270,7 @@ public class tradeProfitsController {
         long result = 0;
         try {
             SEMAPHORE.acquire();
-            currencyPairItem pair = pair_map.get(symbolPair);
+            OrderPairItem pair = pairOrders.get(symbolPair);
             if (pair == null) {
                 app.log("Pair " + symbolPair + " not found!");
                 SEMAPHORE.release();
@@ -362,21 +364,21 @@ public class tradeProfitsController {
         if (!isTestMode) {
             client.cancelOrder(symbolPair, limitOrderId);
         } else {
-            currencyPairItem pair = pair_map.get(symbolPair);
+            OrderPairItem pair = pairOrders.get(symbolPair);
             pair.rollbackTransaction();
             updatePairText(symbolPair, false);
         }
     }
     
     public void setPairPrice(String symbolPair, BigDecimal price) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         if (pair != null) {
             pair.setPrice(price);
             updatePairText(symbolPair, false);
         }
     }
     public void setPairPrices(String symbolPair, BigDecimal price, BigDecimal order_price) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         if (pair != null) {
             pair.setPrice(price);
             pair.setLastOrderPrice(order_price);
@@ -385,7 +387,7 @@ public class tradeProfitsController {
     }
 
     public void finishOrder(String symbolPair, boolean isok, BigDecimal sold_price) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         if (pair != null) {
             if (isok) {
                 pair.setLastOrderPrice(sold_price);
@@ -397,7 +399,7 @@ public class tradeProfitsController {
     }
     
     public void finishOrderPart(String symbolPair, BigDecimal sold_price, BigDecimal sold_qty) {
-        currencyPairItem pair = pair_map.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(symbolPair);
         if (pair != null) {
             pair.setLastOrderPrice(sold_price);
             pair.confirmTransactionPart(sold_qty, sold_qty.multiply(sold_price));
@@ -409,8 +411,8 @@ public class tradeProfitsController {
             List<AssetBalance> allBalances = client.getAllBalances();
             for (int i = 0; i < allBalances.size(); i++) {
                 String symbol = allBalances.get(i).getAsset().toUpperCase();
-                if (curr_map.containsKey(symbol)) {
-                    currencyItem curr = curr_map.get(symbol);
+                if (coins.containsKey(symbol)) {
+                    CoinBalanceItem curr = coins.get(symbol);
                     if (!isTestMode || curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
                         BigDecimal balance_free = new BigDecimal(allBalances.get(i).getFree());
                         BigDecimal balance_limit = new BigDecimal(allBalances.get(i).getLocked());
@@ -424,8 +426,8 @@ public class tradeProfitsController {
                 }
             }
             if (updateLists) {
-                for (Map.Entry<String, currencyPairItem> entry : pair_map.entrySet()) {
-                    currencyPairItem curr = entry.getValue();
+                for (Map.Entry<String, OrderPairItem> entry : pairOrders.entrySet()) {
+                    OrderPairItem curr = entry.getValue();
                     if (curr != null) {
                         if (curr.getListIndex() >= 0) {
                             listCurrenciesModel.set(curr.getListIndex(), curr.toString());
@@ -438,8 +440,8 @@ public class tradeProfitsController {
                         }
                     }
                 }
-                if (!tradeComissionCurrency.isEmpty()) {
-                    currencyItem curr = curr_map.get(tradeComissionCurrency);
+                if (client.getTradeComissionCurrency() != null) {
+                    CoinBalanceItem curr = coins.get(client.getTradeComissionCurrency());
                     if (curr != null && curr.getListIndex() >= 0) {
                         listProfitModel.set(curr.getListIndex(), curr.toString());
                     }
@@ -452,8 +454,8 @@ public class tradeProfitsController {
         updateAllBalances(true);
     }
     
-    private currencyItem addCurrItem(String symbol) {
-        currencyItem result = new currencyItem(symbol);
+    private CoinBalanceItem addCurrItem(String symbol) {
+        CoinBalanceItem result = new CoinBalanceItem(symbol);
         return result;
     }
 
@@ -462,8 +464,8 @@ public class tradeProfitsController {
             updateAllBalances();
         }
         boolean symbol_updated = false;
-        for (Map.Entry<String, currencyPairItem> entry : pair_map.entrySet()) {
-            currencyPairItem curr = entry.getValue();
+        for (Map.Entry<String, OrderPairItem> entry : pairOrders.entrySet()) {
+            OrderPairItem curr = entry.getValue();
             if (curr != null && curr.getSymbolBase().equals(symbolBase)) {
                 symbol_updated = true;
                 if (curr.getListIndex() >= 0) {
@@ -478,7 +480,7 @@ public class tradeProfitsController {
             }
         }
         if (!symbol_updated) {
-            currencyItem curr = curr_map.get(symbolBase);
+            CoinBalanceItem curr = coins.get(symbolBase);
             if (curr != null && curr.getListIndex() >= 0) {
                 listProfitModel.set(curr.getListIndex(), curr.toString());
             }
@@ -486,7 +488,7 @@ public class tradeProfitsController {
     }
     
     public void updateAllPairTexts(boolean updateBalance) {
-        pair_map.forEach((symbolPair, item) -> {
+        pairOrders.forEach((symbolPair, item) -> {
             placeOrUpdatePair("", "", symbolPair, updateBalance);
         });
     }
@@ -499,28 +501,28 @@ public class tradeProfitsController {
         try {
             SEMAPHORE_ADDCOIN.acquire();
             symbolPair = symbolPair.toUpperCase();
-            currencyPairItem cpair = pair_map.get(symbolPair);
+            OrderPairItem cpair = pairOrders.get(symbolPair);
             if (cpair == null) {
                 symbolBase = symbolBase.toUpperCase();
                 symbolQuote = symbolQuote.toUpperCase();
                 if (!symbolBase.isEmpty() && !symbolQuote.isEmpty()) {
-                    currencyItem cbase = curr_map.get(symbolBase);
-                    currencyItem cquote = curr_map.get(symbolQuote);
+                    CoinBalanceItem cbase = coins.get(symbolBase);
+                    CoinBalanceItem cquote = coins.get(symbolQuote);
                     if (cbase == null) {
                         cbase = addCurrItem(symbolBase);
                         cbase.setListIndex(-1);
-                        curr_map.put(symbolBase, cbase);
+                        coins.put(symbolBase, cbase);
                     } else {
                         cbase.setPairKey(true);
                     }
                     if (cquote == null) {
                         cquote = addCurrItem(symbolQuote);
                         cquote.setListIndex(listProfitModel.size());
-                        curr_map.put(symbolQuote, cquote);
+                        coins.put(symbolQuote, cquote);
                     }
-                    cpair = new currencyPairItem(cbase, cquote, symbolPair);
+                    cpair = new OrderPairItem(cbase, cquote, symbolPair);
                     cpair.setListIndex(listCurrenciesModel.size());
-                    pair_map.put(symbolPair, cpair);
+                    pairOrders.put(symbolPair, cpair);
                     if (updateBalance) {
                         updateAllBalances(false);
                     }
@@ -550,6 +552,22 @@ public class tradeProfitsController {
         SEMAPHORE_ADDCOIN.release();
     }
 
+    @Override
+    protected void runStart() {
+        info.StartAndWaitForInit();
+        showTradeComissionCurrency();
+    }
+
+    @Override
+    protected void runBody() {
+        
+    }
+
+    @Override
+    protected void runFinish() {
+        
+    }
+    
     /**
      * @return the listProfitModel
      */
@@ -566,13 +584,19 @@ public class tradeProfitsController {
 
     public void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
+        if (client != null) {
+            tradeMinProfitPercent = client.getTradeComissionPercent().multiply(BigDecimal.valueOf(2));
+            if (info.getClient() == null) {
+                info.setClient(client);
+            }
+        }
     }
     public TradingAPIAbstractInterface getClient() {
         return client;
     }
 
     public String getNthCurrencyPair(int n) {
-        for (Map.Entry<String, currencyPairItem> entry : pair_map.entrySet()) {
+        for (Map.Entry<String, OrderPairItem> entry : pairOrders.entrySet()) {
             if (entry.getValue().getListIndex() == n) {
                 return entry.getValue().getSymbolPair();
             }
@@ -594,34 +618,19 @@ public class tradeProfitsController {
         this.isTestMode = isTestMode;
     }
 
-    /**
-     * @return the tradeComissionPercent
-     */
-    public BigDecimal getTradeComissionPercent() {
-        return tradeComissionPercent;
-    }
-
-    /**
-     * @param tradeComissionPercent the tradeComissionPercent to set
-     */
-    public void setTradeComissionPercent(BigDecimal tradeComissionPercent) {
-        this.tradeComissionPercent = tradeComissionPercent;
-        tradeMinProfitPercent = tradeComissionPercent.multiply(BigDecimal.valueOf(2));
-    }
-
     public void removeCurrencyPair(String symbolPair) {
-        if (pair_map.containsKey(symbolPair)) {
-            int list_index_to_remove = pair_map.get(symbolPair).getListIndex();
+        if (pairOrders.containsKey(symbolPair)) {
+            int list_index_to_remove = pairOrders.get(symbolPair).getListIndex();
             listCurrenciesModel.remove(list_index_to_remove);
-            pair_map.remove(symbolPair);
-            pair_map.entrySet().stream().filter((entry) -> (entry.getValue().getListIndex() > list_index_to_remove)).forEachOrdered((entry) -> {
+            pairOrders.remove(symbolPair);
+            pairOrders.entrySet().stream().filter((entry) -> (entry.getValue().getListIndex() > list_index_to_remove)).forEachOrdered((entry) -> {
                 entry.getValue().setListIndex(entry.getValue().getListIndex() - 1);
             });
         }
     }
 
-    public currencyPairItem getPair(String pair) {
-        return pair_map.get(pair);
+    public OrderPairItem getPairOrderInfo(String pair) {
+        return pairOrders.get(pair);
     }
     
     /**

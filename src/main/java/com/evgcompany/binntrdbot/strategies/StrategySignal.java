@@ -63,8 +63,8 @@ public class StrategySignal extends StrategyItem {
         Decimal price2u = price2.multipliedBy(90).plus(priceT.multipliedBy(10)).dividedBy(100);
         Decimal loss_percent;
         if (!priceS.isZero()) {
-            if (profitsChecker!= null && profitsChecker.getStopLossPercent() != null && profitsChecker.getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
-                loss_percent = Decimal.valueOf(profitsChecker.getStopLossPercent());
+            if (ordersController!= null && ordersController.getStopLossPercent() != null && ordersController.getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
+                loss_percent = Decimal.valueOf(ordersController.getStopLossPercent());
             } else {
                 loss_percent = getLossPercent(price1, priceS);
             }
