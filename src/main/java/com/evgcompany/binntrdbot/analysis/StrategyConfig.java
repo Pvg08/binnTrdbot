@@ -5,8 +5,8 @@
  */
 package com.evgcompany.binntrdbot.analysis;
 
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -21,7 +21,6 @@ import org.ta4j.core.Decimal;
 public class StrategyConfig {
     private final HashMap<String, StrategyConfigItem> params = new HashMap<>();
     private final List<String> param_names = new ArrayList<>();
-    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     public StrategyConfigItem Add(String name, StrategyConfigItem item) {
         params.put(name, item);
@@ -32,7 +31,7 @@ public class StrategyConfig {
     public static String ConfigRowToStr(HashMap<String, BigDecimal> row) {
         String result = "";
         for (Map.Entry<String, BigDecimal> entry : row.entrySet()) {
-            result += entry.getKey() + "=" + df6.format(entry.getValue()) + "; ";
+            result += entry.getKey() + "=" + NumberFormatter.df6.format(entry.getValue()) + "; ";
         }
         return result;
     }
@@ -118,9 +117,9 @@ public class StrategyConfig {
             StrategyConfigItem item = params.get(pname);
             if (item != null && item.isActive()) {
                 if (with_names) {
-                    parts.add(pname + "=" + df6.format(item.getValue()).replaceAll(",", "."));
+                    parts.add(pname + "=" + NumberFormatter.df6.format(item.getValue()).replaceAll(",", "."));
                 } else {
-                    parts.add(df6.format(item.getValue()).replaceAll(",", "."));
+                    parts.add(NumberFormatter.df6.format(item.getValue()).replaceAll(",", "."));
                 }
             }
         });

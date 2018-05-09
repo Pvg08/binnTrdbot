@@ -15,6 +15,7 @@ import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import com.evgcompany.binntrdbot.strategies.core.StrategyItem;
@@ -22,7 +23,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -88,9 +88,6 @@ public class tradePairProcess extends PeriodicProcessThread {
     private boolean base_strategy_sell_ignored = false;
     private boolean do_remove_flag = false;
     
-    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
-    
     private boolean useBuyStopLimited = false;
     private int stopBuyLimitTimeout = 120;
     private boolean useSellStopLimited = false;
@@ -99,15 +96,14 @@ public class tradePairProcess extends PeriodicProcessThread {
     private int stopSellLimitTimeout = 1200;
     
     private long lastOrderMillis = 0;
-    private long lastStrategyPriceMillis = 0;
     private long startMillis = 0;
     private BigDecimal currentPrice = BigDecimal.ZERO;
     private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
     SignalItem init_signal = null;
     
-    public tradePairProcess(mainApplication application, TradingAPIAbstractInterface rclient, tradeProfitsController rprofitsChecker, String pair) {
-        app = application;
+    public tradePairProcess(TradingAPIAbstractInterface rclient, tradeProfitsController rprofitsChecker, String pair) {
+        app = mainApplication.getInstance();
         symbol = pair;
         client = rclient;
         profitsChecker = rprofitsChecker;
@@ -140,7 +136,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         quote_asset_amount = sold_price.multiply(sold_amount);
         base_strategy_sell_ignored = false;
         if (profitsChecker.canBuy(symbol, sold_amount, sold_price)) {
-            app.log("BYING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + df8.format(sold_price) + ")", true, true);
+            app.log("BYING " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(sold_price) + ")", true, true);
             long result = profitsChecker.Buy(symbol, sold_amount, sold_price);
             if (result >= 0) {
                 limitOrderId = result;
@@ -154,7 +150,7 @@ public class tradePairProcess extends PeriodicProcessThread {
                 app.log("Error!", true, true);
             }
         } else {
-            app.log("Can't buy " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")");
+            app.log("Can't buy " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(curPrice) + ")");
         }
     }
     private void doExit(BigDecimal curPrice, boolean skip_check) {
@@ -181,12 +177,12 @@ public class tradePairProcess extends PeriodicProcessThread {
             ) {
             if (profitsChecker.canSell(symbol, sold_amount)) {
                 base_strategy_sell_ignored = false;
-                app.log("SELLING " + df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + df8.format(curPrice) + ")", true, true);
+                app.log("SELLING " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(curPrice) + ")", true, true);
                 long result = profitsChecker.Sell(symbol, sold_amount, curPrice, orderToCancelOnSellUp);
                 if (result >= 0) {
                     limitOrderId = result;
                     app.log("Successful!", true, true);
-                    app.log("RESULT: " + df8.format(incomeWithoutComission) + " " + quoteAssetSymbol + " (" + df8.format(incomeWithoutComissionPercent) + "%)\n", true);
+                    app.log("RESULT: " + NumberFormatter.df8.format(incomeWithoutComission) + " " + quoteAssetSymbol + " (" + NumberFormatter.df8.format(incomeWithoutComissionPercent) + "%)\n", true);
                     is_hodling = false;
                     orderToCancelOnSellUp.clear();
                     isTryingToSellUp = false;
@@ -366,7 +362,7 @@ public class tradePairProcess extends PeriodicProcessThread {
                 sold_price = lastBuyPrice;
                 sold_amount = res_cnt;
                 stopAfterSell = true;
-                app.log("START WAITING to sell " + df8.format(sold_amount) + " " + baseAssetSymbol + " for price more than " + df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
+                app.log("START WAITING to sell " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
                 long result = profitsChecker.PreBuySell(symbol, sold_amount, lastBuyPrice, currentLimitSellQty, currentLimitSellPrice);
                 if (result >= 0) {
                     limitOrderId = result;
@@ -411,7 +407,6 @@ public class tradePairProcess extends PeriodicProcessThread {
         if (bars.size() > 0) {
             addBars(bars);
             last_time = bars.get(bars.size() - 1).getBeginTime().toInstant().toEpochMilli();
-            lastStrategyPriceMillis = System.currentTimeMillis();
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
         }
@@ -430,7 +425,7 @@ public class tradePairProcess extends PeriodicProcessThread {
                 profitsChecker.setPairPrice(symbol, currentPrice);
             }
             if (is_fin && (predictor == null || !predictor.isLearning())) {
-                app.log(symbol + " current price = " + df8.format(currentPrice));
+                app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
             }
         });
     }
@@ -450,8 +445,6 @@ public class tradePairProcess extends PeriodicProcessThread {
         }
         if (bars != null && bars.size() > 0) {
             last_time = bars.get(bars.size() - 1).getBeginTime().toInstant().toEpochMilli();
-            //app.log(symbol + ": price=" + bars.get(bars.size() - 1).getClose() + "; volume=" + bars.get(bars.size() - 1).getVolume() + "; bars=" + series.getBarCount(), false, true);
-            lastStrategyPriceMillis = System.currentTimeMillis();
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
         }
@@ -526,7 +519,7 @@ public class tradePairProcess extends PeriodicProcessThread {
             doBuy();
         }
 
-        app.log(symbol + " initialized. Current price = " + df8.format(currentPrice));
+        app.log(symbol + " initialized. Current price = " + NumberFormatter.df8.format(currentPrice));
     }
     
     @Override
@@ -535,7 +528,7 @@ public class tradePairProcess extends PeriodicProcessThread {
         if(strategiesController.getMainStrategy().equals("Neural Network")) {
             if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
                 Bar nbar = predictor.predictNextBar(series);
-                app.log(symbol + " NEUR prediction = " + df8.format(nbar.getClosePrice()));
+                app.log(symbol + " NEUR prediction = " + NumberFormatter.df8.format(nbar.getClosePrice()));
             }
         }
         if (limitOrderId > 0) {

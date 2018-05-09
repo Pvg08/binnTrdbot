@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
  */
 public class tradePairProcessController {
     
-    private final mainApplication app;
     private tradeProfitsController profitsChecker = null;
     private final List<tradePairProcess> pairs = new ArrayList<>(0);
     
@@ -31,25 +30,17 @@ public class tradePairProcessController {
     private int barAdditionalCount;
     private int tradingBalancePercent;
     private long updateDelay;
-    private boolean checkOtherStrategies;
-    private boolean buyStop;
-    private boolean sellStop;
+    private boolean checkOtherStrategies = false;
+    private boolean buyStop = false;
+    private boolean sellStop = false;
+    private boolean allPairsWavesUsage = false;
     private int buyStopLimitedTimeout;
     private int sellStopLimitedTimeout;
     
-    public tradePairProcessController(mainApplication app, tradeProfitsController profitsChecker) {
-        this.app = app;
+    public tradePairProcessController(tradeProfitsController profitsChecker) {
         this.profitsChecker = profitsChecker;
     }
     
-    private int searchCurrencyFirstPair(String currencyPair, boolean is_hodling) {
-        for(int i=0; i<pairs.size(); i++) {
-            if (pairs.get(i).getSymbol().equals(currencyPair) && pairs.get(i).isHodling() == is_hodling) {
-                return i;
-            }
-        }
-        return -1;
-    }
     private int searchCurrencyFirstPair(String currencyPair) {
         for(int i=0; i<pairs.size(); i++) {
             if (pairs.get(i).getSymbol().equals(currencyPair)) {
@@ -68,14 +59,19 @@ public class tradePairProcessController {
     }
     
     private tradePairProcess initializePair(String symbol, boolean run) {
+        boolean has_wave = symbol.contains("~");
         boolean has_plus = symbol.contains("+");
         boolean has_2plus = symbol.contains("++");
         boolean has_minus = !has_plus && symbol.contains("-");
-        symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "");
+        symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "").replaceAll("\\~", "");
         int pair_index = searchCurrencyFirstPair(symbol);
-        tradePairProcess nproc = null;
+        tradePairProcess nproc;
         if (pair_index < 0) {
-            nproc = new tradePairProcess(app, profitsChecker.getClient(), profitsChecker, symbol);
+            if (has_wave || allPairsWavesUsage) {
+                nproc = new tradePairWaveProcess(profitsChecker.getClient(), profitsChecker, symbol);
+            } else {
+                nproc = new tradePairProcess(profitsChecker.getClient(), profitsChecker, symbol);
+            }
             nproc.setStartDelay(pairs.size() * 1000 + 500);
             nproc.setTryingToSellUp(has_plus);
             nproc.setSellUpAll(has_2plus);
@@ -382,5 +378,19 @@ public class tradePairProcessController {
     
     public tradeProfitsController getProfitsChecker() {
         return profitsChecker;
+    }
+
+    /**
+     * @return the wavesUsage
+     */
+    public boolean isAllPairsWavesUsage() {
+        return allPairsWavesUsage;
+    }
+
+    /**
+     * @param wavesUsage the wavesUse to set
+     */
+    public void setAllPairsWavesUsage(boolean wavesUsage) {
+        this.allPairsWavesUsage = wavesUsage;
     }
 }

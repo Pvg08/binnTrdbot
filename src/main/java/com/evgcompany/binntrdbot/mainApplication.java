@@ -9,11 +9,11 @@ import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.api.TradingAPIBinance;
 import com.evgcompany.binntrdbot.coinrating.*;
 import com.evgcompany.binntrdbot.misc.ComponentsConfigController;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.awt.Toolkit;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -35,16 +35,12 @@ public class mainApplication extends javax.swing.JFrame {
     
     private final ComponentsConfigController config = new ComponentsConfigController(this);
     private final tradeProfitsController profitsChecker = new tradeProfitsController(this);
-    private final tradePairProcessController pairController = new tradePairProcessController(this, profitsChecker);
+    private final tradePairProcessController pairController = new tradePairProcessController(profitsChecker);
     private final CoinRatingController coinRatingController = new CoinRatingController(this, pairController);
     
     private boolean is_paused = false;
     
     private static volatile mainApplication instance = null;
-    
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
-    private static final DecimalFormat df3 = new DecimalFormat("0.##");
-    private static final DecimalFormat df3p = new DecimalFormat("0.###%");
     
     public static mainApplication getInstance() {
         return instance;
@@ -74,18 +70,18 @@ public class mainApplication extends javax.swing.JFrame {
         });
         
         coinRatingController.setTrendUpdateEvent((upt, dnt) -> {
-            labelUpTrend.setText("UP: " + df3.format(upt) + "%");
-            labelDownTrend.setText("DOWN: " + df3.format(dnt) + "%");
+            labelUpTrend.setText("UP: " + NumberFormatter.df2.format(upt) + "%");
+            labelDownTrend.setText("DOWN: " + NumberFormatter.df2.format(dnt) + "%");
         });
         
         CoinInfoAggregator.getInstance().setAccountCostUpdate((agg)->{
             double initialCost = agg.getInitialAccountCost();
             if (initialCost >= 0) {
                 double curCost = agg.getBaseAccountCost();
-                String cost_text = "Account cost: " + df8.format(curCost) + " " + agg.getBaseCoin();
+                String cost_text = "Account cost: " + NumberFormatter.df8.format(curCost) + " " + agg.getBaseCoin();
                 if (initialCost > 0) {
                     double changePercent = (curCost - initialCost) / initialCost;
-                    cost_text = cost_text + " ("+df3p.format(changePercent)+")";
+                    cost_text = cost_text + " ("+NumberFormatter.df3p.format(changePercent)+")";
                 }
                 labelAccountCost.setText(cost_text);
             }
@@ -154,6 +150,7 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerCycleMaxSwitches, "cycle_switch_maxcount");
         config.addComponent(spinnerCycleMaxEnterCount, "cycle_maxcount");
         config.addComponent(checkBoxCycleDepthCheck, "cycle_depset");
+        config.addComponent(checkBoxWavesUse, "waves_use");
         config.Load();
     }
     
@@ -227,6 +224,7 @@ public class mainApplication extends javax.swing.JFrame {
         pairController.setSellStopLimitedTimeout((Integer) spinnerSellStopLimited.getValue());
         pairController.setUpdateDelay((Integer) spinnerUpdateDelay.getValue());
         pairController.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
+        pairController.setAllPairsWavesUsage(checkBoxWavesUse.isSelected());
     }
     
     /**
@@ -341,6 +339,8 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel26 = new javax.swing.JLabel();
         spinnerMaxSignalOrders = new javax.swing.JSpinner();
         checkBoxUseSignals = new javax.swing.JCheckBox();
+        jPanel7 = new javax.swing.JPanel();
+        checkBoxWavesUse = new javax.swing.JCheckBox();
         jPanel6 = new javax.swing.JPanel();
         checkBoxUseCycles = new javax.swing.JCheckBox();
         textFieldRestrictedCoins = new javax.swing.JTextField();
@@ -629,7 +629,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(comboBoxLimitedMode, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(11, 11, 11)))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 12, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 26, Short.MAX_VALUE)
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addComponent(jLabel9)
@@ -786,7 +786,7 @@ public class mainApplication extends javax.swing.JFrame {
                             .addComponent(jLabel23)
                             .addComponent(checkBoxWalkForward)
                             .addComponent(jScrollPane7, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))))
-                .addContainerGap(66, Short.MAX_VALUE))
+                .addContainerGap(80, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -934,7 +934,7 @@ public class mainApplication extends javax.swing.JFrame {
                                     .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                         .addComponent(spinnerScanRatingDelayTime, javax.swing.GroupLayout.DEFAULT_SIZE, 70, Short.MAX_VALUE)
                                         .addComponent(spinnerScanRatingUpdateTime)))))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 87, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 94, Short.MAX_VALUE)
                         .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(jPanel4Layout.createSequentialGroup()
                                 .addComponent(jLabel32)
@@ -953,7 +953,7 @@ public class mainApplication extends javax.swing.JFrame {
                                     .addComponent(spinnerRatingMaxOrderWait, javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(spinnerRatingMaxOrders, javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(spinnerRatingMinBaseVolume, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))))))
-                .addGap(0, 10, Short.MAX_VALUE))
+                .addGap(0, 17, Short.MAX_VALUE))
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1092,7 +1092,7 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(buttonTlgConnect))
                             .addComponent(jLabel20))))
-                .addContainerGap(63, Short.MAX_VALUE))
+                .addContainerGap(77, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1129,6 +1129,27 @@ public class mainApplication extends javax.swing.JFrame {
         );
 
         jTabbedPane2.addTab("Signals", jPanel5);
+
+        checkBoxWavesUse.setText("Use waves for all pair trades");
+
+        javax.swing.GroupLayout jPanel7Layout = new javax.swing.GroupLayout(jPanel7);
+        jPanel7.setLayout(jPanel7Layout);
+        jPanel7Layout.setHorizontalGroup(
+            jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel7Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(checkBoxWavesUse)
+                .addContainerGap(362, Short.MAX_VALUE))
+        );
+        jPanel7Layout.setVerticalGroup(
+            jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel7Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(checkBoxWavesUse)
+                .addContainerGap(227, Short.MAX_VALUE))
+        );
+
+        jTabbedPane2.addTab("Waves", jPanel7);
 
         jPanel6.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
 
@@ -1230,7 +1251,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
                                 .addComponent(spinnerCycleAbortTime, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 87, Short.MAX_VALUE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 101, Short.MAX_VALUE)
                                 .addComponent(jLabel35)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(spinnerCycleMaxCoinRank, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -1343,7 +1364,7 @@ public class mainApplication extends javax.swing.JFrame {
         jTextArea1.setColumns(20);
         jTextArea1.setLineWrap(true);
         jTextArea1.setRows(5);
-        jTextArea1.setText("Modifiers:\nBuy for best price: -\nSell free ordered (or opened orders if no free): +\nSell all (free + opened orders): ++");
+        jTextArea1.setText("Modifiers:\nBuy for best price: -\nSell free ordered (or opened orders if no free): +\nSell all (free + opened orders): ++\nForce waves mode: ~");
         jTextArea1.setWrapStyleWord(true);
         jScrollPane6.setViewportView(jTextArea1);
 
@@ -1353,7 +1374,7 @@ public class mainApplication extends javax.swing.JFrame {
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane6, javax.swing.GroupLayout.DEFAULT_SIZE, 495, Short.MAX_VALUE)
+                .addComponent(jScrollPane6, javax.swing.GroupLayout.DEFAULT_SIZE, 509, Short.MAX_VALUE)
                 .addContainerGap())
         );
         jPanel3Layout.setVerticalGroup(
@@ -1488,7 +1509,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addGap(175, 175, 175))
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 268, Short.MAX_VALUE)
+                            .addComponent(jScrollPane1)
                             .addGroup(layout.createSequentialGroup()
                                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addComponent(jLabel6)
@@ -1517,7 +1538,7 @@ public class mainApplication extends javax.swing.JFrame {
                                 .addComponent(textFieldTradePairs)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(buttonSetPairs))
-                            .addComponent(jTabbedPane2)
+                            .addComponent(jTabbedPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 536, Short.MAX_VALUE)
                             .addComponent(jScrollPane3)
                             .addComponent(jScrollPane4)
                             .addGroup(layout.createSequentialGroup()
@@ -2085,6 +2106,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JCheckBox checkBoxUseCycles;
     private javax.swing.JCheckBox checkBoxUseSignals;
     private javax.swing.JCheckBox checkBoxWalkForward;
+    private javax.swing.JCheckBox checkBoxWavesUse;
     private javax.swing.JCheckBox checkboxAutoFastorder;
     private javax.swing.JCheckBox checkboxAutoOrder;
     private javax.swing.JCheckBox checkboxAutoSignalFastorder;
@@ -2144,6 +2166,7 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;
     private javax.swing.JPanel jPanel6;
+    private javax.swing.JPanel jPanel7;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;

@@ -7,12 +7,12 @@ package com.evgcompany.binntrdbot.signal;
 
 import com.evgcompany.binntrdbot.coinrating.CoinRatingPairLogItem;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.DecimalFormat;
 
 /**
  *
@@ -38,8 +38,6 @@ public class SignalItem {
     private long localMillis;
     private double rating;
     private long maxDaysAgo;
-    
-    private static final DecimalFormat df8 = new DecimalFormat("0.#######");
 
     public long getMillisFromSignalStart() {
         long millis = System.currentTimeMillis() - localMillis;
@@ -405,10 +403,10 @@ public class SignalItem {
     public String toString() {
         return symbol1+"_"
                 +symbol2+"_"
-                +df8.format(price_from)+"_"
-                +df8.format(price_to)+"_"
-                +df8.format(price_target)+"_"
-                +df8.format(price_stoploss)+"_";
+                +NumberFormatter.df8.format(price_from)+"_"
+                +NumberFormatter.df8.format(price_to)+"_"
+                +NumberFormatter.df8.format(price_target)+"_"
+                +NumberFormatter.df8.format(price_stoploss)+"_";
     }
 
     /**

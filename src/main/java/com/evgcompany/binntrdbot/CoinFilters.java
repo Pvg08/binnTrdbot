@@ -9,9 +9,9 @@ import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.SymbolFilter;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.util.List;
 
 /**
@@ -201,16 +201,15 @@ public class CoinFilters implements java.io.Serializable {
     }
 
     public void logFiltersInfo() {
-        DecimalFormat df8 = new DecimalFormat("0.########");
         mainApplication.getInstance().log(baseAssetSymbol+quoteAssetSymbol + " filters:");
         if (filterPrice) {
-            mainApplication.getInstance().log("Price: min="+df8.format(filterMinPrice)+"; max="+df8.format(filterMaxPrice)+"; tick=" + df8.format(filterPriceTickSize));
+            mainApplication.getInstance().log("Price: min="+NumberFormatter.df8.format(filterMinPrice)+"; max="+NumberFormatter.df8.format(filterMaxPrice)+"; tick=" + NumberFormatter.df8.format(filterPriceTickSize));
         }
         if (filterQty) {
-            mainApplication.getInstance().log("Quantity: min="+df8.format(filterMinQty)+"; max="+df8.format(filterMaxQty)+"; step=" + df8.format(filterQtyStep));
+            mainApplication.getInstance().log("Quantity: min="+NumberFormatter.df8.format(filterMinQty)+"; max="+NumberFormatter.df8.format(filterMaxQty)+"; step=" + NumberFormatter.df8.format(filterQtyStep));
         }
         if (filterNotional) {
-            mainApplication.getInstance().log("Notional: " + df8.format(filterMinNotional));
+            mainApplication.getInstance().log("Notional: " + NumberFormatter.df8.format(filterMinNotional));
         }
         mainApplication.getInstance().log("");
     }

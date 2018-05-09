@@ -9,6 +9,7 @@ import com.evgcompany.binntrdbot.*;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.JsonReader;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.io.Closeable;
@@ -18,7 +19,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.format.DateTimeFormatter;
@@ -82,11 +82,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     private long updateCoinsMillis = 0;
     private long updateLoadRejectTime = 86400;
     private boolean have_all_coins_pairs_info = false;
-
-    private static final DecimalFormat df3p = new DecimalFormat("0.##%");
-    private static final DecimalFormat df3 = new DecimalFormat("0.##");
-    private static final DecimalFormat df6 = new DecimalFormat("0.#####");
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
 
     private final DefaultListModel<String> coinRatingModel = new DefaultListModel<>();
 
@@ -437,7 +432,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         
         curr.calculateRating();
 
-        mainApplication.getInstance().log("Rating = " + df3.format(curr.rating));
+        mainApplication.getInstance().log("Rating = " + NumberFormatter.df3.format(curr.rating));
     }
     
     private void checkPair(CoinRatingPairLogItem curr) {
@@ -464,13 +459,13 @@ public class CoinRatingController extends PeriodicProcessThread {
         mainApplication.getInstance().log("Base = " + curr.symbolBase);
         mainApplication.getInstance().log("Base name = " + curr.base_rating.fullname);
         mainApplication.getInstance().log("Base rank = " + curr.base_rating.rank);
-        mainApplication.getInstance().log("Base marketcap = " + df3.format(curr.base_rating.market_cap) + " USD");
+        mainApplication.getInstance().log("Base marketcap = " + NumberFormatter.df3.format(curr.base_rating.market_cap) + " USD");
         mainApplication.getInstance().log("Quote = " + curr.symbolQuote);
-        mainApplication.getInstance().log("Current volatility = " + df6.format(curr.volatility));
+        mainApplication.getInstance().log("Current volatility = " + NumberFormatter.df6.format(curr.volatility));
         
         if (bars.size() > 0) {
             mainApplication.getInstance().log("Price = " + bars.get(bars.size()-1).getClosePrice());
-            String timeframe = df3.format(2.0*bars.size()/24) + "d";
+            String timeframe = NumberFormatter.df3.format(2.0*bars.size()/24) + "d";
             mainApplication.getInstance().log("");
             mainApplication.getInstance().log("Timeframe = " + timeframe);
         }
@@ -497,7 +492,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             if (dip_p > 25 && change_p > -5) {
                 h_bars++;
                 last_hbar_info = DateTimeFormatter.ofPattern("dd/MM/yyyy - hh:mm").format(bar.getBeginTime());
-                last_hbar_info += " (DIP "+df3.format(dip_p)+"; CHANGE "+df3.format(change_p)+")";
+                last_hbar_info += " (DIP "+NumberFormatter.df3.format(dip_p)+"; CHANGE "+NumberFormatter.df3.format(change_p)+")";
             }
         }
         
@@ -525,12 +520,12 @@ public class CoinRatingController extends PeriodicProcessThread {
         
         curr.calculateRating();
         
-        mainApplication.getInstance().log("Volatility = " + df3p.format(curr.volatility));
-        mainApplication.getInstance().log("Hour volume = " + df8.format(curr.hour_volume) + " " + curr.symbolQuote + " (" + df8.format(curr.hour_volume_base) + " " + coinInfo.getBaseCoin() + ")");
-        mainApplication.getInstance().log("Day volume = " + df8.format(curr.day_volume) + " " + curr.symbolQuote + " (" + df8.format(curr.day_volume_base) + " " + coinInfo.getBaseCoin() + ")");
-        mainApplication.getInstance().log("Hour change percent = " + df3p.format(curr.percent_hour));
-        mainApplication.getInstance().log("Day change percent = " + df3p.format(curr.percent_day));
-        mainApplication.getInstance().log("Rating = " + df3.format(curr.rating));
+        mainApplication.getInstance().log("Volatility = " + NumberFormatter.df3p.format(curr.volatility));
+        mainApplication.getInstance().log("Hour volume = " + NumberFormatter.df8.format(curr.hour_volume) + " " + curr.symbolQuote + " (" + NumberFormatter.df8.format(curr.hour_volume_base) + " " + coinInfo.getBaseCoin() + ")");
+        mainApplication.getInstance().log("Day volume = " + NumberFormatter.df8.format(curr.day_volume) + " " + curr.symbolQuote + " (" + NumberFormatter.df8.format(curr.day_volume_base) + " " + coinInfo.getBaseCoin() + ")");
+        mainApplication.getInstance().log("Hour change percent = " + NumberFormatter.df3p.format(curr.percent_hour));
+        mainApplication.getInstance().log("Day change percent = " + NumberFormatter.df3p.format(curr.percent_day));
+        mainApplication.getInstance().log("Rating = " + NumberFormatter.df3.format(curr.rating));
         
         mainApplication.getInstance().log("-----------------------------------");
     }
@@ -637,34 +632,34 @@ public class CoinRatingController extends PeriodicProcessThread {
                 
                 if (null != sortby) switch (sortby) {
                     case CR_MARKET_CAP:
-                        text += df3.format(curr.base_rating.market_cap);
+                        text += NumberFormatter.df3.format(curr.base_rating.market_cap);
                         break;
                     case CR_VOLUME_HOUR:
-                        text += df8.format(curr.hour_volume_base);
+                        text += NumberFormatter.df8.format(curr.hour_volume_base);
                         break;
                     case CR_VOLUME_DAY:
-                        text += df8.format(curr.day_volume_base);
+                        text += NumberFormatter.df8.format(curr.day_volume_base);
                         break;
                     case CR_PROGSTART_PRICEUP:
-                        text += df3p.format(curr.percent_from_begin);
+                        text += NumberFormatter.df3p.format(curr.percent_from_begin);
                         break;
                     case CR_24HR_PRICEUP:
-                        text += df3p.format(curr.percent_day);
+                        text += NumberFormatter.df3p.format(curr.percent_day);
                         break;
                     case CR_LAST_HOUR_PRICEUP:
-                        text += df3p.format(curr.percent_hour);
+                        text += NumberFormatter.df3p.format(curr.percent_hour);
                         break;
                     case CR_EVENTS_COUNT:
                         text += curr.base_rating.events_count;
                         break;
                     case CR_SIGNALS_RATING:
-                        text += df3.format(curr.signal_rating);
+                        text += NumberFormatter.df3.format(curr.signal_rating);
                         break;
                     case CR_CALCULATED_RATING:
-                        text += df3.format(curr.rating);
+                        text += NumberFormatter.df3.format(curr.rating);
                         break;
                     case CR_VOLATILITY:
-                        text += df3p.format(curr.volatility);
+                        text += NumberFormatter.df3p.format(curr.volatility);
                         break;
                     case CR_STRATEGIES_SHOULD_ENTER:
                         text += curr.strategies_shouldenter_rate;
@@ -676,10 +671,10 @@ public class CoinRatingController extends PeriodicProcessThread {
                         text += curr.strategies_shouldenter_rate - curr.strategies_shouldexit_rate;
                         break;
                     case CR_LAST_EVENT_ANNO_DATE:
-                        text+=curr.base_rating.last_event_date != null && !curr.base_rating.last_event_date.isEmpty() ? curr.base_rating.last_event_date : "Unknown date";
+                        text += curr.base_rating.last_event_date != null && !curr.base_rating.last_event_date.isEmpty() ? curr.base_rating.last_event_date : "Unknown date";
                         break;
                     default:
-                        text+=df8.format(curr.current_price);
+                        text += NumberFormatter.df8.format(curr.current_price);
                         break;
                 }
                 

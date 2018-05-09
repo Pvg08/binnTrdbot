@@ -11,8 +11,8 @@ import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.analysis.CoinCycleController;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,8 +61,6 @@ public class tradeCycleProcess extends PeriodicProcessThread {
     private double profitAim;
     
     private boolean reverting = false;
-    
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
 
     public tradeCycleProcess(CoinCycleController cycleController) {
         this.cycleController = cycleController;
@@ -402,7 +400,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     initialQty = tobuy_amount.multiply(tobuy_price);
                 }
                 
-                mainApplication.getInstance().log("BYING " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + df8.format(tobuy_amount.multiply(tobuy_price)) + " " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")", true, true);
+                mainApplication.getInstance().log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseSymbol + " for " + NumberFormatter.df8.format(tobuy_amount.multiply(tobuy_price)) + " " + quoteSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
                 long result = profitsChecker.Buy(symbol_order, tobuy_amount, isMarket ? null : tobuy_price);
                 if (result >= 0) {
                     limitOrderId = result;
@@ -420,7 +418,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             } else {
                 BigDecimal avail = profitsChecker.getAvailableCount(quoteSymbol);
                 if (avail == null) avail = BigDecimal.valueOf(-1);
-                mainApplication.getInstance().log("Can't buy " + df8.format(tobuy_amount) + " " + baseSymbol + " for " + df8.format(tobuy_amount.multiply(tobuy_price)) + " " + quoteSymbol + " (price=" + df8.format(tobuy_price) + ")" + " (avail summ = "+avail+")");
+                mainApplication.getInstance().log("Can't buy " + NumberFormatter.df8.format(tobuy_amount) + " " + baseSymbol + " for " + NumberFormatter.df8.format(tobuy_amount.multiply(tobuy_price)) + " " + quoteSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")" + " (avail summ = "+avail+")");
                 if (!reverting) orderAbort();
             }
         } else {
@@ -436,7 +434,7 @@ public class tradeCycleProcess extends PeriodicProcessThread {
                     initialQty = tosell_amount;
                 }
                 
-                mainApplication.getInstance().log("SELLING " + df8.format(tosell_amount) + " " + baseSymbol + " for " + df8.format(tosell_amount.multiply(tosell_price)) + " " + quoteSymbol + " (price=" + df8.format(tosell_price) + ")", true, true);
+                mainApplication.getInstance().log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseSymbol + " for " + NumberFormatter.df8.format(tosell_amount.multiply(tosell_price)) + " " + quoteSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
                 long result = profitsChecker.Sell(symbol_order, tosell_amount, isMarket ? null : tosell_price, null);
                 if (result >= 0) {
                     limitOrderId = result;

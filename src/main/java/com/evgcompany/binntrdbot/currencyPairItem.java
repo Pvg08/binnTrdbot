@@ -5,8 +5,8 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 
 /**
  *
@@ -32,11 +32,6 @@ public class currencyPairItem {
     
     private int listIndex = -1;
     
-    private static final DecimalFormat df3 = new DecimalFormat("0.###");
-    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static final DecimalFormat df6 = new DecimalFormat("0.######");
-    private static final DecimalFormat df8 = new DecimalFormat("0.########");
-    
     public currencyPairItem(currencyItem base_item, currencyItem quote_item, String symbolPair) {
         this.base_item = base_item;
         this.quote_item = quote_item;
@@ -53,9 +48,9 @@ public class currencyPairItem {
     @Override
     public String toString() {
         String txt;
-        txt = base_item.getSymbol() + ": " + df6.format(base_item.getFreeValue());
+        txt = base_item.getSymbol() + ": " + NumberFormatter.df6.format(base_item.getFreeValue());
         if (base_item.getLimitValue().compareTo(BigDecimal.ZERO) > 0) {
-            txt = txt + " / " + df6.format(base_item.getLimitValue());
+            txt = txt + " / " + NumberFormatter.df6.format(base_item.getLimitValue());
         }
         if (base_item.isPairKey()) {
             txt = txt + " ["+symbolPair+"]";
@@ -65,10 +60,10 @@ public class currencyPairItem {
         if (is_changed) {
             
             if (base_item.getInitialValue().compareTo(BigDecimal.ZERO) > 0) {
-                txt = txt + "[Init: " + df6.format(base_item.getInitialValue());
+                txt = txt + "[Init: " + NumberFormatter.df6.format(base_item.getInitialValue());
                 float percent = 100 * (base_item.getValue().floatValue() - base_item.getInitialValue().floatValue()) / base_item.getInitialValue().floatValue();
                 if (Math.abs(percent) > 0.0005) {
-                    txt = txt + " " + (percent >= 0 ? "+" : "") + df3.format(percent) + "%";
+                    txt = txt + " " + (percent >= 0 ? "+" : "") + NumberFormatter.df3.format(percent) + "%";
                 }
                 txt = txt + "]";
             }
@@ -92,17 +87,17 @@ public class currencyPairItem {
             }
             
             if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
-                txt = txt + " [Ord: "+df8.format(last_order_price)+ " " + symbolQuote + "]";
+                txt = txt + " [Ord: "+NumberFormatter.df8.format(last_order_price)+ " " + symbolQuote + "]";
             }
         }
  
         if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
-            txt = txt + " [Cur: "+df8.format(price)+ " " + symbolQuote;
+            txt = txt + " [Cur: "+NumberFormatter.df8.format(price)+ " " + symbolQuote;
             
             if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
                 float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
                 if (Math.abs(percent) > 0.0005) {
-                    txt = txt + " " + (percent >= 0 ? "+" : "") + df3.format(percent) + "%";
+                    txt = txt + " " + (percent >= 0 ? "+" : "") + NumberFormatter.df3.format(percent) + "%";
                 }
             }
             

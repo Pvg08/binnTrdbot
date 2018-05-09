@@ -9,6 +9,7 @@ import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.AssetBalance;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.text.DecimalFormat;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -56,9 +57,6 @@ public class tradeProfitsController {
     private boolean autoPickStrategyParams = false;
 
     private TradingAPIAbstractInterface client = null;
-
-    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static final DecimalFormat df6 = new DecimalFormat("0.######");
 
     public tradeProfitsController(mainApplication _app) {
         app = _app;
@@ -200,7 +198,7 @@ public class tradeProfitsController {
                 return -1;
             }
             if (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) < 0) {
-                app.log("Not enough " + pair.getSymbolQuote() + " to buy " + df6.format(baseAmount) + " " + pair.getSymbolBase() + ". Need " + df6.format(baseAmount.multiply(price)) + " but have " + df6.format(pair.getQuoteItem().getFreeValue()), true, true);
+                app.log("Not enough " + pair.getSymbolQuote() + " to buy " + NumberFormatter.df6.format(baseAmount) + " " + pair.getSymbolBase() + ". Need " + NumberFormatter.df6.format(baseAmount.multiply(price)) + " but have " + NumberFormatter.df6.format(pair.getQuoteItem().getFreeValue()), true, true);
                 SEMAPHORE.release();
                 return -1;
             }
@@ -227,7 +225,7 @@ public class tradeProfitsController {
                             pair.confirmTransaction();
                         BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, true);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
-                            app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
+                            app.log("Real order market price = " + NumberFormatter.df6.format(lastTradePrice), true, true);
                             price = lastTradePrice;
                             pair.setPrice(price);
                             pair.setLastOrderPrice(lastTradePrice);
@@ -291,7 +289,7 @@ public class tradeProfitsController {
                 return -1;
             }
             if (pair.getBaseItem().getFreeValue().compareTo(baseAmount) < 0) {
-                app.log("Not enough " + pair.getSymbolBase() + " to sell (" + df6.format(pair.getBaseItem().getFreeValue()) + " < " + df6.format(baseAmount) + ")", true, true);
+                app.log("Not enough " + pair.getSymbolBase() + " to sell (" + NumberFormatter.df6.format(pair.getBaseItem().getFreeValue()) + " < " + NumberFormatter.df6.format(baseAmount) + ")", true, true);
                 SEMAPHORE.release();
                 return -1;
             }
@@ -325,7 +323,7 @@ public class tradeProfitsController {
                             pair.confirmTransaction();
                         BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, false);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
-                            app.log("Real order market price = " + df6.format(lastTradePrice), true, true);
+                            app.log("Real order market price = " + NumberFormatter.df6.format(lastTradePrice), true, true);
                             price = lastTradePrice;
                             pair.setPrice(price);
                             pair.setLastOrderPrice(lastTradePrice);

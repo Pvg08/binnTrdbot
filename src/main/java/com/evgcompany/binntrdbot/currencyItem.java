@@ -5,8 +5,8 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 
 /**
  *
@@ -20,9 +20,6 @@ public class currencyItem {
     private BigDecimal initial_value = new BigDecimal("-1");
     
     private int orders_count = 0;
-    
-    private static final DecimalFormat df5 = new DecimalFormat("0.#####");
-    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     private boolean pair_key = false;
     private int active_orders = 0;
@@ -52,17 +49,17 @@ public class currencyItem {
     @Override
     public String toString() {
         String txt;
-        txt = getSymbol() + ": " + df6.format(getFreeValue());
+        txt = getSymbol() + ": " + NumberFormatter.df6.format(getFreeValue());
         if (limit_value.compareTo(BigDecimal.ZERO) > 0) {
-            txt = txt + " / " + df6.format(getLimitValue());
+            txt = txt + " / " + NumberFormatter.df6.format(getLimitValue());
         }
         if (getValue().compareTo(initial_value) != 0 /*|| isInOrder() || isInPendingOrder()*/) {
             txt = txt + " (";
             
-            txt = txt + "initially " + df6.format(initial_value);
+            txt = txt + "initially " + NumberFormatter.df6.format(initial_value);
             if (initial_value.compareTo(BigDecimal.ZERO) > 0) {
                 float percent = 100 * (getValue().floatValue() - initial_value.floatValue()) / initial_value.floatValue();
-                txt = txt + "; " + (percent >= 0 ? "+" : "") + df5.format(percent) + "%";
+                txt = txt + "; " + (percent >= 0 ? "+" : "") + NumberFormatter.df5.format(percent) + "%";
             }
             
             /*if (!isPairKey()) {

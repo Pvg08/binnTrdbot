@@ -11,13 +11,13 @@ import com.evgcompany.binntrdbot.analysis.TimeSeriesManagerForIndicator;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.strategies.StrategySignal;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -119,7 +119,6 @@ public class SignalController extends Thread {
     private int preload_count = 200;
     
     private static final DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DecimalFormat df8 = new DecimalFormat("0.#######");
 
     public SignalController() {
         signalsListenerFile = "TGsignalsListener.py";
@@ -360,17 +359,17 @@ public class SignalController extends Thread {
             "Stoploss then done signals: " + stat.stoploss_done_signals + "\n" + 
             "Signals without price1 / price2 / target / stoploss: " + stat.price1_not_set + " / " + stat.price2_not_set + " / " + stat.price_target_not_set + " / " + stat.price_stop_not_set + "\n" + 
             "Done signals (main / fast): " + stat.done_signals + " / " + stat.done_signals_fast + "\n" + 
-            "Done signals avg time (main / fast): " + df8.format(avg_time / 86400000.0) + " / " + df8.format(avg_time_fast / 86400000.0) + " day.\n" + 
-            "Done signals avg percent profit (main / fast): " + df8.format(avg_done_percent) + " / " + df8.format(avg_done_percent_fast) + "%\n" + 
-            "Avg signal profit (main / fast): " + df8.format(avg_percent) + " / " + df8.format(avg_percent_fast) + "%\n" + 
-            "Avg rating: " + df8.format(avg_rating) + "\n" + 
-            "Avg MAX Dip percent: " + df8.format(avg_max_done_dip_percent) + "%\n" + 
-            "Copy avg interval: " + df8.format(avg_copy_diff / 60000) + " min.\n" + 
+            "Done signals avg time (main / fast): " + NumberFormatter.df8.format(avg_time / 86400000.0) + " / " + NumberFormatter.df8.format(avg_time_fast / 86400000.0) + " day.\n" + 
+            "Done signals avg percent profit (main / fast): " + NumberFormatter.df8.format(avg_done_percent) + " / " + NumberFormatter.df8.format(avg_done_percent_fast) + "%\n" + 
+            "Avg signal profit (main / fast): " + NumberFormatter.df8.format(avg_percent) + " / " + NumberFormatter.df8.format(avg_percent_fast) + "%\n" + 
+            "Avg rating: " + NumberFormatter.df8.format(avg_rating) + "\n" + 
+            "Avg MAX Dip percent: " + NumberFormatter.df8.format(avg_max_done_dip_percent) + "%\n" + 
+            "Copy avg interval: " + NumberFormatter.df8.format(avg_copy_diff / 60000) + " min.\n" + 
             "Copy signals: " + stat.copy_signals + "\n" + 
             "Channel copy sources: " + stat.copy_sources + "\n" + 
             "Channel regexp_ids: " + stat.used_regexps + "\n" + 
-            "Average day signal profit: " + df8.format(stat.avg_day_signal_profit) + "%\n" + 
-            "Recommended rating: " + df8.format(stat.recommended_rating) + "\n" + 
+            "Average day signal profit: " + NumberFormatter.df8.format(stat.avg_day_signal_profit) + "%\n" + 
+            "Recommended rating: " + NumberFormatter.df8.format(stat.recommended_rating) + "\n" + 
             "\n"
         );
     }
@@ -643,7 +642,7 @@ public class SignalController extends Thread {
             TradingRecord tradingRecordFastNS = seriesManager.run(strategy_fast_nostop, Order.OrderType.BUY, millis_index, series.getEndIndex());
 
             System.out.println();
-            System.out.println(symbol_pair+" " + datetime + " " + df8.format(price1)+" " + df8.format(price2)+" " + df8.format(price_target)+" " + df8.format(price_stoploss) + "    " + millis_index + "/" + bars.size() + " -- " + bars.get(millis_index).getBeginTime());
+            System.out.println(symbol_pair + " " + datetime + " " + NumberFormatter.df8.format(price1)+" " + NumberFormatter.df8.format(price2) + " " + NumberFormatter.df8.format(price_target) + " " + NumberFormatter.df8.format(price_stoploss) + "    " + millis_index + "/" + bars.size() + " -- " + bars.get(millis_index).getBeginTime());
             
             if (millis_index < series.getEndIndex()) {
                 if (tradingRecordMain.getLastEntry() != null && tradingRecordMain.getLastExit() == null) {
@@ -687,13 +686,13 @@ public class SignalController extends Thread {
             double maxdip_fastNS = maxDipCriterion.calculate(series, tradingRecordFastNS);
             
             System.out.println(tradingRecordMain.getTrades());
-            System.out.println("M   Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount() + "    Maxdip:" + df8.format(maxdip_main)+"%");
+            System.out.println("M   Profit:" + profit_main + "   Bars:" + barscnt_main + "   Trades:" + tradingRecordMain.getTradeCount() + "    Maxdip:" + NumberFormatter.df8.format(maxdip_main)+"%");
             System.out.println(tradingRecordMainNS.getTrades());
-            System.out.println("MNS Profit:" + profit_mainNS + "   Bars:" + barscnt_mainNS + "   Trades:" + tradingRecordMainNS.getTradeCount() + "    Maxdip:" + df8.format(maxdip_mainNS)+"%");
+            System.out.println("MNS Profit:" + profit_mainNS + "   Bars:" + barscnt_mainNS + "   Trades:" + tradingRecordMainNS.getTradeCount() + "    Maxdip:" + NumberFormatter.df8.format(maxdip_mainNS)+"%");
             System.out.println(tradingRecordFast.getTrades());
-            System.out.println("F   Profit:" + profit_fast + "   Bars:" + barscnt_fast + "   Trades:" + tradingRecordFast.getTradeCount() + "    Maxdip:" + df8.format(maxdip_fast)+"%");
+            System.out.println("F   Profit:" + profit_fast + "   Bars:" + barscnt_fast + "   Trades:" + tradingRecordFast.getTradeCount() + "    Maxdip:" + NumberFormatter.df8.format(maxdip_fast)+"%");
             System.out.println(tradingRecordFastNS.getTrades());
-            System.out.println("NS  Profit:" + profit_fastNS + "   Bars:" + barscnt_fastNS + "   Trades:" + tradingRecordFastNS.getTradeCount() + "    Maxdip:" + df8.format(maxdip_fastNS)+"%");
+            System.out.println("NS  Profit:" + profit_fastNS + "   Bars:" + barscnt_fastNS + "   Trades:" + tradingRecordFastNS.getTradeCount() + "    Maxdip:" + NumberFormatter.df8.format(maxdip_fastNS)+"%");
             System.out.println();
             
             is_waiting_enter = tradingRecordMain.getTradeCount() == 0;
@@ -774,10 +773,10 @@ public class SignalController extends Thread {
             + symbol_pair + " from " 
             + datetime.format(df) + " (channel = '"+title+"') " 
             + "rating = " + rating + "; "
-            + df8.format(price1) + " - " 
-            + df8.format(price2) + " ===> " 
-            + df8.format(price_target)
-            + "; Stoploss: " + df8.format(price_stoploss) + " : "
+            + NumberFormatter.df8.format(price1) + " - " 
+            + NumberFormatter.df8.format(price2) + " ===> " 
+            + NumberFormatter.df8.format(price_target)
+            + "; Stoploss: " + NumberFormatter.df8.format(price_stoploss) + " : "
             + (is_done ? "DONE " : " ")
             + (is_stop_loss ? "STOP " : " ")
             + (is_timeout ? "TIMEOUT " : "")

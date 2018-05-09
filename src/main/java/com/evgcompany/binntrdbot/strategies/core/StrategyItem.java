@@ -10,9 +10,9 @@ import com.evgcompany.binntrdbot.analysis.StrategyConfig;
 import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
 import com.evgcompany.binntrdbot.analysis.TrailingStopLossRule;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.tradeProfitsController;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -41,8 +41,6 @@ public abstract class StrategyItem {
     protected tradeProfitsController profitsChecker = null;
     protected StrategiesController controller = null;
     protected StrategyConfig config = null;
-    
-    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     public StrategyItem(StrategiesController controller) {
         this.controller = controller;
@@ -81,7 +79,7 @@ public abstract class StrategyItem {
             config.resetParams();
             if (max_index >= 0) {
                 config.setParams(variants.get(max_index));
-                mainApplication.getInstance().log("Optimal params for " + StrategyName + " is: " + StrategyConfig.ConfigRowToStr(variants.get(max_index)) + " ::: profit = " + df6.format(max_profit));
+                mainApplication.getInstance().log("Optimal params for " + StrategyName + " is: " + StrategyConfig.ConfigRowToStr(variants.get(max_index)) + " ::: profit = " + NumberFormatter.df6.format(max_profit));
             }
         }
         

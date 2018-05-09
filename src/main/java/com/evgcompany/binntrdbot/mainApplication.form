@@ -35,7 +35,7 @@
                   </Group>
                   <Group type="102" attributes="0">
                       <Group type="103" groupAlignment="0" attributes="0">
-                          <Component id="jScrollPane1" alignment="0" pref="268" max="32767" attributes="0"/>
+                          <Component id="jScrollPane1" alignment="0" max="32767" attributes="0"/>
                           <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="jLabel6" alignment="0" min="-2" max="-2" attributes="0"/>
@@ -74,7 +74,7 @@
                               <EmptySpace max="-2" attributes="0"/>
                               <Component id="buttonSetPairs" min="-2" max="-2" attributes="0"/>
                           </Group>
-                          <Component id="jTabbedPane2" max="32767" attributes="0"/>
+                          <Component id="jTabbedPane2" pref="536" max="32767" attributes="0"/>
                           <Component id="jScrollPane3" max="32767" attributes="0"/>
                           <Component id="jScrollPane4" max="32767" attributes="0"/>
                           <Group type="102" alignment="0" attributes="0">
@@ -538,7 +538,7 @@
                               <EmptySpace min="-2" pref="11" max="-2" attributes="0"/>
                           </Group>
                       </Group>
-                      <EmptySpace pref="12" max="32767" attributes="0"/>
+                      <EmptySpace pref="26" max="32767" attributes="0"/>
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="103" alignment="1" groupAlignment="0" attributes="0">
                               <Component id="jLabel9" alignment="0" min="-2" max="-2" attributes="0"/>
@@ -779,7 +779,7 @@
                               </Group>
                           </Group>
                       </Group>
-                      <EmptySpace pref="66" max="32767" attributes="0"/>
+                      <EmptySpace pref="80" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1058,7 +1058,7 @@
                                       </Group>
                                   </Group>
                               </Group>
-                              <EmptySpace pref="87" max="32767" attributes="0"/>
+                              <EmptySpace pref="94" max="32767" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="jLabel32" min="-2" max="-2" attributes="0"/>
@@ -1084,7 +1084,7 @@
                               </Group>
                           </Group>
                       </Group>
-                      <EmptySpace min="0" pref="10" max="32767" attributes="0"/>
+                      <EmptySpace min="0" pref="17" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1350,7 +1350,7 @@
                               </Group>
                           </Group>
                       </Group>
-                      <EmptySpace pref="63" max="32767" attributes="0"/>
+                      <EmptySpace pref="77" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1489,6 +1489,43 @@
             </Component>
           </SubComponents>
         </Container>
+        <Container class="javax.swing.JPanel" name="jPanel7">
+          <Constraints>
+            <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
+              <JTabbedPaneConstraints tabName="Waves">
+                <Property name="tabTitle" type="java.lang.String" value="Waves"/>
+              </JTabbedPaneConstraints>
+            </Constraint>
+          </Constraints>
+
+          <Layout>
+            <DimensionLayout dim="0">
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Group type="102" alignment="0" attributes="0">
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="checkBoxWavesUse" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace pref="362" max="32767" attributes="0"/>
+                  </Group>
+              </Group>
+            </DimensionLayout>
+            <DimensionLayout dim="1">
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Group type="102" alignment="0" attributes="0">
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Component id="checkBoxWavesUse" min="-2" max="-2" attributes="0"/>
+                      <EmptySpace pref="227" max="32767" attributes="0"/>
+                  </Group>
+              </Group>
+            </DimensionLayout>
+          </Layout>
+          <SubComponents>
+            <Component class="javax.swing.JCheckBox" name="checkBoxWavesUse">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Use waves for all pair trades"/>
+              </Properties>
+            </Component>
+          </SubComponents>
+        </Container>
         <Container class="javax.swing.JPanel" name="jPanel6">
           <Properties>
             <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
@@ -1543,7 +1580,7 @@
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Group type="102" alignment="1" attributes="0">
                                       <Component id="spinnerCycleAbortTime" min="-2" pref="70" max="-2" attributes="0"/>
-                                      <EmptySpace pref="87" max="32767" attributes="0"/>
+                                      <EmptySpace pref="101" max="32767" attributes="0"/>
                                       <Component id="jLabel35" min="-2" max="-2" attributes="0"/>
                                       <EmptySpace max="-2" attributes="0"/>
                                       <Component id="spinnerCycleMaxCoinRank" min="-2" pref="67" max="-2" attributes="0"/>
@@ -1887,7 +1924,7 @@
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" alignment="0" attributes="0">
                       <EmptySpace max="-2" attributes="0"/>
-                      <Component id="jScrollPane6" pref="495" max="32767" attributes="0"/>
+                      <Component id="jScrollPane6" pref="509" max="32767" attributes="0"/>
                       <EmptySpace max="-2" attributes="0"/>
                   </Group>
               </Group>
@@ -1915,7 +1952,7 @@
                     <Property name="columns" type="int" value="20"/>
                     <Property name="lineWrap" type="boolean" value="true"/>
                     <Property name="rows" type="int" value="5"/>
-                    <Property name="text" type="java.lang.String" value="Modifiers:&#xa;Buy for best price: -&#xa;Sell free ordered (or opened orders if no free): +&#xa;Sell all (free + opened orders): ++"/>
+                    <Property name="text" type="java.lang.String" value="Modifiers:&#xa;Buy for best price: -&#xa;Sell free ordered (or opened orders if no free): +&#xa;Sell all (free + opened orders): ++&#xa;Force waves mode: ~"/>
                     <Property name="wrapStyleWord" type="boolean" value="true"/>
                   </Properties>
                 </Component>

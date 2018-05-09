@@ -7,11 +7,11 @@ package com.evgcompany.binntrdbot.strategies.core;
 
 import com.evgcompany.binntrdbot.analysis.*;
 import com.evgcompany.binntrdbot.mainApplication;
+import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.*;
 import com.evgcompany.binntrdbot.tradeProfitsController;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -55,8 +55,6 @@ public class StrategiesController {
     private String groupName;
     private final List<StrategyMarker> markers = new ArrayList<>();
     private TradingRecord tradingRecord = null;
-    
-    private static final DecimalFormat df6 = new DecimalFormat("0.######");
     
     public StrategiesController(String groupName, mainApplication app, tradeProfitsController profitsChecker) {
         this.groupName = groupName;
@@ -400,7 +398,7 @@ public class StrategiesController {
                 Strategy strategy = strategies.get(strategy_key);
                 TradingRecord tradingRecordC = sliceManager.run(strategy);
                 double profit = profitCriterion.calculate(slice, tradingRecordC);
-                log += "    Profit wo comission for " + strategy_key + ": " + df6.format(profit) + "\n";
+                log += "    Profit wo comission for " + strategy_key + ": " + NumberFormatter.df6.format(profit) + "\n";
             }
             Strategy bestStrategy = profitCriterion.chooseBest(sliceManager, pick_list);
             String bestStrategyName = getStrategyName(bestStrategy, result);
@@ -424,7 +422,7 @@ public class StrategiesController {
         if (subseries.size() > 1) {
             log += "\nSummary ("+subseries.size()+" slices):\n";
             for (Map.Entry<String, Double> entry : successMap.entrySet()) {
-                log += "    Wins count for " + entry.getKey() + ": " + df6.format(entry.getValue()) + "\n";
+                log += "    Wins count for " + entry.getKey() + ": " + NumberFormatter.df6.format(entry.getValue()) + "\n";
             }
             log += "\t--> Summ Best strategy: " + result + "\n\n";
         }
