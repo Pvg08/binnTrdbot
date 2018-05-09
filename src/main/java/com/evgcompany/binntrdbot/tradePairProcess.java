@@ -548,6 +548,7 @@ public class tradePairProcess extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         stopSockets();
+        info.stopDepthCheckForPair(symbol);
         app.log("");
         app.log("thread for " + symbol + " is stopped...");
     }

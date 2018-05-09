@@ -350,6 +350,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             for(int i=hour_ago_index; i<=last_index; i++) {
                 curr.hour_volume += bars_h.get(i).getVolume().floatValue();
             }
+            curr.hour_volume_base = (float) coinInfo.convertSumm(curr.symbolBase, curr.hour_volume, coinInfo.getBaseCoin());
             BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
             TradingAPIAbstractInterface.addSeriesBars(series, bars_h);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -366,6 +367,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             for(int i=0; i<bars_d.size(); i++) {
                 curr.day_volume += bars_d.get(i).getVolume().floatValue();
             }
+            curr.day_volume_base = (float) coinInfo.convertSumm(curr.symbolBase, curr.day_volume, coinInfo.getBaseCoin());
             BaseTimeSeries series = new BaseTimeSeries(curr.symbol + "_SERIES");
             TradingAPIAbstractInterface.addSeriesBars(series, bars_d);
             ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
@@ -524,8 +526,8 @@ public class CoinRatingController extends PeriodicProcessThread {
         curr.calculateRating();
         
         mainApplication.getInstance().log("Volatility = " + df3p.format(curr.volatility));
-        mainApplication.getInstance().log("Hour volume = " + df8.format(curr.hour_volume) + " (" + df8.format(getPairBaseHourVolume(curr.symbol)) + " " + coinInfo.getBaseCoin() + ")");
-        mainApplication.getInstance().log("Day volume = " + df8.format(curr.day_volume));
+        mainApplication.getInstance().log("Hour volume = " + df8.format(curr.hour_volume) + " " + curr.symbolQuote + " (" + df8.format(curr.hour_volume_base) + " " + coinInfo.getBaseCoin() + ")");
+        mainApplication.getInstance().log("Day volume = " + df8.format(curr.day_volume) + " " + curr.symbolQuote + " (" + df8.format(curr.day_volume_base) + " " + coinInfo.getBaseCoin() + ")");
         mainApplication.getInstance().log("Hour change percent = " + df3p.format(curr.percent_hour));
         mainApplication.getInstance().log("Day change percent = " + df3p.format(curr.percent_day));
         mainApplication.getInstance().log("Rating = " + df3.format(curr.rating));
@@ -581,7 +583,10 @@ public class CoinRatingController extends PeriodicProcessThread {
                     entry.getValue().sort = (float) entry.getValue().base_rating.market_cap;
                     break;
                 case CR_VOLUME_HOUR:
-                    entry.getValue().sort = (float) entry.getValue().hour_volume;
+                    entry.getValue().sort = (float) entry.getValue().hour_volume_base;
+                    break;
+                case CR_VOLUME_DAY:
+                    entry.getValue().sort = (float) entry.getValue().day_volume_base;
                     break;
                 case CR_PROGSTART_PRICEUP:
                     entry.getValue().sort = (float) entry.getValue().percent_from_begin;
@@ -635,7 +640,10 @@ public class CoinRatingController extends PeriodicProcessThread {
                         text += df3.format(curr.base_rating.market_cap);
                         break;
                     case CR_VOLUME_HOUR:
-                        text += df8.format(curr.hour_volume);
+                        text += df8.format(curr.hour_volume_base);
+                        break;
+                    case CR_VOLUME_DAY:
+                        text += df8.format(curr.day_volume_base);
                         break;
                     case CR_PROGSTART_PRICEUP:
                         text += df3p.format(curr.percent_from_begin);
@@ -713,8 +721,8 @@ public class CoinRatingController extends PeriodicProcessThread {
         return 0;
     }
     public float getPairBaseHourVolume(String pair) {
-        if (coinPairRatingMap.containsKey(pair) && coinInfo.getCoinPairs().containsKey(pair)) {
-            return (float) coinInfo.convertSumm(coinInfo.getCoinPairs().get(pair)[0], coinPairRatingMap.get(pair).hour_volume, coinInfo.getBaseCoin());
+        if (coinPairRatingMap.containsKey(pair)) {
+            return (float) coinPairRatingMap.get(pair).hour_volume_base;
         }
         return 0;
     }

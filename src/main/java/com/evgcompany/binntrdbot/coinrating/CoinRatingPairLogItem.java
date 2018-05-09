@@ -28,7 +28,9 @@ public class CoinRatingPairLogItem implements java.io.Serializable {
     public Float current_price = 0f;
 
     public Float hour_volume = 0f;
+    public Float hour_volume_base = 0f;
     public Float day_volume = 0f;
+    public Float day_volume_base = 0f;
     public Float volatility = 0f;
     
     public Float signal_rating = 0f;

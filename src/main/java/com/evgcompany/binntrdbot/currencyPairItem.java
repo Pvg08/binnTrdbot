@@ -61,7 +61,7 @@ public class currencyPairItem {
             txt = txt + " ["+symbolPair+"]";
         }
         txt = txt + "  ";
-        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || in_order_buy_sell_cycle || order_pending;
+        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || in_order_buy_sell_cycle || order_pending || !marker.isEmpty();
         if (is_changed) {
             
             if (base_item.getInitialValue().compareTo(BigDecimal.ZERO) > 0) {

@@ -1508,7 +1508,7 @@
           <Layout>
             <DimensionLayout dim="0">
               <Group type="103" groupAlignment="0" attributes="0">
-                  <Group type="102" attributes="0">
+                  <Group type="102" alignment="1" attributes="0">
                       <Group type="103" groupAlignment="1" attributes="0">
                           <Group type="102" alignment="1" attributes="0">
                               <EmptySpace max="-2" attributes="0"/>
@@ -1576,8 +1576,11 @@
                               </Group>
                           </Group>
                           <Group type="102" alignment="1" attributes="0">
-                              <EmptySpace min="-2" pref="23" max="-2" attributes="0"/>
-                              <Component id="checkBoxUseCycles" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace min="-2" pref="19" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Component id="checkBoxUseCycles" min="-2" max="-2" attributes="0"/>
+                                  <Component id="checkBoxCycleDepthCheck" min="-2" max="-2" attributes="0"/>
+                              </Group>
                               <EmptySpace max="32767" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Component id="jLabel39" min="-2" max="-2" attributes="0"/>
@@ -1602,14 +1605,17 @@
             <DimensionLayout dim="1">
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" alignment="0" attributes="0">
-                      <EmptySpace min="-2" pref="17" max="-2" attributes="0"/>
+                      <EmptySpace min="-2" pref="13" max="-2" attributes="0"/>
                       <Group type="103" groupAlignment="1" attributes="0">
                           <Group type="102" attributes="0">
-                              <Component id="jLabel39" min="-2" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="3" attributes="0">
+                                  <Component id="jLabel39" alignment="3" min="-2" max="-2" attributes="0"/>
+                                  <Component id="checkBoxUseCycles" alignment="3" min="-2" max="-2" attributes="0"/>
+                              </Group>
                               <EmptySpace max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="3" attributes="0">
                                   <Component id="textFieldCycleMainCoins" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  <Component id="checkBoxUseCycles" alignment="3" min="-2" max="-2" attributes="0"/>
+                                  <Component id="checkBoxCycleDepthCheck" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                           <Group type="102" attributes="0">
@@ -1676,7 +1682,7 @@
                               <Component id="spinnerCycleMaxEnterCount" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                       </Group>
-                      <EmptySpace pref="54" max="32767" attributes="0"/>
+                      <EmptySpace pref="53" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1853,6 +1859,11 @@
                 </Property>
               </Properties>
             </Component>
+            <Component class="javax.swing.JCheckBox" name="checkBoxCycleDepthCheck">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Depth checking"/>
+              </Properties>
+            </Component>
           </SubComponents>
         </Container>
         <Container class="javax.swing.JPanel" name="jPanel3">
@@ -1943,21 +1954,22 @@
     <Component class="javax.swing.JComboBox" name="comboBoxRatingSortby">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="14">
+          <StringArray count="15">
             <StringItem index="0" value="Rank"/>
             <StringItem index="1" value="Market cap"/>
-            <StringItem index="2" value="Hour Volume"/>
-            <StringItem index="3" value="% from prog start"/>
-            <StringItem index="4" value="% last hour"/>
-            <StringItem index="5" value="% 24hr"/>
-            <StringItem index="6" value="Events count"/>
-            <StringItem index="7" value="Last event anno date"/>
-            <StringItem index="8" value="Volatility"/>
-            <StringItem index="9" value="Strategies to enter value"/>
-            <StringItem index="10" value="Strategies to exit value"/>
-            <StringItem index="11" value="Strategies value"/>
-            <StringItem index="12" value="Signals rating"/>
-            <StringItem index="13" value="Calculated rating"/>
+            <StringItem index="2" value="Hour Volume in Base Currency"/>
+            <StringItem index="3" value="Day Volume in Base Currency"/>
+            <StringItem index="4" value="% from prog start"/>
+            <StringItem index="5" value="% last hour"/>
+            <StringItem index="6" value="% 24hr"/>
+            <StringItem index="7" value="Events count"/>
+            <StringItem index="8" value="Last event anno date"/>
+            <StringItem index="9" value="Volatility"/>
+            <StringItem index="10" value="Strategies to enter value"/>
+            <StringItem index="11" value="Strategies to exit value"/>
+            <StringItem index="12" value="Strategies value"/>
+            <StringItem index="13" value="Signals rating"/>
+            <StringItem index="14" value="Calculated rating"/>
           </StringArray>
         </Property>
       </Properties>

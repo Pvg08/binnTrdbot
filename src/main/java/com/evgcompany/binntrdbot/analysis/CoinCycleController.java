@@ -10,6 +10,7 @@ import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingPairLogItem;
+import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.tradeCycleProcess;
 import com.evgcompany.binntrdbot.tradePairProcessController;
@@ -17,14 +18,15 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.KShortestPaths;
-import org.jgrapht.graph.DefaultDirectedWeightedGraph;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 /**
@@ -61,6 +63,15 @@ public class CoinCycleController extends PeriodicProcessThread {
     
     private int minCycleLength = 2;
     private int maxCycleLength = 5;
+    
+    private boolean useDepsetUpdates = true;
+    private double maxPairVolumeForUsingDepsets = 10;
+    private int depsetSizeLimit = 60;
+    
+    private long lastDepsetSetMillis = 0;
+    private long depsetUpdateTime = 25 * 60;
+    
+    private double depsetBidAskAddPercent = 0.1;
 
     public CoinCycleController(TradingAPIAbstractInterface client, CoinRatingController coinRatingController) {
         this.client = client;
@@ -172,16 +183,64 @@ public class CoinCycleController extends PeriodicProcessThread {
         return bd.doubleValue();
     }
 
-    private double getCycleWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle, int from, double start_weight) {
+    public double getEdgeWeight(String symbol1, String symbol2) {
+        if (useDepsetUpdates) {
+            DepthCacheProcess proc = info.getDepthProcessForPair(symbol1 + symbol2);
+            if (proc != null) { // selling
+                Map.Entry<BigDecimal, BigDecimal> ask = proc.getBestAsk();
+                if (ask != null) return ask.getKey().doubleValue() * (1-depsetBidAskAddPercent*0.01);
+            } else {
+                proc = info.getDepthProcessForPair(symbol2 + symbol1);
+                if (proc != null) { // buying
+                    Map.Entry<BigDecimal, BigDecimal> bid = proc.getBestBid();
+                    if (bid != null) return 1/bid.getKey().doubleValue() * (1+depsetBidAskAddPercent*0.01);
+                }
+            }
+        }
+        /*if (proc != null) {
+            if (isBuy) {
+                Map.Entry<BigDecimal, BigDecimal> bid = proc.getBestBid();
+                if (bid != null) {
+                    System.out.println(bid.getKey() + " / " + info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol1, symbol2)));
+                    return bid.getKey().doubleValue();
+                }
+            } else {
+                Map.Entry<BigDecimal, BigDecimal> ask = proc.getBestAsk();
+                if (ask != null) {
+                    System.out.println(ask.getKey() + " / " + info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol1, symbol2)));
+                    return ask.getKey().doubleValue();
+                }
+            }
+        } else {
+            proc = info.getDepthProcessForPair(symbol2 + symbol1);
+            if (proc != null) {
+                if (isBuy) {
+                    Map.Entry<BigDecimal, BigDecimal> bid = proc.getBestBid();
+                    if (bid != null) {
+                        System.out.println(bid.getKey() + " / " + info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol2, symbol1)));
+                        return 1/bid.getKey().doubleValue();
+                    }
+                } else {
+                    Map.Entry<BigDecimal, BigDecimal> ask = proc.getBestAsk();
+                    if (ask != null) {
+                        System.out.println(ask.getKey() + " / " + info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol2, symbol1)));
+                        return 1/ask.getKey().doubleValue();
+                    }
+                }
+            }
+        }*/
+        return info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol1, symbol2));
+    }
+    private double getCycleWeight(List<String> cycle, int from, double start_weight) {
         double totalWeight = start_weight;
         for(int i = from; i < cycle.size(); i++){
-            double weight = graph.getEdgeWeight(graph.getEdge(cycle.get(i-1), cycle.get(i)));
+            double weight = getEdgeWeight(cycle.get(i-1), cycle.get(i));
             totalWeight *= weight * ((100.0-comissionPercent) / 100.0);
         }
         return totalWeight;
     }
-    private double getCycleWeight(DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph, List<String> cycle) {
-        return getCycleWeight(graph, cycle, 1, 1);
+    private double getCycleWeight(List<String> cycle) {
+        return getCycleWeight(cycle, 1, 1);
     }
 
     private List<List<String>> getAllCycles(String baseCoin) {
@@ -218,58 +277,72 @@ public class CoinCycleController extends PeriodicProcessThread {
         return getAllValidCycles(cycles, null);
     }
     
+    private double getCycleRating(List<String> cycle) {
+        double rating = 1;
+        int csize = cycle.size();
+        if (csize <= 4) rating*=1.3;
+        if (csize == 5) rating*=1.15;
+        if (csize == 6) rating*=1.05;
+
+        if (coinRatingController.isAnalyzer()) {
+            
+            double mult_strat = Math.pow(3, 1.0/csize);
+            double mult_depth = Math.pow(3, 1.0/csize);
+            
+            for(int i = 1; i < csize; i++){
+                String coin1 = cycle.get(i-1);
+                String coin2 = cycle.get(i);
+                String pair = "";
+                boolean isBuy = false;
+                if (info.getPairsGraph().containsEdge(coin1, coin2)) {
+                    pair = coin1 + coin2;
+                    isBuy = false;
+                } else if (info.getPairsGraph().containsEdge(coin2, coin1)) {
+                    pair = coin2 + coin1;
+                    isBuy = true;
+                } else {
+                    rating = 0;
+                }
+                if (!pair.isEmpty()) {
+                    if (info.getDepthProcessForPair(pair) != null) {
+                        rating *= mult_depth;
+                    }
+                    CoinRatingPairLogItem logitem = coinRatingController.getCoinPairRatingMap().get(pair);
+                    if (logitem != null) {
+                        rating *= Math.pow(logitem.rating, 0.05/csize);
+                        if (isBuy) {
+                            if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 3)) {
+                                rating *= mult_strat;
+                            } else if ((logitem.strategies_shouldexit_rate + 3) < logitem.strategies_shouldenter_rate) {
+                                rating *= 1/mult_strat;
+                            }
+                        } else {
+                            if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 3)) {
+                                rating *= 1/mult_strat;
+                            } else if ((logitem.strategies_shouldexit_rate + 3) < logitem.strategies_shouldenter_rate) {
+                                rating *= mult_strat;
+                            }
+                        }
+                    } else {
+                        rating = 0;
+                    }
+                }
+            }
+            System.out.println("Cycle " + cycle + " rating = " + rating);
+        }
+
+        return rating;
+    }
+    
     private List<String> getBestCycleFromList(List<List<String>> valid_cycles, List<String> pre_cycle, double pre_weight) {
         List<String> best_cycle = null;
         double min_weight = 1 + 0.01*minProfitPercent;
         double max_rating = Double.MIN_VALUE;
         for(List<String> cycle : valid_cycles) {
-            double weight = round(getCycleWeight(info.getPricesGraph(), cycle, pre_cycle != null ? pre_cycle.size() : 1, pre_weight), 4);
+            double weight = round(getCycleWeight(cycle, pre_cycle != null ? pre_cycle.size() : 1, pre_weight), 4);
             if (weight > min_weight) {
-                double rating = Math.pow(weight, 3) * (999.5 + Math.random()) * 0.001;
-                if (cycle.size() <= 4) rating*=1.1;
-                if (cycle.size() == 5) rating*=1.05;
-                if (cycle.size() == 6) rating*=1.025;
-                
-                if (coinRatingController.isAnalyzer()) {
-                    for(int i = 1; i < cycle.size(); i++){
-                        String coin1 = cycle.get(i-1);
-                        String coin2 = cycle.get(i);
-                        String pair = "";
-                        boolean isBuy = false;
-                        if (info.getPairsGraph().containsEdge(coin1, coin2)) {
-                            pair = coin1 + coin2;
-                            isBuy = false;
-                        } else if (info.getPairsGraph().containsEdge(coin2, coin1)) {
-                            pair = coin2 + coin1;
-                            isBuy = true;
-                        } else {
-                            rating = 0;
-                        }
-                        if (!pair.isEmpty()) {
-                            CoinRatingPairLogItem logitem = coinRatingController.getCoinPairRatingMap().get(pair);
-                            if (logitem != null) {
-                                rating *= Math.pow(logitem.rating, 0.05);
-                                if (isBuy) {
-                                    if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 3)) {
-                                        rating *= Math.sqrt(2);
-                                    } else if ((logitem.strategies_shouldexit_rate + 3) < logitem.strategies_shouldenter_rate) {
-                                        rating *= Math.sqrt(0.5);
-                                    }
-                                } else {
-                                    if (logitem.strategies_shouldexit_rate > (logitem.strategies_shouldenter_rate + 3)) {
-                                        rating *= Math.sqrt(0.5);
-                                    } else if ((logitem.strategies_shouldexit_rate + 3) < logitem.strategies_shouldenter_rate) {
-                                        rating *= Math.sqrt(2);
-                                    }
-                                }
-                            } else {
-                                rating = 0;
-                            }
-                        }
-                    }
-                    System.out.println("Cycle " + cycle + " rating = " + rating);
-                }
-                
+                double rating = Math.pow(weight, 5) * (999.5 + Math.random()) * 0.001;
+                rating *= getCycleRating(cycle);
                 if (rating > max_rating) {
                     max_rating = rating;
                     best_cycle = cycle;
@@ -300,12 +373,51 @@ public class CoinCycleController extends PeriodicProcessThread {
         return getBestCycleFromList(cycles, pre_cycle, pre_weight);
     }
     
+    private Set<String> getPairsToDepthCheck(int limitValue) {
+        List<List<String>> cycles = getAllCycles();
+        cycles = getAllValidCycles(cycles);
+        Set<String> result = new HashSet<>();
+        Map<String, Integer> pairs_usage = new HashMap<>();
+        int max_usage = -1;
+        for(List<String> cycle : cycles) {
+            for(int i = 1; i < cycle.size(); i++){
+                String coin1 = cycle.get(i-1);
+                String coin2 = cycle.get(i);
+                String pair = "";
+                if (info.getPairsGraph().containsEdge(coin1, coin2)) {
+                    pair = coin1 + coin2;
+                } else if (info.getPairsGraph().containsEdge(coin2, coin1)) {
+                    pair = coin2 + coin1;
+                }
+                if (coinRatingController.isAnalyzer()) {
+                    double coinPairVolume = coinRatingController.getPairBaseHourVolume(pair);
+                    if (coinPairVolume > maxPairVolumeForUsingDepsets) {
+                        pair = "";
+                    }
+                }
+                if (!pair.isEmpty()) {
+                    pairs_usage.put(pair, pairs_usage.getOrDefault(pair, 0) + 1);
+                    if (pairs_usage.get(pair) > max_usage) {
+                        max_usage = pairs_usage.get(pair);
+                    }
+                }
+            }
+        }
+        pairs_usage.entrySet().stream()
+        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()) 
+        .limit(limitValue) 
+        .forEach((val) -> {
+            result.add(val.getKey());
+        });
+        return result;
+    }
+    
     private void checkEnterCycles() {
         try {
             info.getSemaphore().acquire();
             List<String> best_cycle = getBestCyclesForEnter();
             if (best_cycle != null) {
-                double best_profit = round(getCycleWeight(info.getPricesGraph(), best_cycle), 4);
+                double best_profit = round(getCycleWeight(best_cycle), 4);
                 if (best_profit < 1 + 0.01*minProfitPercent) {
                     mainApplication.getInstance().log("", true, false);
                     mainApplication.getInstance().log("Found cycle: " + best_cycle + " but recheck failed!", true, true);
@@ -315,7 +427,7 @@ public class CoinCycleController extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Cycle description: " + getCycleDescription(best_cycle), true, false);
                     mainApplication.getInstance().log("Profit: " + best_profit, true, false);
                     tradeCycleProcess cycleProcess = new tradeCycleProcess(this);
-                    cycleProcess.setDelayTime(5);
+                    cycleProcess.setDelayTime(1);
                     cycleProcess.setProfitAim(best_profit);
                     cycleProcess.addCycleToCycleChain(best_cycle);
                     cycleProcess.setCycleIndex(cycleProcesses.size()+1);
@@ -342,6 +454,24 @@ public class CoinCycleController extends PeriodicProcessThread {
         }
     }
     
+    private void updateDepSet() {
+        if (!useDepsetUpdates) {
+            return;
+        }
+        if ((System.currentTimeMillis() - lastDepsetSetMillis) < depsetUpdateTime * 1000) {
+            return;
+        }
+        lastDepsetSetMillis = System.currentTimeMillis();
+        Set<String> depset = getPairsToDepthCheck(depsetSizeLimit);
+        if (depset != null) {
+            mainApplication.getInstance().log("Updating depset...");
+            mainApplication.getInstance().log("Current set: " + depset);
+            info.setDepthCheckForPairSet(depset);
+            mainApplication.getInstance().log("Waiting for collect data...");
+            doWait(180000);
+        }
+    }
+    
     @Override
     protected void runStart() {
         mainApplication.getInstance().log("Cycle thread starting...");
@@ -362,6 +492,7 @@ public class CoinCycleController extends PeriodicProcessThread {
                 coinRatingController.isHaveAllCoinsPairsInfo()
             )
         ) {
+            updateDepSet();
             checkEnterCycles();
         }
     }
@@ -485,7 +616,7 @@ public class CoinCycleController extends PeriodicProcessThread {
             info.getSemaphore().acquire();
             List<String> cycle = getBestCyclesForEnter(pre_cycle, pre_weight);
             if (cycle != null && !cycle.isEmpty()) {
-                double new_weight = this.getCycleWeight(info.getPricesGraph(), cycle, pre_cycle.size(), pre_weight);
+                double new_weight = getCycleWeight(cycle, pre_cycle.size(), pre_weight);
                 if (new_weight < 1 + 0.01*minProfitPercent) {
                     mainApplication.getInstance().log("", true, false);
                     mainApplication.getInstance().log("Found cycle: " + cycle + " but recheck failed!", true, true);
@@ -709,5 +840,19 @@ public class CoinCycleController extends PeriodicProcessThread {
      */
     public void setMaxCycleLength(int maxCycleLength) {
         this.maxCycleLength = maxCycleLength;
+    }
+
+    /**
+     * @return the useDepsetUpdates
+     */
+    public boolean isUseDepsetUpdates() {
+        return useDepsetUpdates;
+    }
+
+    /**
+     * @param useDepsetUpdates the useDepsetUpdates to set
+     */
+    public void setUseDepsetUpdates(boolean useDepsetUpdates) {
+        this.useDepsetUpdates = useDepsetUpdates;
     }
 }

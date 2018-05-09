@@ -70,7 +70,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     private long pricesUpdateTimeMillis = 0;
     private long coinsUpdateTimeMillis = 0;
     
-    private DepthCacheProcess depthProc = null;
+    private final Map<String, DepthCacheProcess> depthProcesses = new HashMap<>();
     
     private CoinInfoAggregator() {
         delayTime = 30;
@@ -105,10 +105,33 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     }
     
     public void startDepthCheckForPair(String pair) {
-        if (depthProc != null) {
-            depthProc.stopDepthEventStreaming();
+        if (depthProcesses.containsKey(pair)) {
+            if (depthProcesses.get(pair).isStopped()) {
+                depthProcesses.get(pair).startProcess();
+            }
+        } else {
+            DepthCacheProcess newproc = new DepthCacheProcess(pair);
+            newproc.startProcess();
+            depthProcesses.put(pair, newproc);
         }
-        depthProc = new DepthCacheProcess(pair);
+    }
+    public void stopDepthCheckForPair(String pair) {
+        if (depthProcesses.containsKey(pair) && !depthProcesses.get(pair).isStopped()) {
+            depthProcesses.get(pair).stopProcess();
+        }
+    }
+    public DepthCacheProcess getDepthProcessForPair(String pair) {
+        return depthProcesses.get(pair);
+    }
+    public void setDepthCheckForPairSet(Set<String> pairs) {
+        depthProcesses.forEach((pair, depthProcess) -> {
+            if (!pairs.contains(pair)) {
+                stopDepthCheckForPair(pair);
+            }
+        });
+        pairs.forEach((pair) -> {
+            startDepthCheckForPair(pair);
+        });
     }
     
     public void saveToFile(String fname) {
@@ -478,6 +501,9 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     protected void runFinish() {
         mainApplication.getInstance().log("Stopping coins update thread...");
         saveToFile(serialize_filename);
+        depthProcesses.forEach((pair, depthProcess) -> {
+            stopDepthCheckForPair(pair);
+        });
     }
 
     public boolean isInitialised() {

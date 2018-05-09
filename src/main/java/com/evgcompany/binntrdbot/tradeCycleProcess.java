@@ -96,9 +96,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             String symbol1 = new_cycle.get(i-1);
             String symbol2 = new_cycle.get(i);
             if (info.getPairsGraph().containsEdge(symbol2, symbol1)) { // BUY
-                addChain(symbol2+symbol1 + " BUY", info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol2, symbol1))); 
+                addChain(symbol2+symbol1 + " BUY", cycleController.getEdgeWeight(symbol2, symbol1)); 
             } else { // SELL
-                addChain(symbol1+symbol2 + " SELL", info.getPricesGraph().getEdgeWeight(info.getPricesGraph().getEdge(symbol1, symbol2)));
+                addChain(symbol1+symbol2 + " SELL", cycleController.getEdgeWeight(symbol1, symbol2));
             }
         }
     }
@@ -228,6 +228,9 @@ public class tradeCycleProcess extends PeriodicProcessThread {
             return;
         }
         initAndOrderStep();
+        if (cycleStep == 0) {
+            setDelayTime(2);
+        }
     }
     
     private void orderSuccessfullyFinish() {
