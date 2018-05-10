@@ -488,7 +488,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             return;
         }
 
-        orderCID = ordersController.registerPairTrade(baseAssetSymbol, quoteAssetSymbol, true);
+        orderCID = ordersController.registerPairTrade(symbol, true);
 
         if (!buyOnStart) {
             doWait(startDelayTime);

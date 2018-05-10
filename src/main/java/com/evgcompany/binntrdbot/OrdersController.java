@@ -40,7 +40,7 @@ public class OrdersController extends PeriodicProcessThread {
     private final Map<Long, OrderPairItem> pairOrders = new HashMap<>();
     private long lastOrderId = 0;
 
-    private final DefaultListModel<String> listCurrenciesModel = new DefaultListModel<>();
+    private final DefaultListModel<String> listPairOrdersModel = new DefaultListModel<>();
 
     private boolean isTestMode = false;
     private boolean isLimitedOrders = false;
@@ -383,7 +383,7 @@ public class OrdersController extends PeriodicProcessThread {
             if (curr != null && curr.getSymbolBase().equals(symbolBase)) {
                 symbol_updated = true;
                 if (curr.getListIndex() >= 0) {
-                    listCurrenciesModel.set(curr.getListIndex(), curr.toString());
+                    listPairOrdersModel.set(curr.getListIndex(), curr.toString());
                 }
                 if (curr.getQuoteItem().getListIndex() >= 0) {
                     balance.updateCoinText(curr.getQuoteItem().getSymbol());
@@ -404,23 +404,24 @@ public class OrdersController extends PeriodicProcessThread {
         });
     }
 
-    public Long registerPairTrade(String symbolBase, String symbolQuote, boolean updateBalance) {
+    public Long registerPairTrade(String symbolPair, boolean updateBalance) {
         Long orderCID = null;
         try {
             SEMAPHORE_ADDCOIN.acquire();
-            symbolBase = symbolBase.toUpperCase();
-            symbolQuote = symbolQuote.toUpperCase();
+            app.log("Registering pair: " + symbolPair);
+            String symbolBase = info.getPairBaseSymbol(symbolPair);
+            String symbolQuote = info.getPairQuoteSymbol(symbolPair);
             if (!symbolBase.isEmpty() && !symbolQuote.isEmpty()) {
                 orderCID = ++lastOrderId;
                 CoinBalanceItem cbase = balance.getCoinBalanceInfo(symbolBase);
                 CoinBalanceItem cquote = balance.getCoinBalanceInfo(symbolQuote);
-                OrderPairItem cpair = new OrderPairItem(cbase, cquote, symbolBase+symbolQuote);
-                cpair.setListIndex(listCurrenciesModel.size());
+                OrderPairItem cpair = new OrderPairItem(cbase, cquote, symbolPair);
+                cpair.setListIndex(listPairOrdersModel.size());
                 pairOrders.put(orderCID, cpair);
                 if (updateBalance) {
                     balance.updateAllBalances(false);
                 }
-                listCurrenciesModel.addElement(cpair.toString());
+                listPairOrdersModel.addElement(cpair.toString());
                 balance.setCoinVisible(cbase.getSymbol());
                 balance.setCoinVisible(cquote.getSymbol());
             }
@@ -439,7 +440,7 @@ public class OrdersController extends PeriodicProcessThread {
                     balance.updateAllBalances();
                 }
                 if (cpair.getListIndex() >= 0) {
-                    listCurrenciesModel.set(cpair.getListIndex(), cpair.toString());
+                    listPairOrdersModel.set(cpair.getListIndex(), cpair.toString());
                 }
                 if (cpair.getBaseItem().getListIndex() >= 0) {
                     balance.updateCoinText(cpair.getBaseItem().getSymbol());
@@ -472,8 +473,8 @@ public class OrdersController extends PeriodicProcessThread {
     /**
      * @return the listCurrenciesModel
      */
-    public DefaultListModel<String> getListCurrenciesModel() {
-        return listCurrenciesModel;
+    public DefaultListModel<String> getListPairOrdersModel() {
+        return listPairOrdersModel;
     }
 
     public void setClient(TradingAPIAbstractInterface _client) {
@@ -515,7 +516,7 @@ public class OrdersController extends PeriodicProcessThread {
     public void removeCurrencyPair(Long orderCID) {
         if (pairOrders.containsKey(orderCID)) {
             int list_index_to_remove = pairOrders.get(orderCID).getListIndex();
-            listCurrenciesModel.remove(list_index_to_remove);
+            listPairOrdersModel.remove(list_index_to_remove);
             pairOrders.remove(orderCID);
             pairOrders.entrySet().stream().filter((entry) -> (entry.getValue().getListIndex() > list_index_to_remove)).forEachOrdered((entry) -> {
                 entry.getValue().setListIndex(entry.getValue().getListIndex() - 1);

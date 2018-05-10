@@ -6,6 +6,8 @@
 package com.evgcompany.binntrdbot;
 
 import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -13,6 +15,8 @@ import java.util.concurrent.Semaphore;
  */
 abstract public class PeriodicProcessThread extends Thread {
 
+    protected final Semaphore SEMAPHORE_STARTWAIT = new Semaphore(1, true);
+    
     protected boolean need_stop = false;
     protected boolean paused = false;
     protected long delayTime = 10;
@@ -52,20 +56,26 @@ abstract public class PeriodicProcessThread extends Thread {
     }
 
     public void StartAndWaitForInit() {
-        need_stop = false;
-        boolean starting = false;
-        if (!isAlive()) {
-            starting = true;
-            start();
-            while (!isAlive()) {
-                doWait(1000);
+        try {
+            SEMAPHORE_STARTWAIT.acquire();
+            need_stop = false;
+            boolean starting = false;
+            if (!isAlive()) {
+                starting = true;
+                start();
+                while (!isAlive()) {
+                    doWait(1000);
+                }
+                doWait(100);
             }
-            doWait(100);
+            waitForInit();
+            if (starting) {
+                doWait(500);
+            }
+        } catch (InterruptedException ex) {
+            Logger.getLogger(PeriodicProcessThread.class.getName()).log(Level.SEVERE, null, ex);
         }
-        waitForInit();
-        if (starting) {
-            doWait(500);
-        }
+        SEMAPHORE_STARTWAIT.release();
     }
     
     protected void waitForInit() {

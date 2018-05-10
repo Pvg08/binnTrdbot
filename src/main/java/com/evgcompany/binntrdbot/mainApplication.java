@@ -60,7 +60,7 @@ public class mainApplication extends javax.swing.JFrame {
         DefaultCaret caret = (DefaultCaret)logTextarea.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         listProfit.setModel(BalanceController.getInstance().getListProfitModel());
-        listCurrencies.setModel(OrdersController.getInstance().getListCurrenciesModel());
+        listCurrencies.setModel(OrdersController.getInstance().getListPairOrdersModel());
         listRating.setModel(coinRatingController.getCoinRatingModel());
         listBoxAutoStrategies.setModel(new DefaultListModel<>());
         new StrategiesController().getStrategiesNames().forEach((strategy_name)->{

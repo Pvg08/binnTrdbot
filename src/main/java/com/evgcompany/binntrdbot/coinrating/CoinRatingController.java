@@ -963,7 +963,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             coinCycleController.start();
         }
 
-        if (paircontroller != null && paircontroller.getOrdersController() != null && !paircontroller.getOrdersController().isTestMode()) {
+        if (!OrdersController.getInstance().isTestMode()) {
             orderEvent = client.OnOrderEvent(null, event -> {
                 mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
                 mainApplication.getInstance().systemSound();

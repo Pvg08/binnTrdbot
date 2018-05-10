@@ -71,7 +71,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     public TradeCycleProcess(CoinCycleController cycleController) {
         this.cycleController = cycleController;
         client = cycleController.getClient();
-        ordersController = cycleController.getPairProcessController().getOrdersController();
+        ordersController = OrdersController.getInstance();
         startMillis = System.currentTimeMillis();
         isBuy = false;
         mainAsset = "";
@@ -121,9 +121,8 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     private void doPreStep(int from) {
         for(int i = from; i<cycle.size(); i++) {
             String cpair = getChainPair(cycle.get(i));
-            String[] coins = info.getCoinPairs().get(cpair);
             if (orderCIDs.containsKey(cpair)) {
-                Long orderCID = ordersController.registerPairTrade(coins[0], coins[1], true);
+                Long orderCID = ordersController.registerPairTrade(cpair, true);
                 orderCIDs.put(cpair, orderCID);
             } else {
                 ordersController.updatePairTrade(orderCIDs.get(cpair), true);
@@ -316,7 +315,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         filter.logFiltersInfo();
         
         if (orderCIDs.containsKey(symbol)) {
-            Long orderCID = ordersController.registerPairTrade(filter.getBaseAssetSymbol(), filter.getQuoteAssetSymbol(), true);
+            Long orderCID = ordersController.registerPairTrade(symbol, true);
             orderCIDs.put(symbol, orderCID);
         } else {
             ordersController.updatePairTrade(orderCIDs.get(symbol), true);

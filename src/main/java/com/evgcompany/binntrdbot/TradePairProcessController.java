@@ -41,6 +41,10 @@ public class TradePairProcessController {
         this.ordersController = OrdersController.getInstance();
     }
     
+    public List<TradePairProcess> getPairs() {
+        return pairs;
+    }
+
     private int searchCurrencyFirstPair(String currencyPair) {
         for(int i=0; i<pairs.size(); i++) {
             if (pairs.get(i).getSymbol().equals(currencyPair)) {
@@ -49,15 +53,11 @@ public class TradePairProcessController {
         }
         return -1;
     }
-    
-    public List<TradePairProcess> getPairs() {
-        return pairs;
-    }
-    
+
     public boolean hasPair(String currencyPair) {
         return searchCurrencyFirstPair(currencyPair) >= 0;
     }
-    
+
     private TradePairProcess initializePair(String symbol, boolean run) {
         boolean has_wave = symbol.contains("~");
         boolean has_plus = symbol.contains("+");
@@ -374,10 +374,6 @@ public class TradePairProcessController {
      */
     public void setSellStopLimitedTimeout(int sellStopLimitedTimeout) {
         this.sellStopLimitedTimeout = sellStopLimitedTimeout;
-    }
-    
-    public OrdersController getOrdersController() {
-        return ordersController;
     }
 
     /**
