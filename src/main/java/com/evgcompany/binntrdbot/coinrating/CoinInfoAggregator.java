@@ -9,6 +9,7 @@ import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.general.SymbolStatus;
 import com.binance.api.client.domain.market.TickerPrice;
+import com.evgcompany.binntrdbot.BalanceController;
 import com.evgcompany.binntrdbot.CoinFilters;
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
@@ -44,7 +45,6 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     
     private DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph = null;
     private DefaultDirectedGraph<String, DefaultEdge> graph_pair = null;
-    private AccountCostUpdateEvent accountCostUpdate = null;
     
     private final String serialize_filename = "coinsInfo_serialized.bin";
     
@@ -61,8 +61,6 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     
     private String baseCoin = "BTC";
     private double baseCoinMinCount = 0.001;
-    private double baseAccountCost = 0;
-    private double initialAccountCost = -1;
     
     private boolean init_complete = false;
     private long last_init_millis = 0;
@@ -273,27 +271,6 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         return convertSumm(symbol1, price, baseCoin);
     }
     
-    private double getAccountCost(String coin) {
-        double accountCost = 0;
-        List<AssetBalance> allBalances = client.getAllBalances();
-        for(AssetBalance balance : allBalances) {
-            if (coins.contains(balance.getAsset())) {
-                accountCost += convertSumm(balance.getAsset(), Double.parseDouble(balance.getFree()) + Double.parseDouble(balance.getLocked()), coin);
-            }
-        }
-        return accountCost;
-    }
-    
-    private void updateBaseAccountCost() {
-        baseAccountCost = getAccountCost(baseCoin);
-        if (initialAccountCost < 0) {
-            initialAccountCost = baseAccountCost;
-        }
-        if (accountCostUpdate != null) {
-            accountCostUpdate.onUpdate(this);
-        }
-    }
-    
     private void updatePrices(boolean needSync) {
         try {
             if (needSync) SEMAPHORE_UPDATE.acquire();
@@ -480,7 +457,6 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             mainApplication.getInstance().log("Getting coins & pairs info...");
             doMainInit(true);
             mainApplication.getInstance().log("Enough amount coins: " + coinsToCheck);
-            updateBaseAccountCost();
             init_complete = true;
         }
     }
@@ -494,7 +470,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         } else {
             updatePrices(true);
         }
-        updateBaseAccountCost();
+        BalanceController.getInstance().updateBaseAccountCost();
     }
 
     @Override
@@ -518,13 +494,6 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     }
 
     /**
-     * @return the baseAccountCost
-     */
-    public double getBaseAccountCost() {
-        return baseAccountCost;
-    }
-
-    /**
      * @param client the client to set
      */
     public void setClient(TradingAPIAbstractInterface client) {
@@ -536,8 +505,7 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
      */
     public void setBaseCoin(String baseCoin) {
         this.baseCoin = baseCoin.toUpperCase().trim();
-        baseAccountCost = 0;
-        initialAccountCost = -1;
+        BalanceController.getInstance().resetAccountCost();
     }
 
     /**
@@ -594,26 +562,5 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
      */
     public Map<String, CoinFilters> getPairFilters() {
         return pairFilters;
-    }
-
-    /**
-     * @return the accountCostUpdate
-     */
-    public AccountCostUpdateEvent getAccountCostUpdate() {
-        return accountCostUpdate;
-    }
-
-    /**
-     * @param accountCostUpdate the accountCostUpdate to set
-     */
-    public void setAccountCostUpdate(AccountCostUpdateEvent accountCostUpdate) {
-        this.accountCostUpdate = accountCostUpdate;
-    }
-
-    /**
-     * @return the initialAccountCost
-     */
-    public double getInitialAccountCost() {
-        return initialAccountCost;
     }
 }

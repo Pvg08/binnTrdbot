@@ -408,7 +408,6 @@ public class OrdersController extends PeriodicProcessThread {
         Long orderCID = null;
         try {
             SEMAPHORE_ADDCOIN.acquire();
-            app.log("Registering pair: " + symbolPair);
             String symbolBase = info.getPairBaseSymbol(symbolPair);
             String symbolQuote = info.getPairQuoteSymbol(symbolPair);
             if (!symbolBase.isEmpty() && !symbolQuote.isEmpty()) {
@@ -425,7 +424,14 @@ public class OrdersController extends PeriodicProcessThread {
                 balance.setCoinVisible(cbase.getSymbol());
                 balance.setCoinVisible(cquote.getSymbol());
             }
-        } catch (Exception e) {
+            if (orderCID != null) {
+                app.log("Trading order pair registered: " + symbolPair + " (" + orderCID + ")");
+            } else {
+                app.log("Can't register new order pair: " + symbolPair);
+            }
+        } catch (Exception exx) {
+            app.log("Error while register new order pair: " + symbolPair);
+            exx.printStackTrace(System.out);
         }
         SEMAPHORE_ADDCOIN.release();
         return orderCID;
@@ -467,7 +473,7 @@ public class OrdersController extends PeriodicProcessThread {
 
     @Override
     protected void runFinish() {
-        
+        mainApplication.getInstance().log("Stopping orders update thread...");
     }
 
     /**

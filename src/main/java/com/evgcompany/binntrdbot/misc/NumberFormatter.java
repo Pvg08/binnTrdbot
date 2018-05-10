@@ -14,11 +14,14 @@ import java.text.DecimalFormat;
 public class NumberFormatter {
     public static final DecimalFormat df1 = new DecimalFormat("0.#");
     public static final DecimalFormat df2 = new DecimalFormat("0.##");
-    public static final DecimalFormat df2p = new DecimalFormat("0.##%");
     public static final DecimalFormat df3 = new DecimalFormat("0.###");
-    public static final DecimalFormat df3p = new DecimalFormat("0.###%");
     public static final DecimalFormat df4 = new DecimalFormat("0.####");
     public static final DecimalFormat df5 = new DecimalFormat("0.#####");
-    public static final DecimalFormat df6 = new DecimalFormat("0.#####");
+    public static final DecimalFormat df6 = new DecimalFormat("0.######");
+    public static final DecimalFormat df7 = new DecimalFormat("0.#######");
     public static final DecimalFormat df8 = new DecimalFormat("0.########");
+    
+    public static final DecimalFormat df1p = new DecimalFormat("0.#%");
+    public static final DecimalFormat df2p = new DecimalFormat("0.##%");
+    public static final DecimalFormat df3p = new DecimalFormat("0.###%");
 }

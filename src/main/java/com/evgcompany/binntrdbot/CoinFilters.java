@@ -214,7 +214,7 @@ public class CoinFilters implements java.io.Serializable {
         mainApplication.getInstance().log("");
     }
 
-    public void prepareForBuy(OrdersController ordersController) {
+    public void prepareForBuy() {
         BigDecimal tobuy_price = normalizePrice(currentPrice);
         BigDecimal tobuy_amount = currentAmount;
         tobuy_amount = normalizeQuantity(tobuy_amount.divide(tobuy_price, RoundingMode.HALF_DOWN), true);
@@ -226,7 +226,7 @@ public class CoinFilters implements java.io.Serializable {
         currentAmount = tobuy_amount;
     }
     
-    public void prepareForSell(OrdersController ordersController) {
+    public void prepareForSell() {
         BigDecimal tosell_price = normalizePrice(currentPrice);
         BigDecimal tosell_amount = normalizeQuantity(currentAmount, true);
         tosell_amount = normalizeNotionalQuantity(tosell_amount, tosell_price);

@@ -8,7 +8,6 @@ package com.evgcompany.binntrdbot;
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.OrderType;
-import com.binance.api.client.domain.account.AssetBalance;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
@@ -100,12 +99,12 @@ public class TradePairProcess extends PeriodicProcessThread {
     
     private SignalItem init_signal = null;
     
-    public TradePairProcess(TradingAPIAbstractInterface rclient, OrdersController ordersController, String pair) {
+    public TradePairProcess(TradingAPIAbstractInterface rclient, String pair) {
         app = mainApplication.getInstance();
         symbol = pair;
         client = rclient;
-        this.ordersController = ordersController;
-        strategiesController = new StrategiesController(symbol, ordersController);
+        this.ordersController = OrdersController.getInstance();
+        strategiesController = new StrategiesController(symbol);
         startMillis = System.currentTimeMillis();
         info = CoinInfoAggregator.getInstance();
         if (info.getClient() == null) info.setClient(client);
@@ -127,7 +126,7 @@ public class TradePairProcess extends PeriodicProcessThread {
         BigDecimal quote_asset_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent);
         filter.setCurrentPrice(curPrice);
         filter.setCurrentAmount(quote_asset_amount);
-        filter.prepareForBuy(ordersController);
+        filter.prepareForBuy();
         sold_price = filter.getCurrentPrice();
         sold_amount = filter.getCurrentAmount();
         quote_asset_amount = sold_price.multiply(sold_amount);
@@ -156,7 +155,7 @@ public class TradePairProcess extends PeriodicProcessThread {
         }
         filter.setCurrentPrice(curPrice);
         filter.setCurrentAmount(sold_amount);
-        filter.prepareForSell(ordersController);
+        filter.prepareForSell();
         curPrice = filter.getCurrentPrice();
         sold_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = sold_amount.multiply(curPrice);
@@ -326,8 +325,8 @@ public class TradePairProcess extends PeriodicProcessThread {
             BigDecimal currentLimitSellPrice = BigDecimal.ZERO;
             BigDecimal currentLimitSellQty = BigDecimal.ZERO;
             
-            AssetBalance qbalance = ordersController.getClient().getAssetBalance(baseAssetSymbol);
-            BigDecimal free_cnt = new BigDecimal(qbalance.getFree());
+            CoinBalanceItem qbalance = BalanceController.getInstance().getCoinBalanceInfo(baseAssetSymbol);
+            BigDecimal free_cnt = qbalance.getFreeValue();
             BigDecimal order_cnt = BigDecimal.ZERO;
             
             orderToCancelOnSellUp.clear();
@@ -413,9 +412,7 @@ public class TradePairProcess extends PeriodicProcessThread {
                 last_time = nbar.getBeginTime().toInstant().toEpochMilli();
             }
             currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
-            if (ordersController != null) {
-                ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
-            }
+            ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
             if (is_fin && (predictor == null || !predictor.isLearning())) {
                 app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
             }
@@ -471,10 +468,10 @@ public class TradePairProcess extends PeriodicProcessThread {
             doWait(ThreadLocalRandom.current().nextLong(100, 500));
         }
 
-        app.log("thread for " + symbol + " running...");
+        app.log("thread for " + symbol + " is running...");
         app.log("");
         
-        info.StartAndWaitForInit();
+        BalanceController.getInstance().StartAndWaitForInit();
         info.startDepthCheckForPair(symbol);
         
         try {

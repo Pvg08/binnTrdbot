@@ -68,9 +68,9 @@ public class TradePairProcessController {
         TradePairProcess nproc;
         if (pair_index < 0) {
             if (has_wave || allPairsWavesUsage) {
-                nproc = new TradePairWaveProcess(ordersController.getClient(), ordersController, symbol);
+                nproc = new TradePairWaveProcess(ordersController.getClient(), symbol);
             } else {
-                nproc = new TradePairProcess(ordersController.getClient(), ordersController, symbol);
+                nproc = new TradePairProcess(ordersController.getClient(), symbol);
             }
             nproc.setStartDelay(pairs.size() * 1000 + 500);
             nproc.setTryingToSellUp(has_plus);

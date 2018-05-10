@@ -5,11 +5,13 @@
  */
 package com.evgcompany.binntrdbot.coinrating;
 
+import com.evgcompany.binntrdbot.BalanceController;
+
 /**
  *
  * @author EVG_adm_T
  */
 @FunctionalInterface
 public interface AccountCostUpdateEvent {
-    void onUpdate(CoinInfoAggregator agg);
+    void onUpdate(BalanceController agg);
 }

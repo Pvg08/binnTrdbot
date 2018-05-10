@@ -18,8 +18,8 @@ public class TradePairWaveProcess extends TradePairProcess {
     private double wavesSecondaryPercent = 25;
     private double wavesIncKoef = 59;
     
-    public TradePairWaveProcess(TradingAPIAbstractInterface rclient, OrdersController ordersController, String pair) {
-        super(rclient, ordersController, pair);
+    public TradePairWaveProcess(TradingAPIAbstractInterface rclient, String pair) {
+        super(rclient, pair);
     }
 
     /**

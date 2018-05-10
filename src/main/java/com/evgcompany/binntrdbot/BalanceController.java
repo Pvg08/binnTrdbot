@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.domain.account.AssetBalance;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.coinrating.AccountCostUpdateEvent;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import java.io.Closeable;
 import java.io.IOException;
@@ -27,19 +28,18 @@ import java.util.logging.Logger;
 public class BalanceController extends PeriodicProcessThread {
     
     private static final Semaphore SEMAPHORE = new Semaphore(1, true);
-    
     private static final BalanceController instance = new BalanceController();
-    
     private CoinInfoAggregator info = null;
-
+    private TradingAPIAbstractInterface client = null;
     private final Map<String, CoinBalanceItem> coins = new HashMap<>();
-
     private final DefaultListModel<String> listProfitModel = new DefaultListModel<>();
 
     private boolean isTestMode = false;
-
-    private TradingAPIAbstractInterface client = null;
     private Closeable socket = null;
+    
+    private double baseAccountCost = 0;
+    private double initialAccountCost = -1;
+    private AccountCostUpdateEvent accountCostUpdate = null;
 
     private BalanceController() {
         info = CoinInfoAggregator.getInstance();
@@ -49,19 +49,32 @@ public class BalanceController extends PeriodicProcessThread {
         return instance;
     }
     
+    private double getAccountCost(String coin) {
+        double accountCost = 0;
+        for (Map.Entry<String, CoinBalanceItem> entry : coins.entrySet()) {
+            accountCost += info.convertSumm(entry.getValue().getSymbol(), entry.getValue().getValue().doubleValue(), coin);
+        }
+        return accountCost;
+    }
+    
+    public void updateBaseAccountCost() {
+        if (coins.isEmpty()) return;
+        double tmpCost = baseAccountCost;
+        baseAccountCost = getAccountCost(info.getBaseCoin());
+        if (initialAccountCost < 0) {
+            initialAccountCost = baseAccountCost;
+        }
+        if (accountCostUpdate != null && tmpCost != baseAccountCost) {
+            accountCostUpdate.onUpdate(this);
+        }
+    }
+    
     public CoinBalanceItem getCoinBalanceInfo(String symbolAsset) {
         return coins.get(symbolAsset);
     }
     
     private void showTradeComissionCurrency() {
-        if (client == null || client.getTradeComissionCurrency() == null) {
-            return;
-        }
-        CoinBalanceItem cbase = coins.get(client.getTradeComissionCurrency());
-        if (cbase == null) {
-            cbase = new CoinBalanceItem(client.getTradeComissionCurrency());
-            coins.put(client.getTradeComissionCurrency(), cbase);
-            updateAllBalances(false);
+        if (client != null && client.getTradeComissionCurrency() != null) {
             setCoinVisible(client.getTradeComissionCurrency());
         }
     }
@@ -162,7 +175,7 @@ public class BalanceController extends PeriodicProcessThread {
             SEMAPHORE.acquire();
             for (int i = 0; i < allBalances.size(); i++) {
                 String symbol = allBalances.get(i).getAsset().toUpperCase();
-                if (info.getCoinPairs().containsKey(symbol)) {
+                if (info.getCoins().contains(symbol)) {
                     CoinBalanceItem curr;
                     if (!coins.containsKey(symbol)) {
                         curr = new CoinBalanceItem(symbol);
@@ -172,7 +185,6 @@ public class BalanceController extends PeriodicProcessThread {
                     if (!isTestMode || curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
                         BigDecimal balance_free = new BigDecimal(allBalances.get(i).getFree());
                         BigDecimal balance_limit = new BigDecimal(allBalances.get(i).getLocked());
-                        BigDecimal balance = balance_free.add(balance_limit);
                         curr.setFreeValue(balance_free);
                         curr.setLimitValue(balance_limit);
                         if (curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
@@ -190,6 +202,7 @@ public class BalanceController extends PeriodicProcessThread {
         } catch (InterruptedException ex) {
             Logger.getLogger(BalanceController.class.getName()).log(Level.SEVERE, null, ex);
         }
+        updateBaseAccountCost();
         SEMAPHORE.release();
     }
     
@@ -207,8 +220,8 @@ public class BalanceController extends PeriodicProcessThread {
     @Override
     protected void runStart() {
         info.StartAndWaitForInit();
-        showTradeComissionCurrency();
         updateAllBalances(true);
+        showTradeComissionCurrency();
         if (!isTestMode) {
             socket = client.OnBalanceEvent((balances) -> {
                 System.out.println("Balance changed: " + balances);
@@ -226,6 +239,7 @@ public class BalanceController extends PeriodicProcessThread {
 
     @Override
     protected void runFinish() {
+        mainApplication.getInstance().log("Stopping balance update thread...");
         if (socket != null) try {
             socket.close();
         } catch (IOException ex) {
@@ -235,11 +249,6 @@ public class BalanceController extends PeriodicProcessThread {
     
     public void setClient(TradingAPIAbstractInterface _client) {
         client = _client;
-        if (client != null) {
-            if (info.getClient() == null) {
-                info.setClient(client);
-            }
-        }
     }
 
     public TradingAPIAbstractInterface getClient() {
@@ -265,5 +274,38 @@ public class BalanceController extends PeriodicProcessThread {
      */
     public DefaultListModel<String> getListProfitModel() {
         return listProfitModel;
+    }
+    
+    /**
+     * @return the baseAccountCost
+     */
+    public double getBaseAccountCost() {
+        return baseAccountCost;
+    }
+    
+    /**
+     * @return the accountCostUpdate
+     */
+    public AccountCostUpdateEvent getAccountCostUpdate() {
+        return accountCostUpdate;
+    }
+
+    /**
+     * @param accountCostUpdate the accountCostUpdate to set
+     */
+    public void setAccountCostUpdate(AccountCostUpdateEvent accountCostUpdate) {
+        this.accountCostUpdate = accountCostUpdate;
+    }
+
+    /**
+     * @return the initialAccountCost
+     */
+    public double getInitialAccountCost() {
+        return initialAccountCost;
+    }
+
+    public void resetAccountCost() {
+        baseAccountCost = 0;
+        initialAccountCost = -1;
     }
 }

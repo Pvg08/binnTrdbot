@@ -56,10 +56,10 @@ public class CoinBalanceItem {
         if (getValue().compareTo(initial_value) != 0 /*|| isInOrder() || isInPendingOrder()*/) {
             txt = txt + " (";
             
-            txt = txt + "initially " + NumberFormatter.df6.format(initial_value);
+            txt = txt + "Init: " + NumberFormatter.df6.format(initial_value);
             if (initial_value.compareTo(BigDecimal.ZERO) > 0) {
                 float percent = 100 * (getValue().floatValue() - initial_value.floatValue()) / initial_value.floatValue();
-                txt = txt + "; " + (percent >= 0 ? "+" : "") + NumberFormatter.df5.format(percent) + "%";
+                txt = txt + "; " + (percent >= 0 ? "+" : "") + NumberFormatter.df3.format(percent) + "%";
             }
             
             /*if (!isPairKey()) {

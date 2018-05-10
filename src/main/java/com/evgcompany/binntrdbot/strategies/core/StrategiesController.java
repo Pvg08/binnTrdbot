@@ -55,7 +55,7 @@ public class StrategiesController {
     private final List<StrategyMarker> markers = new ArrayList<>();
     private TradingRecord tradingRecord = null;
     
-    public StrategiesController(String groupName, OrdersController ordersController) {
+    public StrategiesController(String groupName) {
         this.groupName = groupName;
         this.app = mainApplication.getInstance();
         this.ordersController = OrdersController.getInstance();
