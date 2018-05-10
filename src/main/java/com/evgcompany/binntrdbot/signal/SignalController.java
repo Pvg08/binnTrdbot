@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot.signal;
 
+import com.evgcompany.binntrdbot.OrdersController;
 import com.evgcompany.binntrdbot.analysis.MaxDipCriterion;
 import com.evgcompany.binntrdbot.analysis.OHLC4Indicator;
 import com.evgcompany.binntrdbot.analysis.TimeSeriesManagerForIndicator;
@@ -148,8 +149,8 @@ public class SignalController extends Thread {
     
     @Override
     public void run() {
-        if (mainApplication.getInstance().getOrdersController() != null && mainApplication.getInstance().getOrdersController().getStopLossPercent() != null) {
-            STOPLOSS_PERCENT = mainApplication.getInstance().getOrdersController().getStopLossPercent().intValue();
+        if (OrdersController.getInstance() != null && OrdersController.getInstance().getStopLossPercent() != null) {
+            STOPLOSS_PERCENT = OrdersController.getInstance().getStopLossPercent().intValue();
         }
         initialSignalsIsLoaded = false;
         while (signalsProcess != null && signalsProcess.getProcess().isAlive()) {
@@ -434,7 +435,6 @@ public class SignalController extends Thread {
     
     private Strategy getSignalStrategy(TimeSeries series, boolean is_fast, BigDecimal price1, BigDecimal price2, BigDecimal price_target, BigDecimal price_stop) {
         StrategySignal sig = new StrategySignal(null);
-        sig.setOrdersController(mainApplication.getInstance().getOrdersController());
         sig.getConfig().setParam("Price1", price1);
         sig.getConfig().setParam("Price2", price2);
         sig.getConfig().setParam("PriceTarget", price_target);

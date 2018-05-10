@@ -37,8 +37,8 @@ public class TradePairProcessController {
     private int buyStopLimitedTimeout;
     private int sellStopLimitedTimeout;
     
-    public TradePairProcessController(OrdersController ordersController) {
-        this.ordersController = ordersController;
+    public TradePairProcessController() {
+        this.ordersController = OrdersController.getInstance();
     }
     
     private int searchCurrencyFirstPair(String currencyPair) {
@@ -179,7 +179,7 @@ public class TradePairProcessController {
     
     private void removePair(int pairIndex) {
         pairs.get(pairIndex).doStop();
-        ordersController.removeCurrencyPair(pairs.get(pairIndex).getSymbol());
+        ordersController.removeCurrencyPair(pairs.get(pairIndex).getOrderCID());
         pairs.remove(pairIndex);
     }
     

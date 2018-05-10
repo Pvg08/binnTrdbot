@@ -5,6 +5,8 @@
  */
 package com.evgcompany.binntrdbot;
 
+import java.util.concurrent.Semaphore;
+
 /**
  *
  * @author EVG_adm_T
@@ -49,6 +51,29 @@ abstract public class PeriodicProcessThread extends Thread {
         this.startDelayTime = startDelayTime;
     }
 
+    public void StartAndWaitForInit() {
+        need_stop = false;
+        boolean starting = false;
+        if (!isAlive()) {
+            starting = true;
+            start();
+            while (!isAlive()) {
+                doWait(1000);
+            }
+            doWait(100);
+        }
+        waitForInit();
+        if (starting) {
+            doWait(500);
+        }
+    }
+    
+    protected void waitForInit() {
+        while (!isInitialized) {
+            doWait(500);
+        }
+    }
+    
     /**
      * @return the isInitialized
      */

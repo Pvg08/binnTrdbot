@@ -38,13 +38,11 @@ import org.ta4j.core.trading.rules.StopLossRule;
 public abstract class StrategyItem {
     protected String StrategyName;
     protected StrategyDatasetInitializer initializer = null;
-    protected OrdersController ordersController = null;
     protected StrategiesController controller = null;
     protected StrategyConfig config = null;
     
     public StrategyItem(StrategiesController controller) {
         this.controller = controller;
-        this.ordersController = controller != null ? controller.getOrdersController() : null;
         this.config = new StrategyConfig();
         StrategyName = "NoName";
     }
@@ -59,8 +57,8 @@ public abstract class StrategyItem {
 
             TimeSeriesManager sliceManager = new TimeSeriesManager(series);
             AnalysisCriterion profitCriterion;
-            if (ordersController != null)
-                profitCriterion = new ProfitWithoutComissionCriterion(0.01f * ordersController.getClient().getTradeComissionPercent().doubleValue());
+            if (OrdersController.getInstance() != null)
+                profitCriterion = new ProfitWithoutComissionCriterion(0.01f * OrdersController.getInstance().getClient().getTradeComissionPercent().doubleValue());
             else 
                 profitCriterion = new TotalProfitCriterion();
 
@@ -87,15 +85,15 @@ public abstract class StrategyItem {
     }
     
     protected Rule addStopLossGain(Rule rule, TimeSeries series) {
-        if (ordersController != null) {
+        if (OrdersController.getInstance() != null) {
             /*if (ordersController.isLowHold()) {
                 rule = rule.and(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(ordersController.getTradeMinProfitPercent())));
             }*/
-            if (ordersController.getStopLossPercent() != null) {
-                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(ordersController.getStopLossPercent()), Decimal.ZERO));
+            if (OrdersController.getInstance().getStopLossPercent() != null) {
+                rule = rule.or(new TrailingStopLossRule(new ClosePriceIndicator(series), Decimal.valueOf(OrdersController.getInstance().getStopLossPercent()), Decimal.ZERO));
             }
-            if (ordersController.getStopGainPercent() != null) {
-                rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(ordersController.getStopGainPercent())));
+            if (OrdersController.getInstance().getStopGainPercent() != null) {
+                rule = rule.or(new StopGainRule(new ClosePriceIndicator(series), Decimal.valueOf(OrdersController.getInstance().getStopGainPercent())));
             }
         }
         return rule;
@@ -136,12 +134,5 @@ public abstract class StrategyItem {
      */
     public StrategyConfig getConfig() {
         return config;
-    }
-
-    /**
-     * @param ordersController the ordersController to set
-     */
-    public void setOrdersController(OrdersController ordersController) {
-        this.ordersController = ordersController;
     }
 }

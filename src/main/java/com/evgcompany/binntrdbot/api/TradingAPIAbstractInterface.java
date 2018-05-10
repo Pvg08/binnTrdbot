@@ -220,4 +220,5 @@ public abstract class TradingAPIAbstractInterface {
     
     abstract public Closeable OnBarUpdateEvent(String pair, String barInterval, BarEvent evt);
     abstract public Closeable OnOrderEvent(String symbol, OrderEvent evt);
+    abstract public Closeable OnBalanceEvent(BalanceEvent evt);
 }

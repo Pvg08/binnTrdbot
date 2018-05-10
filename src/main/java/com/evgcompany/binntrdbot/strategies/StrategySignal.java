@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot.strategies;
 
+import com.evgcompany.binntrdbot.OrdersController;
 import com.evgcompany.binntrdbot.strategies.core.*;
 import com.evgcompany.binntrdbot.analysis.*;
 import java.math.BigDecimal;
@@ -63,8 +64,8 @@ public class StrategySignal extends StrategyItem {
         Decimal price2u = price2.multipliedBy(90).plus(priceT.multipliedBy(10)).dividedBy(100);
         Decimal loss_percent;
         if (!priceS.isZero()) {
-            if (ordersController!= null && ordersController.getStopLossPercent() != null && ordersController.getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
-                loss_percent = Decimal.valueOf(ordersController.getStopLossPercent());
+            if (OrdersController.getInstance().getStopLossPercent() != null && OrdersController.getInstance().getStopLossPercent().compareTo(BigDecimal.ZERO) > 0) {
+                loss_percent = Decimal.valueOf(OrdersController.getInstance().getStopLossPercent());
             } else {
                 loss_percent = getLossPercent(price1, priceS);
             }

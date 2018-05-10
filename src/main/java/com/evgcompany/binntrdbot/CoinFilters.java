@@ -219,10 +219,8 @@ public class CoinFilters implements java.io.Serializable {
         BigDecimal tobuy_amount = currentAmount;
         tobuy_amount = normalizeQuantity(tobuy_amount.divide(tobuy_price, RoundingMode.HALF_DOWN), true);
         tobuy_amount = normalizeNotionalQuantity(tobuy_amount, tobuy_price);
-        if (ordersController != null && ordersController.hasPair(baseAssetSymbol+quoteAssetSymbol)) {
-            if (!ordersController.canBuy(baseAssetSymbol+quoteAssetSymbol, tobuy_amount, tobuy_price) && filterQtyStep != null && tobuy_amount.compareTo(filterQtyStep) > 0) {
-                tobuy_amount = tobuy_amount.subtract(filterQtyStep);
-            }
+        if (!BalanceController.getInstance().canBuy(baseAssetSymbol+quoteAssetSymbol, tobuy_amount, tobuy_price) && filterQtyStep != null && tobuy_amount.compareTo(filterQtyStep) > 0) {
+            tobuy_amount = tobuy_amount.subtract(filterQtyStep);
         }
         currentPrice = tobuy_price;
         currentAmount = tobuy_amount;
@@ -232,10 +230,8 @@ public class CoinFilters implements java.io.Serializable {
         BigDecimal tosell_price = normalizePrice(currentPrice);
         BigDecimal tosell_amount = normalizeQuantity(currentAmount, true);
         tosell_amount = normalizeNotionalQuantity(tosell_amount, tosell_price);
-        if (ordersController != null && ordersController.hasPair(baseAssetSymbol+quoteAssetSymbol)) {
-            if (!ordersController.canSell(baseAssetSymbol+quoteAssetSymbol, tosell_amount) && filterQtyStep != null && tosell_amount.compareTo(filterQtyStep) > 0) {
-                tosell_amount = tosell_amount.subtract(filterQtyStep);
-            }
+        if (!BalanceController.getInstance().canSell(baseAssetSymbol+quoteAssetSymbol, tosell_amount) && filterQtyStep != null && tosell_amount.compareTo(filterQtyStep) > 0) {
+            tosell_amount = tosell_amount.subtract(filterQtyStep);
         }
         currentPrice = tosell_price;
         currentAmount = tosell_amount;

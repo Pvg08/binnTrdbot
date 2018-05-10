@@ -38,13 +38,14 @@ import org.jgrapht.graph.DefaultWeightedEdge;
  */
 public class CoinInfoAggregator extends PeriodicProcessThread {
     
+    protected final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
+    
     private static final CoinInfoAggregator instance = new CoinInfoAggregator();
     
     private DefaultDirectedWeightedGraph<String, DefaultWeightedEdge> graph = null;
     private DefaultDirectedGraph<String, DefaultEdge> graph_pair = null;
     private AccountCostUpdateEvent accountCostUpdate = null;
     
-    private final Semaphore SEMAPHORE_UPDATE = new Semaphore(1, true);
     private final String serialize_filename = "coinsInfo_serialized.bin";
     
     private Set<String> quoteAssets = null;
@@ -80,28 +81,13 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         return instance;
     }
     
-    public void StartAndWaitForInit() {
-        need_stop = false;
-        boolean starting = false;
-        if (!isAlive()) {
-            starting = true;
-            start();
-            while (!isAlive()) {
-                doWait(1000);
-            }
-            doWait(100);
-        }
-        waitForInit();
-        if (starting) {
-            doWait(500);
-        }
-    }
-    
-    public void waitForInit() {
+    @Override
+    protected void waitForInit() {
         try {
             SEMAPHORE_UPDATE.acquire();
         } catch(InterruptedException exx) {}
         SEMAPHORE_UPDATE.release();
+        super.waitForInit();
     }
     
     public void startDepthCheckForPair(String pair) {
@@ -452,6 +438,20 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         return coinPairs;
     }
 
+    public String getPairQuoteSymbol(String pair) {
+        if (coinPairs.containsKey(pair)) {
+            return coinPairs.get(pair)[1];
+        }
+        return null;
+    }
+    
+    public String getPairBaseSymbol(String pair) {
+        if (coinPairs.containsKey(pair)) {
+            return coinPairs.get(pair)[0];
+        }
+        return null;
+    }
+    
     /**
      * @return the initialPrices
      */

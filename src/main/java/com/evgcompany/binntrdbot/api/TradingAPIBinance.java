@@ -46,6 +46,8 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
 
     private BinanceApiClientFactory factory = null;
     private BinanceApiRestClient client = null;
+    private BinanceApiWebSocketClient client_s = null;
+    
 
     public TradingAPIBinance(String secret, String key) {
         super(secret, key);
@@ -229,7 +231,9 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
 
     @Override
     public Closeable OnBarUpdateEvent(String symbol, String barInterval, BarEvent evt) {
-        BinanceApiWebSocketClient client_s = BinanceApiClientFactory.newInstance().newWebSocketClient();
+        if (client_s == null) {
+            client_s = factory.newWebSocketClient();
+        }
         Closeable socket = client_s.onCandlestickEvent(symbol.toLowerCase(), getCandlestickIntervalByString(barInterval), response -> {
             Duration barDuration = Duration.ofSeconds(barIntervalToSeconds(barInterval));
             ZonedDateTime endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(response.getCloseTime()), ZoneId.systemDefault());
@@ -245,20 +249,14 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
             );
             evt.onUpdate(nbar, response.getBarFinal());
         });
-        
-        /*
-        if (client_s != null) {
-            client_s.close();
-            client_s = null;
-        }
-        */
-        
         return socket;
     }
     
     @Override
     public Closeable OnOrderEvent(String symbol, OrderEvent evt) {
-        BinanceApiWebSocketClient client_s = factory.newWebSocketClient();
+        if (client_s == null) {
+            client_s = factory.newWebSocketClient();
+        }
         String listenKey = client.startUserDataStream();
         Closeable socket = client_s.onUserDataUpdateEvent(listenKey, response -> {
             if (
@@ -272,6 +270,20 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
                     )
             ) {
                 evt.onUpdate(response.getOrderTradeUpdateEvent());
+            }
+        });
+        return socket;
+    }
+    
+    @Override
+    public Closeable OnBalanceEvent(BalanceEvent evt) {
+        if (client_s == null) {
+            client_s = factory.newWebSocketClient();
+        }
+        String listenKey = client.startUserDataStream();
+        Closeable socket = client_s.onUserDataUpdateEvent(listenKey, response -> {
+            if (response.getEventType() == UserDataUpdateEventType.ACCOUNT_UPDATE) {
+                evt.onUpdate(response.getAccountUpdateEvent().getBalances());
             }
         });
         return socket;

@@ -58,13 +58,13 @@ public class StrategiesController {
     public StrategiesController(String groupName, OrdersController ordersController) {
         this.groupName = groupName;
         this.app = mainApplication.getInstance();
-        this.ordersController = ordersController;
+        this.ordersController = OrdersController.getInstance();
         this.tradingRecord = new BaseTradingRecord();
     }
     public StrategiesController() {
         this.groupName = null;
         this.app = mainApplication.getInstance();
-        this.ordersController = null;
+        this.ordersController = OrdersController.getInstance();
         this.tradingRecord = null;
     }
     
@@ -78,10 +78,6 @@ public class StrategiesController {
     
     public List<StrategyMarker> getStrategyMarkers() {
         return markers;
-    }
-    
-    public OrdersController getOrdersController() {
-        return ordersController;
     }
     
     /**
@@ -630,12 +626,5 @@ public class StrategiesController {
      */
     public void setTradingRecord(TradingRecord tradingRecord) {
         this.tradingRecord = tradingRecord;
-    }
-
-    /**
-     * @param ordersController the ordersController to set
-     */
-    public void setOrdersController(OrdersController ordersController) {
-        this.ordersController = ordersController;
     }
 }

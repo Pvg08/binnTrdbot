@@ -7,7 +7,6 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
-import com.binance.api.client.domain.account.AssetBalance;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,16 +28,18 @@ public class OrdersController extends PeriodicProcessThread {
         LOMODE_SELL, LOMODE_BUY, LOMODE_SELLANDBUY
     }
     
+    private static final OrdersController instance = new OrdersController();
+    
     private final mainApplication app;
     private CoinInfoAggregator info = null;
+    private BalanceController balance = null;
     
     private static final Semaphore SEMAPHORE = new Semaphore(1, true);
     private static final Semaphore SEMAPHORE_ADDCOIN = new Semaphore(1, true);
 
-    private final Map<String, CoinBalanceItem> coins = new HashMap<>();
-    private final Map<String, OrderPairItem> pairOrders = new HashMap<>();
+    private final Map<Long, OrderPairItem> pairOrders = new HashMap<>();
+    private long lastOrderId = 0;
 
-    private final DefaultListModel<String> listProfitModel = new DefaultListModel<>();
     private final DefaultListModel<String> listCurrenciesModel = new DefaultListModel<>();
 
     private boolean isTestMode = false;
@@ -58,100 +58,19 @@ public class OrdersController extends PeriodicProcessThread {
 
     private TradingAPIAbstractInterface client = null;
 
-    public OrdersController() {
+    private OrdersController() {
         app = mainApplication.getInstance();
         info = CoinInfoAggregator.getInstance();
+        balance = BalanceController.getInstance();
     }
     
-    public CoinBalanceItem getCoinBalanceInfo(String symbolAsset) {
-        return coins.get(symbolAsset);
+    public static OrdersController getInstance(){
+        return instance;
     }
     
-    private void showTradeComissionCurrency() {
-        if (client.getTradeComissionCurrency() == null || client == null) {
-            return;
-        }
-        CoinBalanceItem cbase = coins.get(client.getTradeComissionCurrency());
-        if (cbase == null) {
-            cbase = addCurrItem(client.getTradeComissionCurrency());
-            cbase.setListIndex(listProfitModel.size());
-            coins.put(client.getTradeComissionCurrency(), cbase);
-            updateAllBalances(false);
-            listProfitModel.addElement(cbase.toString());
-        }
-    }
-    
-    public BigDecimal getOrderAssetAmount(String symbolAsset, BigDecimal percent) {
-        CoinBalanceItem quote = coins.get(symbolAsset);
-        if (quote != null) {
-            BigDecimal quoteBalance;
-            if (quote.getInitialValue().compareTo(quote.getValue()) >= 0) {
-                quoteBalance = quote.getInitialValue();
-            } else {
-                quoteBalance = quote.getValue();
-            }
-            quoteBalance = quoteBalance.multiply(percent.divide(BigDecimal.valueOf(100)));
-            if (quote.getFreeValue().compareTo(quoteBalance) < 0) {
-                quoteBalance = quote.getFreeValue();
-            }
-            return quoteBalance;
-        }
-        return BigDecimal.ZERO;
-    }
-    
-    public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
-        return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && price.compareTo(BigDecimal.ZERO) > 0 && (pair.getQuoteItem().getFreeValue().compareTo(baseAmount.multiply(price)) >= 0);
-    }
-    public boolean canSell(String symbolPair, BigDecimal baseAmount) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
-        return (pair != null) && baseAmount.compareTo(BigDecimal.ZERO) > 0 && (pair.getBaseItem().getFreeValue().compareTo(baseAmount) >= 0);
-    }
-    public BigDecimal getAvailableCount(String assetSymbol) {
-        CoinBalanceItem citem = coins.get(assetSymbol);
-        if (citem == null) return null;
-        return citem.getFreeValue();
-    }
-
-    public boolean hasPair(String symbolPair) {
-        return pairOrders.containsKey(symbolPair);
-    }
-    
-    private void testPayTradeComission(BigDecimal price, String quoteSymbol) {
-        boolean use_spec_currency = client.getTradeComissionCurrency() != null && !client.getTradeComissionCurrency().equals(quoteSymbol);
-        BigDecimal comission_quote;
-        if (use_spec_currency) {
-            comission_quote = price.multiply(client.getTradeComissionCurrencyPercent()).divide(BigDecimal.valueOf(100));
-            String comission_pair = (client.getTradeComissionCurrency() + quoteSymbol).toUpperCase();
-            BigDecimal pair_price = null;
-            if (pairOrders.containsKey(comission_pair)) {
-                pair_price = pairOrders.get(comission_pair).getPrice();
-            } else {
-                pair_price = client.getCurrentPrice(comission_pair);
-            }
-            if (pair_price != null && pair_price.compareTo(BigDecimal.ZERO) > 0) {
-                CoinBalanceItem ccomm = coins.get(client.getTradeComissionCurrency());
-                BigDecimal trade_com = comission_quote.divide(pair_price, RoundingMode.HALF_DOWN);
-                if (ccomm != null && ccomm.getFreeValue().compareTo(trade_com) > 0) {
-                    ccomm.addFreeValue(trade_com.multiply(BigDecimal.valueOf(-1)));
-                    updateBaseSymbolText(client.getTradeComissionCurrency(), false);
-                } else {
-                    use_spec_currency = false;
-                }
-            } else {
-                use_spec_currency = false;
-            }
-        }
-        if (!use_spec_currency) {
-            comission_quote = price.multiply(client.getTradeComissionPercent()).divide(BigDecimal.valueOf(100));
-            CoinBalanceItem cquote = coins.get(quoteSymbol);
-            cquote.addFreeValue(comission_quote.multiply(BigDecimal.valueOf(-1)));
-        }
-    }
-    
-    public long PreBuySell(String symbolPair, BigDecimal baseAmount, BigDecimal buyPrice, BigDecimal sellAmount, BigDecimal sellPrice) {
+    public long PreBuySell(Long orderCID, BigDecimal baseAmount, BigDecimal buyPrice, BigDecimal sellAmount, BigDecimal sellPrice) {
         long result = 0;
-        OrderPairItem pair = pairOrders.get(symbolPair);
+        OrderPairItem pair = pairOrders.get(orderCID);
         pair.setPrice(buyPrice);
         pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), true);
         if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
@@ -160,33 +79,33 @@ public class OrdersController extends PeriodicProcessThread {
                 result = 1;
             }
         }
-        updatePairText(symbolPair, !isTestMode);
+        updatePairTrade(orderCID, !isTestMode);
         return result;
     }
     
-    public void PreBuy(String symbolPair, BigDecimal baseAmount, BigDecimal buyPrice) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
+    public void PreBuy(Long orderCID, BigDecimal baseAmount, BigDecimal buyPrice) {
+        OrderPairItem pair = pairOrders.get(orderCID);
         pair.setPrice(buyPrice);
         pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), false);
-        updatePairText(symbolPair, !isTestMode);
+        updatePairTrade(orderCID, !isTestMode);
     }
     
-    public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
-        return Buy(symbolPair, baseAmount, price, true);
+    public long Buy(Long orderCID, BigDecimal baseAmount, BigDecimal price) {
+        return Buy(orderCID, baseAmount, price, true);
     }
     
-    public long Buy(String symbolPair, BigDecimal baseAmount, BigDecimal price, boolean use_transactions) {
+    public long Buy(Long orderCID, BigDecimal baseAmount, BigDecimal price, boolean use_transactions) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
-            OrderPairItem pair = pairOrders.get(symbolPair);
+            OrderPairItem pair = pairOrders.get(orderCID);
             if (pair == null) {
-                app.log("Pair " + symbolPair + " not found!");
+                app.log("Pair for order " + orderCID + " not found!");
                 SEMAPHORE.release();
                 return -1;
             }
             if (baseAmount == null) {
-                app.log("Amount for BUY order of " + symbolPair + " is NULL!");
+                app.log("Amount for BUY order " + pair.getSymbolPair() + " (" + orderCID + ") is NULL!");
                 SEMAPHORE.release();
                 return -1;
             }
@@ -195,7 +114,7 @@ public class OrdersController extends PeriodicProcessThread {
                 price = pair.getPrice();
             }
             if (price == null) {
-                app.log("Price for BUY order of " + symbolPair + " is NULL!");
+                app.log("Price for BUY order " + pair.getSymbolPair() + " (" + orderCID + ") is NULL!");
                 SEMAPHORE.release();
                 return -1;
             }
@@ -206,16 +125,16 @@ public class OrdersController extends PeriodicProcessThread {
             }
             if (!isTestMode) {
                 if (isMarket) {
-                    result = client.order(true, true, symbolPair, baseAmount, price);
+                    result = client.order(true, true, pair.getSymbolPair(), baseAmount, price);
                 } else {
-                    result = client.order(true, false, symbolPair, baseAmount, price);
+                    result = client.order(true, false, pair.getSymbolPair(), baseAmount, price);
                 }
                 if (result > 0) {
                     if (use_transactions)
                         pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
                     app.log("Order id = " + result, false, true);
                     Thread.sleep(550);
-                    Order mord = client.getOrderStatus(symbolPair, result);
+                    Order mord = client.getOrderStatus(pair.getSymbolPair(), result);
                     if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
                         if (use_transactions)
                             pair.rollbackTransaction();
@@ -225,7 +144,7 @@ public class OrdersController extends PeriodicProcessThread {
                     } else if (mord.getStatus() == OrderStatus.FILLED) {
                         if (use_transactions)
                             pair.confirmTransaction();
-                        BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, true);
+                        BigDecimal lastTradePrice = client.getLastTradePrice(pair.getSymbolPair(), true);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                             app.log("Real order market price = " + NumberFormatter.df6.format(lastTradePrice), true, true);
                             price = lastTradePrice;
@@ -249,9 +168,9 @@ public class OrdersController extends PeriodicProcessThread {
                     pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
                     pair.confirmTransaction();
                 }
-                testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
+                balance.testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
             }
-            updatePairText(symbolPair, !isTestMode);
+            updatePairTrade(orderCID, !isTestMode);
             SEMAPHORE.release();
         } catch (Exception e) {
             e.printStackTrace(System.out);
@@ -262,22 +181,22 @@ public class OrdersController extends PeriodicProcessThread {
         return result;
     }
 
-    public long Sell(String symbolPair, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel) {
-        return Sell(symbolPair, baseAmount, price, OrderToCancel, true);
+    public long Sell(Long orderCID, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel) {
+        return Sell(orderCID, baseAmount, price, OrderToCancel, true);
     }
     
-    public long Sell(String symbolPair, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel, boolean use_transactions) {
+    public long Sell(Long orderCID, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel, boolean use_transactions) {
         long result = 0;
         try {
             SEMAPHORE.acquire();
-            OrderPairItem pair = pairOrders.get(symbolPair);
+            OrderPairItem pair = pairOrders.get(orderCID);
             if (pair == null) {
-                app.log("Pair " + symbolPair + " not found!");
+                app.log("Pair for order " + orderCID + " not found!");
                 SEMAPHORE.release();
                 return -1;
             }
             if (baseAmount == null) {
-                app.log("Amount for SELL order of " + symbolPair + " is NULL!");
+                app.log("Amount for SELL order " + pair.getSymbolPair() + " (" + orderCID + ") is NULL!");
                 SEMAPHORE.release();
                 return -1;
             }
@@ -286,7 +205,7 @@ public class OrdersController extends PeriodicProcessThread {
                 price = pair.getPrice();
             }
             if (price == null) {
-                app.log("Price for SELL order of " + symbolPair + " is NULL!");
+                app.log("Price for SELL order " + pair.getSymbolPair() + " (" + orderCID + ") is NULL!");
                 SEMAPHORE.release();
                 return -1;
             }
@@ -298,22 +217,22 @@ public class OrdersController extends PeriodicProcessThread {
             if (!isTestMode) {
                 if (OrderToCancel != null && !OrderToCancel.isEmpty()) {
                     OrderToCancel.forEach((order_id)->{
-                        client.cancelOrder(symbolPair, order_id);
+                        client.cancelOrder(pair.getSymbolPair(), order_id);
                         app.log("Canceling LimitOrder "+order_id+"!", true, true);
                     });
                     Thread.sleep(750);
                 }
                 if (isMarket) {
-                    result = client.order(false, true, symbolPair, baseAmount, price);
+                    result = client.order(false, true, pair.getSymbolPair(), baseAmount, price);
                 } else {
-                    result = client.order(false, false, symbolPair, baseAmount, price);
+                    result = client.order(false, false, pair.getSymbolPair(), baseAmount, price);
                 }
                 if (result > 0) {
                     if (use_transactions)
                         pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
                     app.log("Order id = " + result, false, true);
                     Thread.sleep(550);
-                    Order mord = client.getOrderStatus(symbolPair, result);
+                    Order mord = client.getOrderStatus(pair.getSymbolPair(), result);
                     if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
                         if (use_transactions)
                             pair.rollbackTransaction();
@@ -323,7 +242,7 @@ public class OrdersController extends PeriodicProcessThread {
                     } else if (mord.getStatus() == OrderStatus.FILLED) {
                         if (use_transactions)
                             pair.confirmTransaction();
-                        BigDecimal lastTradePrice = client.getLastTradePrice(symbolPair, false);
+                        BigDecimal lastTradePrice = client.getLastTradePrice(pair.getSymbolPair(), false);
                         if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
                             app.log("Real order market price = " + NumberFormatter.df6.format(lastTradePrice), true, true);
                             price = lastTradePrice;
@@ -347,9 +266,9 @@ public class OrdersController extends PeriodicProcessThread {
                     pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
                     pair.confirmTransaction();
                 }
-                testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
+                balance.testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
             }
-            updatePairText(symbolPair, !isTestMode);
+            updatePairTrade(orderCID, !isTestMode);
             SEMAPHORE.release();
         } catch (Exception e) {
             e.printStackTrace(System.out);
@@ -360,34 +279,34 @@ public class OrdersController extends PeriodicProcessThread {
         return result;
     }
 
-    public void cancelOrder(String symbolPair, long limitOrderId) {
+    public void cancelOrder(Long orderCID, long limitOrderId) {
+        OrderPairItem pair = pairOrders.get(orderCID);
         if (!isTestMode) {
-            client.cancelOrder(symbolPair, limitOrderId);
+            client.cancelOrder(pair.getSymbolPair(), limitOrderId);
         } else {
-            OrderPairItem pair = pairOrders.get(symbolPair);
             pair.rollbackTransaction();
-            updatePairText(symbolPair, false);
+            updatePairTrade(orderCID, false);
         }
     }
     
-    public void setPairPrice(String symbolPair, BigDecimal price) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
+    public void setPairOrderCurrentPrice(Long orderCID, BigDecimal price) {
+        OrderPairItem pair = pairOrders.get(orderCID);
         if (pair != null) {
             pair.setPrice(price);
-            updatePairText(symbolPair, false);
+            updatePairTrade(orderCID, false);
         }
     }
-    public void setPairPrices(String symbolPair, BigDecimal price, BigDecimal order_price) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
+    public void setPairOrderPrices(Long orderCID, BigDecimal price, BigDecimal order_price) {
+        OrderPairItem pair = pairOrders.get(orderCID);
         if (pair != null) {
             pair.setPrice(price);
             pair.setLastOrderPrice(order_price);
-            updatePairText(symbolPair, false);
+            updatePairTrade(orderCID, false);
         }
     }
 
-    public void finishOrder(String symbolPair, boolean isok, BigDecimal sold_price) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
+    public void finishOrder(Long orderCID, boolean isok, BigDecimal sold_price) {
+        OrderPairItem pair = pairOrders.get(orderCID);
         if (pair != null) {
             if (isok) {
                 pair.setLastOrderPrice(sold_price);
@@ -398,15 +317,15 @@ public class OrdersController extends PeriodicProcessThread {
         }
     }
     
-    public void finishOrderPart(String symbolPair, BigDecimal sold_price, BigDecimal sold_qty) {
-        OrderPairItem pair = pairOrders.get(symbolPair);
+    public void finishOrderPart(Long orderCID, BigDecimal sold_price, BigDecimal sold_qty) {
+        OrderPairItem pair = pairOrders.get(orderCID);
         if (pair != null) {
             pair.setLastOrderPrice(sold_price);
             pair.confirmTransactionPart(sold_qty, sold_qty.multiply(sold_price));
         }
     }
     
-    public void updateAllBalances(boolean updateLists) {
+    /*public void updateAllBalances(boolean updateLists) {
         if (client != null) {
             List<AssetBalance> allBalances = client.getAllBalances();
             for (int i = 0; i < allBalances.size(); i++) {
@@ -452,19 +371,14 @@ public class OrdersController extends PeriodicProcessThread {
 
     public void updateAllBalances() {
         updateAllBalances(true);
-    }
-    
-    private CoinBalanceItem addCurrItem(String symbol) {
-        CoinBalanceItem result = new CoinBalanceItem(symbol);
-        return result;
-    }
+    }*/
 
     public void updateBaseSymbolText(String symbolBase, boolean updateBalance) {
         if (updateBalance) {
-            updateAllBalances();
+            balance.updateAllBalances();
         }
         boolean symbol_updated = false;
-        for (Map.Entry<String, OrderPairItem> entry : pairOrders.entrySet()) {
+        for (Map.Entry<Long, OrderPairItem> entry : pairOrders.entrySet()) {
             OrderPairItem curr = entry.getValue();
             if (curr != null && curr.getSymbolBase().equals(symbolBase)) {
                 symbol_updated = true;
@@ -472,90 +386,77 @@ public class OrdersController extends PeriodicProcessThread {
                     listCurrenciesModel.set(curr.getListIndex(), curr.toString());
                 }
                 if (curr.getQuoteItem().getListIndex() >= 0) {
-                    listProfitModel.set(curr.getQuoteItem().getListIndex(), curr.toString());
+                    balance.updateCoinText(curr.getQuoteItem().getSymbol());
                 }
                 if (curr.getBaseItem().getListIndex() >= 0) {
-                    listProfitModel.set(curr.getBaseItem().getListIndex(), curr.toString());
+                    balance.updateCoinText(curr.getBaseItem().getSymbol());
                 }
             }
         }
         if (!symbol_updated) {
-            CoinBalanceItem curr = coins.get(symbolBase);
-            if (curr != null && curr.getListIndex() >= 0) {
-                listProfitModel.set(curr.getListIndex(), curr.toString());
-            }
+            balance.updateCoinText(symbolBase);
         }
     }
-    
+
     public void updateAllPairTexts(boolean updateBalance) {
-        pairOrders.forEach((symbolPair, item) -> {
-            placeOrUpdatePair("", "", symbolPair, updateBalance);
+        pairOrders.forEach((orderCID, item) -> {
+            updatePairTrade(orderCID, updateBalance);
         });
     }
-    
-    public void updatePairText(String symbolPair, boolean updateBalance) {
-        placeOrUpdatePair("", "", symbolPair, updateBalance);
-    }
 
-    public void placeOrUpdatePair(String symbolBase, String symbolQuote, String symbolPair, boolean updateBalance) {
+    public Long registerPairTrade(String symbolBase, String symbolQuote, boolean updateBalance) {
+        Long orderCID = null;
         try {
             SEMAPHORE_ADDCOIN.acquire();
-            symbolPair = symbolPair.toUpperCase();
-            OrderPairItem cpair = pairOrders.get(symbolPair);
-            if (cpair == null) {
-                symbolBase = symbolBase.toUpperCase();
-                symbolQuote = symbolQuote.toUpperCase();
-                if (!symbolBase.isEmpty() && !symbolQuote.isEmpty()) {
-                    CoinBalanceItem cbase = coins.get(symbolBase);
-                    CoinBalanceItem cquote = coins.get(symbolQuote);
-                    if (cbase == null) {
-                        cbase = addCurrItem(symbolBase);
-                        cbase.setListIndex(-1);
-                        coins.put(symbolBase, cbase);
-                    } else {
-                        cbase.setPairKey(true);
-                    }
-                    if (cquote == null) {
-                        cquote = addCurrItem(symbolQuote);
-                        cquote.setListIndex(listProfitModel.size());
-                        coins.put(symbolQuote, cquote);
-                    }
-                    cpair = new OrderPairItem(cbase, cquote, symbolPair);
-                    cpair.setListIndex(listCurrenciesModel.size());
-                    pairOrders.put(symbolPair, cpair);
-                    if (updateBalance) {
-                        updateAllBalances(false);
-                    }
-                    listCurrenciesModel.addElement(cpair.toString());
-                    if (cquote.getListIndex() < listProfitModel.size()) {
-                        listProfitModel.set(cquote.getListIndex(), cquote.toString());
-                    } else {
-                        listProfitModel.addElement(cquote.toString());
-                    }
-                }
-            } else {
+            symbolBase = symbolBase.toUpperCase();
+            symbolQuote = symbolQuote.toUpperCase();
+            if (!symbolBase.isEmpty() && !symbolQuote.isEmpty()) {
+                orderCID = ++lastOrderId;
+                CoinBalanceItem cbase = balance.getCoinBalanceInfo(symbolBase);
+                CoinBalanceItem cquote = balance.getCoinBalanceInfo(symbolQuote);
+                OrderPairItem cpair = new OrderPairItem(cbase, cquote, symbolBase+symbolQuote);
+                cpair.setListIndex(listCurrenciesModel.size());
+                pairOrders.put(orderCID, cpair);
                 if (updateBalance) {
-                    updateAllBalances();
+                    balance.updateAllBalances(false);
+                }
+                listCurrenciesModel.addElement(cpair.toString());
+                balance.setCoinVisible(cbase.getSymbol());
+                balance.setCoinVisible(cquote.getSymbol());
+            }
+        } catch (Exception e) {
+        }
+        SEMAPHORE_ADDCOIN.release();
+        return orderCID;
+    }
+
+    public void updatePairTrade(Long orderCID, boolean updateBalance) {
+        try {
+            SEMAPHORE_ADDCOIN.acquire();
+            OrderPairItem cpair = pairOrders.get(orderCID);
+            if (cpair != null) {
+                if (updateBalance) {
+                    balance.updateAllBalances();
                 }
                 if (cpair.getListIndex() >= 0) {
                     listCurrenciesModel.set(cpair.getListIndex(), cpair.toString());
                 }
                 if (cpair.getBaseItem().getListIndex() >= 0) {
-                    listProfitModel.set(cpair.getBaseItem().getListIndex(), cpair.getBaseItem().toString());
+                    balance.updateCoinText(cpair.getBaseItem().getSymbol());
                 }
                 if (cpair.getQuoteItem().getListIndex() >= 0) {
-                    listProfitModel.set(cpair.getQuoteItem().getListIndex(), cpair.getQuoteItem().toString());
+                    balance.updateCoinText(cpair.getQuoteItem().getSymbol());
                 }
             }
         } catch (Exception e) {
         }
         SEMAPHORE_ADDCOIN.release();
     }
-
+    
     @Override
     protected void runStart() {
         info.StartAndWaitForInit();
-        showTradeComissionCurrency();
+        balance.StartAndWaitForInit();
     }
 
     @Override
@@ -566,13 +467,6 @@ public class OrdersController extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         
-    }
-    
-    /**
-     * @return the listProfitModel
-     */
-    public DefaultListModel<String> getListProfitModel() {
-        return listProfitModel;
     }
 
     /**
@@ -596,7 +490,7 @@ public class OrdersController extends PeriodicProcessThread {
     }
 
     public String getNthCurrencyPair(int n) {
-        for (Map.Entry<String, OrderPairItem> entry : pairOrders.entrySet()) {
+        for (Map.Entry<Long, OrderPairItem> entry : pairOrders.entrySet()) {
             if (entry.getValue().getListIndex() == n) {
                 return entry.getValue().getSymbolPair();
             }
@@ -618,19 +512,19 @@ public class OrdersController extends PeriodicProcessThread {
         this.isTestMode = isTestMode;
     }
 
-    public void removeCurrencyPair(String symbolPair) {
-        if (pairOrders.containsKey(symbolPair)) {
-            int list_index_to_remove = pairOrders.get(symbolPair).getListIndex();
+    public void removeCurrencyPair(Long orderCID) {
+        if (pairOrders.containsKey(orderCID)) {
+            int list_index_to_remove = pairOrders.get(orderCID).getListIndex();
             listCurrenciesModel.remove(list_index_to_remove);
-            pairOrders.remove(symbolPair);
+            pairOrders.remove(orderCID);
             pairOrders.entrySet().stream().filter((entry) -> (entry.getValue().getListIndex() > list_index_to_remove)).forEachOrdered((entry) -> {
                 entry.getValue().setListIndex(entry.getValue().getListIndex() - 1);
             });
         }
     }
 
-    public OrderPairItem getPairOrderInfo(String pair) {
-        return pairOrders.get(pair);
+    public OrderPairItem getPairOrderInfo(Long orderCID) {
+        return pairOrders.get(orderCID);
     }
     
     /**

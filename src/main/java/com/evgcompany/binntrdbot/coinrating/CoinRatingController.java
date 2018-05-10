@@ -372,9 +372,6 @@ public class CoinRatingController extends PeriodicProcessThread {
         }
         curr.is_new_pair = ((bars_d.size() > 0 || bars_h.size() > 0) && bars_d.size() < 12);
         curr.volatility = volatility_hour * 0.7f + volatility_day * 0.3f;
-        if (strategiesController.getOrdersController() == null) {
-            strategiesController.setOrdersController(mainApplication.getInstance().getOrdersController());
-        }
         strategiesController.setGroupName(curr.symbol);
         strategiesController.resetSeries();
         TradingAPIAbstractInterface.addSeriesBars(strategiesController.getSeries(), bars_h);

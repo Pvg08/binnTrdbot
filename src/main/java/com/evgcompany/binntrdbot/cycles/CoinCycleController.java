@@ -36,7 +36,7 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 public class CoinCycleController extends PeriodicProcessThread {
     private CoinRatingController coinRatingController = null;
     private TradePairProcessController pairProcessController = null;
-    private final List<tradeCycleProcess> cycleProcesses = new ArrayList<>();
+    private final List<TradeCycleProcess> cycleProcesses = new ArrayList<>();
     private CoinInfoAggregator info = null;
     
     private TradingAPIAbstractInterface client = null;
@@ -141,7 +141,7 @@ public class CoinCycleController extends PeriodicProcessThread {
                 }
             }
             if (!cycleProcesses.isEmpty()) {
-                for(tradeCycleProcess proc : cycleProcesses) {
+                for(TradeCycleProcess proc : cycleProcesses) {
                     if (proc.getUsedPairs().contains(pairSymbol)) return false;
                 }
             }
@@ -425,7 +425,7 @@ public class CoinCycleController extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Found cycle: " + best_cycle, true, true);
                     mainApplication.getInstance().log("Cycle description: " + getCycleDescription(best_cycle), true, false);
                     mainApplication.getInstance().log("Profit: " + best_profit, true, false);
-                    tradeCycleProcess cycleProcess = new tradeCycleProcess(this);
+                    TradeCycleProcess cycleProcess = new TradeCycleProcess(this);
                     cycleProcess.setDelayTime(1);
                     cycleProcess.setProfitAim(best_profit);
                     cycleProcess.addCycleToCycleChain(best_cycle);
@@ -576,7 +576,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         return mainCoinProfit * 0.95;
     }
     
-    public boolean doCycleSwap(tradeCycleProcess process) {
+    public boolean doCycleSwap(TradeCycleProcess process) {
         if (process.getCycleStep() >= process.getCycle().size()-1) {
             return false;
         }
