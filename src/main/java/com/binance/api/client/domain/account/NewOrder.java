@@ -1,5 +1,6 @@
 package com.binance.api.client.domain.account;
 
+import com.binance.api.client.SyncedTime;
 import com.binance.api.client.constant.BinanceApiConstants;
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderType;
@@ -81,7 +82,7 @@ public class NewOrder {
     this.timeInForce = timeInForce;
     this.quantity = quantity;
     this.newOrderRespType = NewOrderResponseType.RESULT;
-    this.timestamp = System.currentTimeMillis();
+    this.timestamp = SyncedTime.getInstance(-1).currentTimeMillis();
     this.recvWindow = BinanceApiConstants.DEFAULT_RECEIVING_WINDOW;
   }
 
