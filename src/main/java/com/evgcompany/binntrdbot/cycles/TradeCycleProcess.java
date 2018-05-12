@@ -122,7 +122,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         for(int i = from; i<cycle.size(); i++) {
             String cpair = getChainPair(cycle.get(i));
             if (orderCIDs.containsKey(cpair)) {
-                Long orderCID = ordersController.registerPairTrade(cpair, true);
+                Long orderCID = ordersController.registerPairTrade(cpair, null);
                 orderCIDs.put(cpair, orderCID);
             } else {
                 ordersController.updatePairTrade(orderCIDs.get(cpair), true);
@@ -315,7 +315,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         filter.logFiltersInfo();
         
         if (orderCIDs.containsKey(symbol)) {
-            Long orderCID = ordersController.registerPairTrade(symbol, true);
+            Long orderCID = ordersController.registerPairTrade(symbol, null);
             orderCIDs.put(symbol, orderCID);
         } else {
             ordersController.updatePairTrade(orderCIDs.get(symbol), true);

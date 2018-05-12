@@ -18,6 +18,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -562,5 +563,11 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
      */
     public Map<String, CoinFilters> getPairFilters() {
         return pairFilters;
+    }
+
+    public void setLatestPrice(String symbol, BigDecimal currentPrice) {
+        if (lastPrices.containsKey(symbol)) {
+            lastPrices.put(symbol, currentPrice.doubleValue());
+        }
     }
 }

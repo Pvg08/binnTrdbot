@@ -134,15 +134,7 @@ public class TradePairProcess extends PeriodicProcessThread {
         if (BalanceController.getInstance().canBuy(symbol, sold_amount, sold_price)) {
             app.log("BYING " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(sold_price) + ")", true, true);
             long result = ordersController.Buy(orderCID, sold_amount, sold_price);
-            if (result >= 0) {
-                limitOrderId = result;
-                app.log("Successful!", true, true);
-                is_hodling = true;
-                lastOrderMillis = System.currentTimeMillis();
-                if (limitOrderId == 0) {
-                    strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(sold_price), Decimal.valueOf(sold_amount));
-                }
-            } else {
+            if (result < 0) {
                 app.log("Error!", true, true);
             }
         } else {
@@ -175,36 +167,20 @@ public class TradePairProcess extends PeriodicProcessThread {
                 base_strategy_sell_ignored = false;
                 app.log("SELLING " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(curPrice) + ")", true, true);
                 long result = ordersController.Sell(orderCID, sold_amount, curPrice, orderToCancelOnSellUp);
-                if (result >= 0) {
-                    limitOrderId = result;
-                    app.log("Successful!", true, true);
-                    app.log("RESULT: " + NumberFormatter.df8.format(incomeWithoutComission) + " " + quoteAssetSymbol + " (" + NumberFormatter.df8.format(incomeWithoutComissionPercent) + "%)\n", true);
-                    is_hodling = false;
-                    orderToCancelOnSellUp.clear();
-                    isTryingToSellUp = false;
-                    last_trade_profit = incomeWithoutComissionPercent;
-                    lastOrderMillis = System.currentTimeMillis();
-                    if (limitOrderId == 0) {
-                        strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(curPrice), Decimal.valueOf(sold_amount));
-                        fullOrdersCount++;
-                        if (stopAfterSell) {
-                            doStop();
-                        }
-                    }
-                } else {
+                if (result < 0) {
                     app.log("Error!", true, true);
                 }
             } else {
-                app.log("Can't sell " + sold_amount + " " + symbol + "", false, true);
+                app.log("Can't sell " + NumberFormatter.df8.format(sold_amount) + " " + symbol + "", false, true);
             }
         } else {
-            app.log(symbol + " - need to exit but profit ("+incomeWithoutComissionPercent+"%) is too low. Waiting...", false, true);
+            app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(incomeWithoutComissionPercent)+"%) is too low. Waiting...", false, true);
             base_strategy_sell_ignored = true;
         }
     }
     
     private void checkOrder() {
-        if (ordersController.isTestMode()) {
+        /*if (ordersController.isTestMode()) {
             ordersController.finishOrder(orderCID, true, currentPrice);
             return;
         }
@@ -278,7 +254,7 @@ public class TradePairProcess extends PeriodicProcessThread {
                 }
             }
         }
-        ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
+        ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);*/
     }
 
     private boolean canBuyForCoinRating() {
@@ -400,6 +376,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             last_time = bars.get(bars.size() - 1).getBeginTime().toInstant().toEpochMilli();
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
+            info.setLatestPrice(symbol, currentPrice);
         }
 
         if (predictor != null && predictor.isHaveNetworkInFile()) {
@@ -412,6 +389,7 @@ public class TradePairProcess extends PeriodicProcessThread {
                 last_time = nbar.getBeginTime().toInstant().toEpochMilli();
             }
             currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
+            info.setLatestPrice(symbol, currentPrice);
             ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
             if (is_fin && (predictor == null || !predictor.isLearning())) {
                 app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
@@ -460,6 +438,77 @@ public class TradePairProcess extends PeriodicProcessThread {
         }
     }
     
+    private void onOrderEvent(
+            Long pairOrderCID, 
+            OrderPairItem orderPair, 
+            boolean isNew, 
+            boolean isBuying, 
+            boolean isCancelled, 
+            boolean isFinished, 
+            BigDecimal price, 
+            BigDecimal qty, 
+            BigDecimal executedQty) 
+    {
+        if (isNew) {
+            limitOrderId = orderPair.getOrderAPIID();
+            if (isBuying) {
+                app.log("Buying...!", true, true);
+                is_hodling = true;
+            } else {
+                app.log("Selling...", true, true);
+                is_hodling = false;
+                orderToCancelOnSellUp.clear();
+                isTryingToSellUp = false;
+            }
+        }
+        if (!isFinished) {
+            return;
+        }
+        limitOrderId = 0;
+
+        if (isCancelled || executedQty.compareTo(qty) < 0) {
+            // just cancelled or partially filled and then cancelled
+            if(isBuying) {
+                isTryingToSellUp = false;
+                is_hodling = false;
+                orderToCancelOnSellUp.clear();
+                base_strategy_sell_ignored = false;
+            } else {
+                is_hodling = true;
+            }
+
+            if (executedQty.compareTo(BigDecimal.ZERO) <= 0) {
+                app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is cancelled!", true, true);
+                ordersController.finishOrder(orderCID, false, price);
+            } else {
+                ordersController.finishOrderPart(orderCID, price, executedQty);
+                ordersController.finishOrder(orderCID, false, price);
+                sold_amount = sold_amount.subtract(executedQty);
+                app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is partially finished! Price = " + NumberFormatter.df8.format(price) + "; Quantity = " + NumberFormatter.df8.format(executedQty), true, true);
+            }
+
+        } else {
+            // filled
+            if(isBuying) {
+                strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
+            } else {
+                strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
+                fullOrdersCount++;
+            }
+
+            BigDecimal incomeWithoutComission = price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(sold_price);
+            BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price, RoundingMode.HALF_DOWN);
+            last_trade_profit = incomeWithoutComissionPercent;
+            lastOrderMillis = System.currentTimeMillis();
+
+            ordersController.finishOrder(orderCID, true, price);
+            app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is finished! Price = "+NumberFormatter.df8.format(price) + "; Profit = " + NumberFormatter.df4.format(incomeWithoutComissionPercent) + "%", true, true);
+            if (stopAfterSell && !isBuying) {
+                doStop();
+            }
+        }
+    }
+    
     @Override
     protected void runStart() {
         limitOrderId = 0;
@@ -485,7 +534,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             return;
         }
 
-        orderCID = ordersController.registerPairTrade(symbol, true);
+        orderCID = ordersController.registerPairTrade(symbol, this::onOrderEvent);
 
         if (!buyOnStart) {
             doWait(startDelayTime);
@@ -531,6 +580,7 @@ public class TradePairProcess extends PeriodicProcessThread {
     protected void runFinish() {
         stopSockets();
         info.stopDepthCheckForPair(symbol);
+        ordersController.unregisterPairTrade(orderCID);
         app.log("");
         app.log("thread for " + symbol + " is stopped...");
     }
@@ -803,7 +853,7 @@ public class TradePairProcess extends PeriodicProcessThread {
     }
     
     public boolean isInLimitOrder() {
-        return limitOrderId>0;
+        return limitOrderId > 0;
     }
 
     /**

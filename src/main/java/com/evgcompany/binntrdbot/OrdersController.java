@@ -5,11 +5,15 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.binance.api.client.domain.ExecutionType;
+import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
+import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
+import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.io.Closeable;
 import java.io.IOException;
@@ -17,6 +21,8 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
 import java.math.BigDecimal;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -135,48 +141,20 @@ public class OrdersController extends PeriodicProcessThread {
                 } else {
                     result = client.order(true, false, pair.getSymbolPair(), baseAmount, price);
                 }
-                if (result > 0) {
-                    if (use_transactions)
-                        pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
-                    app.log("Order id = " + result, false, true);
-                    Thread.sleep(550);
-                    Order mord = client.getOrderStatus(pair.getSymbolPair(), result);
-                    if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
-                        if (use_transactions)
-                            pair.rollbackTransaction();
-                        app.log("Order cancelled!", true, true);
-                        SEMAPHORE.release();
-                        return -1;
-                    } else if (mord.getStatus() == OrderStatus.FILLED) {
-                        if (use_transactions)
-                            pair.confirmTransaction();
-                        BigDecimal lastTradePrice = client.getLastTradePrice(pair.getSymbolPair(), true);
-                        if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
-                            app.log("Real order market price = " + NumberFormatter.df6.format(lastTradePrice), true, true);
-                            price = lastTradePrice;
-                            pair.setPrice(price);
-                            pair.setLastOrderPrice(lastTradePrice);
-                        } else {
-                            pair.setPrice(price);
-                            pair.setLastOrderPrice(price);
-                        }
-                        result = 0;
-                    }
-                } else {
-                    app.log("Order error!", true, true);
-                    SEMAPHORE.release();
-                    return -1;
-                }
             } else {
-                pair.setPrice(price);
-                pair.setLastOrderPrice(price);
-                if (use_transactions) {
-                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
-                    pair.confirmTransaction();
-                }
-                balance.testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
+                result = 1;
             }
-            updatePairTrade(orderCID, !isTestMode);
+            pair.resetCheckHashOrder();
+            pair.setOrderAPIID(result);
+            if (result > 0) {
+                if (use_transactions)
+                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
+                app.log("Order id = " + result, false, true);
+                Thread.sleep(550);
+                checkOrder(orderCID, pair);
+            } else {
+                app.log("Order error!", true, true);
+            }
             SEMAPHORE.release();
         } catch (Exception e) {
             e.printStackTrace(System.out);
@@ -233,48 +211,20 @@ public class OrdersController extends PeriodicProcessThread {
                 } else {
                     result = client.order(false, false, pair.getSymbolPair(), baseAmount, price);
                 }
-                if (result > 0) {
-                    if (use_transactions)
-                        pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
-                    app.log("Order id = " + result, false, true);
-                    Thread.sleep(550);
-                    Order mord = client.getOrderStatus(pair.getSymbolPair(), result);
-                    if (mord.getStatus() != OrderStatus.NEW && mord.getStatus() != OrderStatus.PARTIALLY_FILLED && mord.getStatus() != OrderStatus.FILLED) {
-                        if (use_transactions)
-                            pair.rollbackTransaction();
-                        app.log("Order cancelled!", true, true);
-                        SEMAPHORE.release();
-                        return -1;
-                    } else if (mord.getStatus() == OrderStatus.FILLED) {
-                        if (use_transactions)
-                            pair.confirmTransaction();
-                        BigDecimal lastTradePrice = client.getLastTradePrice(pair.getSymbolPair(), false);
-                        if (lastTradePrice.compareTo(BigDecimal.ZERO) > 0) {
-                            app.log("Real order market price = " + NumberFormatter.df6.format(lastTradePrice), true, true);
-                            price = lastTradePrice;
-                            pair.setPrice(price);
-                            pair.setLastOrderPrice(lastTradePrice);
-                        } else {
-                            pair.setPrice(price);
-                            pair.setLastOrderPrice(price);
-                        }
-                        result = 0;
-                    }
-                } else {
-                    app.log("Order error!", true, true);
-                    SEMAPHORE.release();
-                    return -1;
-                }
             } else {
-                pair.setPrice(price);
-                pair.setLastOrderPrice(price);
-                if (use_transactions) {
-                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
-                    pair.confirmTransaction();
-                }
-                balance.testPayTradeComission(baseAmount.multiply(price), pair.getSymbolQuote());
+                result = 1;
             }
-            updatePairTrade(orderCID, !isTestMode);
+            pair.resetCheckHashOrder();
+            pair.setOrderAPIID(result);
+            if (result > 0) {
+                if (use_transactions)
+                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
+                app.log("Order id = " + result, false, true);
+                Thread.sleep(550);
+                checkOrder(orderCID, pair);
+            } else {
+                app.log("Order error!", true, true);
+            }
             SEMAPHORE.release();
         } catch (Exception e) {
             e.printStackTrace(System.out);
@@ -410,7 +360,7 @@ public class OrdersController extends PeriodicProcessThread {
         });
     }
 
-    public Long registerPairTrade(String symbolPair, boolean updateBalance) {
+    public Long registerPairTrade(String symbolPair, PairOrderEvent orderEvent) {
         Long orderCID = null;
         try {
             SEMAPHORE_ADDCOIN.acquire();
@@ -422,10 +372,9 @@ public class OrdersController extends PeriodicProcessThread {
                 CoinBalanceItem cquote = balance.getCoinBalanceInfo(symbolQuote);
                 OrderPairItem cpair = new OrderPairItem(cbase, cquote, symbolPair);
                 cpair.setListIndex(listPairOrdersModel.size());
+                cpair.setOrderEvent(orderEvent);
                 pairOrders.put(orderCID, cpair);
-                if (updateBalance) {
-                    balance.updateAllBalances();
-                }
+                balance.updateAllBalances();
                 listPairOrdersModel.addElement(cpair.toString());
                 balance.setCoinVisible(cbase.getSymbol());
                 balance.setCoinVisible(cquote.getSymbol());
@@ -443,6 +392,155 @@ public class OrdersController extends PeriodicProcessThread {
         return orderCID;
     }
 
+    public void unregisterPairTrade(Long orderCID) {
+        if (orderCID != null && pairOrders.containsKey(orderCID)) {
+            removeCurrencyPair(orderCID);
+        }
+    }
+    
+    private String getStringHash(String sourceString) {
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            messageDigest.update(sourceString.getBytes());
+            String encryptedString = new String(messageDigest.digest());
+            return encryptedString;
+        } catch(NoSuchAlgorithmException e) {}
+        return null;
+    }
+    
+    private String getOrderHash(Order order) {
+        String sourceString = order.getSymbol() + " " + 
+                order.getOrderId().toString() + " " + 
+                order.getSide() + " " + 
+                order.getStatus() + " " + 
+                order.getType() + " " + 
+                order.getExecutedQty();
+        return getStringHash(sourceString);
+    }    
+    private String getEventHash(OrderTradeUpdateEvent event) {
+        String sourceString = event.getSymbol() + " " + 
+                event.getOrderId() + " " + 
+                event.getSide() + " " + 
+                event.getOrderStatus() + " " + 
+                event.getType() + " " + 
+                event.getAccumulatedQuantity();
+        return getStringHash(sourceString);
+    }
+    
+    private void orderEvent(OrderTradeUpdateEvent event) {
+        Long pairCID = null;
+        long orderId = event.getOrderId();
+        String symbol = event.getSymbol().toUpperCase();
+        for (Map.Entry<Long, OrderPairItem> entry : pairOrders.entrySet()) {
+            if (entry.getValue().getOrderAPIID() == orderId && symbol.equals(entry.getValue().getSymbolPair())) {
+                pairCID = entry.getKey();
+                break;
+            }
+        }
+        if (pairCID == null || pairOrders.get(pairCID).getOrderEvent() == null) {
+            return;
+        }
+        OrderPairItem pairItem = pairOrders.get(pairCID);
+
+        boolean isNew = (pairItem.getLastCheckHashOrder() != null && pairItem.getLastCheckHashOrder().isEmpty()) || 
+                event.getExecutionType() == ExecutionType.NEW;
+        
+        String newHash = getEventHash(event);
+        if (newHash != null && newHash.equals(pairItem.getLastCheckHashOrder())) {
+            return;
+        } else {
+            pairItem.setLastCheckHashOrder(newHash);
+        }
+        
+        BigDecimal price = new BigDecimal(event.getPrice());
+        BigDecimal executedQty = new BigDecimal(event.getAccumulatedQuantity());
+        BigDecimal qty = new BigDecimal(event.getOriginalQuantity());
+        boolean isCanceled = event.getOrderStatus() == OrderStatus.CANCELED || 
+                event.getOrderStatus() == OrderStatus.EXPIRED || 
+                event.getOrderStatus() == OrderStatus.REJECTED;
+        boolean isFinished = event.getOrderStatus() == OrderStatus.FILLED || isCanceled;
+        boolean isBuying = event.getSide() == OrderSide.BUY;
+
+        if (isFinished) {
+            pairItem.setOrderAPIID(0);
+            pairItem.resetCheckHashOrder();
+        }
+        
+        pairItem.getOrderEvent().onOrderUpdate(orderId, pairItem, isNew, isBuying, isCanceled, isFinished, price, qty, executedQty);
+        
+        if (executedQty.compareTo(BigDecimal.ZERO) > 0) {
+            mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
+            mainApplication.getInstance().systemSound();
+        }
+    }
+    
+    private void emulateTestOrder(Long orderCID, OrderPairItem pairItem) {
+        /*boolean isNew = pairItem.getLastCheckHashOrder()!=null && pairItem.getLastCheckHashOrder().isEmpty();
+        
+        BigDecimal price = pairItem.getLastOrderPrice();
+        BigDecimal executedQty = BigDecimal.ZERO;
+        BigDecimal qty = new BigDecimal(order.getOrigQty());
+        boolean isCanceled = false;
+        boolean isFinished = order.getStatus() == OrderStatus.FILLED || isCanceled;
+        boolean isBuying = order.getSide() == OrderSide.BUY;
+
+        if (isFinished) {
+            pairItem.setOrderAPIID(0);
+            pairItem.resetCheckHashOrder();
+        }
+        if (pairItem.getOrderEvent() != null) {
+            pairItem.getOrderEvent().onOrderUpdate(orderCID, pairItem, isNew, isBuying, isCanceled, isFinished, price, qty, executedQty);
+        }
+        mainApplication.getInstance().log("Checked: " + order.getType().name() + " " + order.getSide().name() + " " + order.getSymbol() + "; Qty=" + executedQty + "; Price=" + price, true, true);
+
+        
+        */
+    }
+    
+    private boolean checkOrder(Long orderCID, OrderPairItem pairItem) {
+        if (pairItem.getOrderAPIID() <= 0) return false;
+        if (isTestMode && pairItem.getOrderAPIID() == 1) {
+            emulateTestOrder(orderCID, pairItem);
+            return true;
+        }
+        Order order = client.getOrderStatus(pairItem.getSymbolPair(), pairItem.getOrderAPIID());
+        if(order != null) {
+            boolean isNew = pairItem.getLastCheckHashOrder()!=null && pairItem.getLastCheckHashOrder().isEmpty();
+            
+            String newHash = getOrderHash(order);
+            if (newHash != null && newHash.equals(pairItem.getLastCheckHashOrder())) {
+                return true;
+            } else {
+                pairItem.setLastCheckHashOrder(newHash);
+            }
+            BigDecimal price = new BigDecimal(order.getPrice());
+            BigDecimal executedQty = new BigDecimal(order.getExecutedQty());
+            BigDecimal qty = new BigDecimal(order.getOrigQty());
+            boolean isCanceled = order.getStatus() == OrderStatus.CANCELED || 
+                    order.getStatus() == OrderStatus.EXPIRED || 
+                    order.getStatus() == OrderStatus.REJECTED;
+            boolean isFinished = order.getStatus() == OrderStatus.FILLED || isCanceled;
+            boolean isBuying = order.getSide() == OrderSide.BUY;
+
+            if (isFinished) {
+                pairItem.setOrderAPIID(0);
+                pairItem.resetCheckHashOrder();
+            }
+            if (pairItem.getOrderEvent() != null) {
+                pairItem.getOrderEvent().onOrderUpdate(orderCID, pairItem, isNew, isBuying, isCanceled, isFinished, price, qty, executedQty);
+            }
+            mainApplication.getInstance().log("Checked: " + order.getType().name() + " " + order.getSide().name() + " " + order.getSymbol() + "; Qty=" + executedQty + "; Price=" + price, true, true);
+            return true;
+        }
+        return false;
+    }
+    
+    private void checkOrders() {
+        for (Map.Entry<Long, OrderPairItem> entry : pairOrders.entrySet()) {
+            if (checkOrder(entry.getKey(), entry.getValue())) doWait(500);
+        }
+    }
+    
     public void updatePairTrade(Long orderCID, boolean updateBalance) {
         try {
             SEMAPHORE_ADDCOIN.acquire();
@@ -470,18 +568,14 @@ public class OrdersController extends PeriodicProcessThread {
     protected void runStart() {
         info.StartAndWaitForInit();
         balance.StartAndWaitForInit();
-        
         if (!isTestMode) {
-            ordersSocket = client.OnOrderEvent(null, event -> {
-                mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
-                mainApplication.getInstance().systemSound();
-            });
+            ordersSocket = client.OnOrderEvent(null, this::orderEvent);
         }
     }
 
     @Override
     protected void runBody() {
-        
+        checkOrders();
     }
 
     @Override

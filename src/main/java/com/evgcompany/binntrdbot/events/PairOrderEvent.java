@@ -14,5 +14,15 @@ import java.math.BigDecimal;
  */
 @FunctionalInterface
 public interface PairOrderEvent {
-    void onOrderUpdate(Long orderCID, OrderPairItem orderPair, boolean finished, BigDecimal qty, BigDecimal executedQty);
+    void onOrderUpdate(
+            Long orderCID, 
+            OrderPairItem orderPair, 
+            boolean isNew,          // order is NEW
+            boolean isBuying,       // order is for BUY
+            boolean isCancelled,    // order is cancelled
+            boolean isFinished,     // order is finished (cancelled or filled)
+            BigDecimal price,       // order Price
+            BigDecimal qty,         // order original qty
+            BigDecimal executedQty  // order executed qty
+    );
 }

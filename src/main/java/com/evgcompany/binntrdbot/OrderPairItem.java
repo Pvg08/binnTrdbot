@@ -34,6 +34,9 @@ public class OrderPairItem {
     private int listIndex = -1;
     private PairOrderEvent orderEvent = null;
     private TradePairProcess pairProcess = null;
+    private long orderAPIID = 0;
+    
+    private String lastCheckHashOrder = "";
     
     public OrderPairItem(CoinBalanceItem base_item, CoinBalanceItem quote_item, String symbolPair) {
         this.base_item = base_item;
@@ -366,5 +369,37 @@ public class OrderPairItem {
      */
     public void setPairProcess(TradePairProcess pairProcess) {
         this.pairProcess = pairProcess;
+    }
+
+    /**
+     * @return the orderAPIID
+     */
+    public long getOrderAPIID() {
+        return orderAPIID;
+    }
+
+    /**
+     * @param orderAPIID the orderAPIID to set
+     */
+    public void setOrderAPIID(long orderAPIID) {
+        this.orderAPIID = orderAPIID;
+    }
+
+    /**
+     * @return the lastCheckHashOrder
+     */
+    public String getLastCheckHashOrder() {
+        return lastCheckHashOrder;
+    }
+
+    /**
+     * @param lastCheckHashOrder the lastCheckHashOrder to set
+     */
+    public void setLastCheckHashOrder(String lastCheckHashOrder) {
+        this.lastCheckHashOrder = lastCheckHashOrder;
+    }
+
+    public void resetCheckHashOrder() {
+        this.lastCheckHashOrder = "";
     }
 }

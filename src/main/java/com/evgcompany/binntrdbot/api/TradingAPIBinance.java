@@ -262,11 +262,14 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         }
         String listenKey = client.startUserDataStream();
         Closeable socket = client_s.onUserDataUpdateEvent(listenKey, response -> {
+            if (response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE) {
+                System.out.println(response.getOrderTradeUpdateEvent());
+            }
             if (
                     response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE &&
                     response.getOrderTradeUpdateEvent().getEventType().equals("executionReport") && 
                     response.getOrderTradeUpdateEvent().getOrderId() > 0 &&
-                    Double.parseDouble(response.getOrderTradeUpdateEvent().getAccumulatedQuantity()) > 0 &&
+                    //Double.parseDouble(response.getOrderTradeUpdateEvent().getAccumulatedQuantity()) > 0 &&
                     (
                         symbol == null ||
                         response.getOrderTradeUpdateEvent().getSymbol().toUpperCase().equals(symbol)
