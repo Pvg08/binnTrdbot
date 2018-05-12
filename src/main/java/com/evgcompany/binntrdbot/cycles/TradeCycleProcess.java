@@ -245,7 +245,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         limitOrderId = 0;
         ordersController.finishOrder(orderCIDs.get(symbol), true, null);
         if (!ordersController.isTestMode()) {
-            BalanceController.getInstance().updateAllBalances(true);
+            BalanceController.getInstance().updateAllBalances();
         } else {
             ordersController.updateAllPairTexts(!ordersController.isTestMode());
         }
@@ -264,7 +264,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         revertCoinCycle();
         
         if (!BalanceController.getInstance().isTestMode()) {
-            BalanceController.getInstance().updateAllBalances(true);
+            BalanceController.getInstance().updateAllBalances();
         }
         doStop();
         mainApplication.getInstance().log("Cycle "+cycle+" is aborted!", true, true);
@@ -292,7 +292,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         
         ordersController.finishOrder(orderCIDs.get(symbol), true, null);
         if (!BalanceController.getInstance().isTestMode()) {
-            BalanceController.getInstance().updateAllBalances(true);
+            BalanceController.getInstance().updateAllBalances();
         } else {
             ordersController.updateAllPairTexts(!ordersController.isTestMode());
         }
@@ -460,7 +460,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
                         cycleCoins.put(baseSymbol, amount.compareTo(tosell_amount) > 0 ? amount.subtract(tosell_amount).stripTrailingZeros() : BigDecimal.ZERO);
                         cycleCoins.put(quoteSymbol, tosell_amount.multiply(tosell_price).stripTrailingZeros());
                         if (!BalanceController.getInstance().isTestMode()) {
-                            BalanceController.getInstance().updateAllBalances(true);
+                            BalanceController.getInstance().updateAllBalances();
                         }
                         if (!reverting) doInitWaitNextStep();
                     }

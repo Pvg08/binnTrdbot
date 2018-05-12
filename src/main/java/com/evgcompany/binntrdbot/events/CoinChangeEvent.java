@@ -3,15 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.coinrating;
+package com.evgcompany.binntrdbot.events;
 
-import com.evgcompany.binntrdbot.BalanceController;
+import com.evgcompany.binntrdbot.CoinBalanceItem;
 
 /**
  *
- * @author EVG_adm_T
+ * @author EVG_Adminer
  */
 @FunctionalInterface
-public interface AccountCostUpdateEvent {
-    void onUpdate(BalanceController agg);
+public interface CoinChangeEvent {
+    void onCoinUpdate(CoinBalanceItem coin);
 }

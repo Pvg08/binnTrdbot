@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.evgcompany.binntrdbot.events.CoinChangeEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
 
@@ -25,6 +26,8 @@ public class CoinBalanceItem {
     private int active_orders = 0;
     
     private int listIndex = -1;
+    
+    private CoinChangeEvent coinEvent = null;
     
     public CoinBalanceItem(String symbol) {
         this.symbol = symbol;
@@ -203,5 +206,19 @@ public class CoinBalanceItem {
      */
     public void setListIndex(int listIndex) {
         this.listIndex = listIndex;
+    }
+
+    /**
+     * @return the coinEvent
+     */
+    public CoinChangeEvent getCoinEvent() {
+        return coinEvent;
+    }
+
+    /**
+     * @param coinEvent the coinEvent to set
+     */
+    public void setCoinEvent(CoinChangeEvent coinEvent) {
+        this.coinEvent = coinEvent;
     }
 }

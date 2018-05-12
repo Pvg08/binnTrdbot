@@ -243,7 +243,7 @@ public class TradePairProcess extends PeriodicProcessThread {
                         ordersController.finishOrderPart(orderCID, new BigDecimal(order.getPrice()), new BigDecimal(order.getExecutedQty()));
                         sold_amount = sold_amount.subtract(new BigDecimal(order.getExecutedQty()));
                         app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is partially finished! Price = "+order.getPrice() + "; Quantity = " + order.getExecutedQty(), true, true);
-                        BalanceController.getInstance().updateAllBalances(true);
+                        BalanceController.getInstance().updateAllBalances();
                         return;
                     }
                 } else {
@@ -255,7 +255,7 @@ public class TradePairProcess extends PeriodicProcessThread {
                     }
                 }
                 ordersController.finishOrder(orderCID, order.getStatus() == OrderStatus.FILLED, new BigDecimal(order.getPrice()));
-                BalanceController.getInstance().updateAllBalances(true);
+                BalanceController.getInstance().updateAllBalances();
                 app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is finished! Status="+order.getStatus().name()+"; Price = "+order.getPrice(), true, true);
                 if (stopAfterSell && order.getSide() == OrderSide.SELL && order.getStatus() == OrderStatus.FILLED) {
                     doStop();

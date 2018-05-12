@@ -3,15 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.api;
-
-import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
+package com.evgcompany.binntrdbot.events;
 
 /**
  *
- * @author EVG_Adminer
+ * @author EVG_adm_T
  */
 @FunctionalInterface
-public interface OrderEvent {
-    void onUpdate(OrderTradeUpdateEvent event);
+public interface GlobalTrendUpdateEvent {
+    void onUpdate(double trend_up, double trend_down);
 }

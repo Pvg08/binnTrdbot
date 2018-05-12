@@ -8,6 +8,7 @@ package com.evgcompany.binntrdbot.coinrating;
 import com.evgcompany.binntrdbot.*;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.cycles.CoinCycleController;
+import com.evgcompany.binntrdbot.events.GlobalTrendUpdateEvent;
 import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
@@ -49,9 +50,8 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  */
 public class CoinRatingController extends PeriodicProcessThread {
 
-    private final TradePairProcessController paircontroller;
+    private final TradePairProcessList paircontroller;
     private TradingAPIAbstractInterface client = null;
-    private Closeable orderEvent = null;
     
     private final String serialize_filename = "coinsRating_serialized.bin";
     
@@ -98,7 +98,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     private double downTrendPercent = 0;
     private boolean noAutoBuysOnDowntrend = false;
 
-    public CoinRatingController(mainApplication application, TradePairProcessController paircontroller) {
+    public CoinRatingController(mainApplication application, TradePairProcessList paircontroller) {
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
         strategiesController.setMainStrategy("No strategy");
@@ -124,12 +124,12 @@ public class CoinRatingController extends PeriodicProcessThread {
             out.writeObject(coinPairRatingMap);
             out.writeObject(coinRatingMap);
             out.flush();
-        } catch (Exception ex) {
+        } catch (IOException ex) {
             Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             try {
                 if (out != null) out.close();
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
@@ -155,7 +155,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             ) {
                 return true;
             }
-        } catch(Exception e) {}
+        } catch(IOException | ClassNotFoundException e) {}
         updateRanksMillis = 0;
         updateCoinsMillis = 0;
         coinPairRatingMap = null;
@@ -962,17 +962,12 @@ public class CoinRatingController extends PeriodicProcessThread {
             mainApplication.getInstance().log("Starting cycles controller...");
             coinCycleController.start();
         }
-
-        if (!OrdersController.getInstance().isTestMode()) {
-            orderEvent = client.OnOrderEvent(null, event -> {
-                mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
-                mainApplication.getInstance().systemSound();
-            });
-        }
         
         if (analyzer) {
             mainApplication.getInstance().log("Start to collect info for coins and pairs rating...");
         }
+        
+        mainApplication.getInstance().log("CoinRatingController started...");
     }
     
     @Override
@@ -1009,13 +1004,6 @@ public class CoinRatingController extends PeriodicProcessThread {
         saveToFile(serialize_filename);
         if (signalOrderController != null && signalOrderController.isAlive()) signalOrderController.doStop();
         if (coinCycleController != null && coinCycleController.isAlive()) coinCycleController.doStop();
-        if (orderEvent != null) {
-            try {
-                orderEvent.close();
-            } catch (IOException ex) {
-                Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
         mainApplication.getInstance().log("CoinRatingController finished.");
     }
 
@@ -1262,7 +1250,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     /**
      * @return the paircontroller
      */
-    public TradePairProcessController getPaircontroller() {
+    public TradePairProcessList getPaircontroller() {
         return paircontroller;
     }
 

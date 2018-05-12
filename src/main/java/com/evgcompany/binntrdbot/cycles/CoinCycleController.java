@@ -12,7 +12,7 @@ import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingPairLogItem;
 import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.mainApplication;
-import com.evgcompany.binntrdbot.TradePairProcessController;
+import com.evgcompany.binntrdbot.TradePairProcessList;
 import com.evgcompany.binntrdbot.analysis.TarjanSimpleCyclesFromVertex;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -35,7 +35,7 @@ import org.jgrapht.graph.DefaultWeightedEdge;
  */
 public class CoinCycleController extends PeriodicProcessThread {
     private CoinRatingController coinRatingController = null;
-    private TradePairProcessController pairProcessController = null;
+    private TradePairProcessList pairProcessController = null;
     private final List<TradeCycleProcess> cycleProcesses = new ArrayList<>();
     private CoinInfoAggregator info = null;
     
@@ -512,7 +512,7 @@ public class CoinCycleController extends PeriodicProcessThread {
     /**
      * @return the pairProcessController
      */
-    public TradePairProcessController getPairProcessController() {
+    public TradePairProcessList getPairProcessController() {
         return pairProcessController;
     }
 

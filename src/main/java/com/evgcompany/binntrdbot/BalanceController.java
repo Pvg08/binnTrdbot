@@ -7,7 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.domain.account.AssetBalance;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
-import com.evgcompany.binntrdbot.coinrating.AccountCostUpdateEvent;
+import com.evgcompany.binntrdbot.events.AccountCostUpdateEvent;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import java.io.Closeable;
 import java.io.IOException;
@@ -143,19 +143,20 @@ public class BalanceController extends PeriodicProcessThread {
         }
     }
 
-    public void updateCoinText(String symbol) {
-        CoinBalanceItem curr = coins.get(symbol);
-        if (curr != null && curr.getListIndex() >= 0) {
-            listProfitModel.set(curr.getListIndex(), curr.toString());
+    private void updateCoinText(CoinBalanceItem coinItem) {
+        if (coinItem != null && coinItem.getListIndex() >= 0) {
+            listProfitModel.set(coinItem.getListIndex(), coinItem.toString());
         }
     }
-
+    
+    public void updateCoinText(String symbol) {
+        updateCoinText(coins.get(symbol));
+    }
+    
     public void updateAllCoinsTexts() {
-        for (Map.Entry<String, CoinBalanceItem> entry : coins.entrySet()) {
-            if (entry.getValue() != null && entry.getValue().getListIndex() >= 0) {
-                listProfitModel.set(entry.getValue().getListIndex(), entry.getValue().toString());
-            }
-        }
+        coins.entrySet().forEach((entry) -> {
+            updateCoinText(entry.getValue());
+        });
     }
     
     public void setCoinVisible(String symbol) {
@@ -165,12 +166,12 @@ public class BalanceController extends PeriodicProcessThread {
                 curr.setListIndex(listProfitModel.size());
                 listProfitModel.addElement(curr.toString());
             } else {
-                listProfitModel.set(curr.getListIndex(), curr.toString());
+                updateCoinText(curr);
             }
         }
     }
     
-    private void updateBalances(List<AssetBalance> allBalances, boolean updateLists) {
+    private void updateBalances(List<AssetBalance> allBalances) {
         try {
             SEMAPHORE.acquire();
             for (int i = 0; i < allBalances.size(); i++) {
@@ -179,6 +180,9 @@ public class BalanceController extends PeriodicProcessThread {
                     CoinBalanceItem curr;
                     if (!coins.containsKey(symbol)) {
                         curr = new CoinBalanceItem(symbol);
+                        curr.setCoinEvent((coinItem)->{
+                            updateCoinText(coinItem);
+                        });
                     } else {
                         curr = coins.get(symbol);
                     }
@@ -196,9 +200,6 @@ public class BalanceController extends PeriodicProcessThread {
                     }
                 }
             }
-            if (updateLists) {
-                updateAllCoinsTexts();
-            }
         } catch (InterruptedException ex) {
             Logger.getLogger(BalanceController.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -206,26 +207,22 @@ public class BalanceController extends PeriodicProcessThread {
         SEMAPHORE.release();
     }
     
-    public void updateAllBalances(boolean updateLists) {
+    public void updateAllBalances() {
         if (client != null) {
             List<AssetBalance> allBalances = client.getAllBalances();
-            updateBalances(allBalances, updateLists);
+            updateBalances(allBalances);
         }
-    }
-    
-    public void updateAllBalances() {
-        updateAllBalances(true);
     }
     
     @Override
     protected void runStart() {
         info.StartAndWaitForInit();
-        updateAllBalances(true);
+        updateAllBalances();
         showTradeComissionCurrency();
         if (!isTestMode) {
             socket = client.OnBalanceEvent((balances) -> {
                 System.out.println("Balance changed: " + balances);
-                updateBalances(balances, true);
+                updateBalances(balances);
             });
         }
     }
@@ -233,7 +230,7 @@ public class BalanceController extends PeriodicProcessThread {
     @Override
     protected void runBody() {
         if (!isTestMode) {
-            updateAllBalances(true);
+            updateAllBalances();
         }
     }
 

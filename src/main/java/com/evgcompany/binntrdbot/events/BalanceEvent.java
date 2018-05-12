@@ -3,15 +3,16 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.api;
+package com.evgcompany.binntrdbot.events;
 
-import org.ta4j.core.Bar;
+import com.binance.api.client.domain.account.AssetBalance;
+import java.util.List;
 
 /**
  *
  * @author EVG_Adminer
  */
 @FunctionalInterface
-public interface BarEvent {
-    void onUpdate(Bar last_bar, boolean is_closed);
+public interface BalanceEvent {
+    void onUpdate(List<AssetBalance> assetBalances);
 }

@@ -22,7 +22,7 @@ public class SignalOrderController extends PeriodicProcessThread {
 
     private final CoinRatingController coinRatingController;
     private SignalController signalcontroller = null;
-    private final TradePairProcessController paircontroller;
+    private final TradePairProcessList pairProcessList;
 
     private boolean autoSignalOrder = false;
     private boolean autoSignalFastOrder = false;
@@ -32,11 +32,11 @@ public class SignalOrderController extends PeriodicProcessThread {
     private int maxEnter = 10;
     private int secondsOrderEnterWait = 28800;
     
-    public SignalOrderController(CoinRatingController coinRatingController, TradePairProcessController paircontroller) {
+    public SignalOrderController(CoinRatingController coinRatingController, TradePairProcessList pairProcessList) {
         this.coinRatingController = coinRatingController;
         signalcontroller = new SignalController();
         signalcontroller.setCoinRatingController(coinRatingController);
-        this.paircontroller = paircontroller;
+        this.pairProcessList = pairProcessList;
     }
 
     private boolean signalOrderEnter(SignalItem item) {
@@ -50,16 +50,16 @@ public class SignalOrderController extends PeriodicProcessThread {
         ) {
             if (
                 !pair.isEmpty() && 
-                !paircontroller.hasPair(pair)
+                !pairProcessList.hasPair(pair)
             ) {
                 CoinRatingPairLogItem toenter = coinRatingController.getCoinPairRatingMap().get(pair);
                 if (toenter != null) {
                     if (autoSignalFastOrder) {
                         mainApplication.getInstance().log("Trying to auto fast-enter signal with pair: " + pair, true, true);
-                        toenter.pair = paircontroller.addPairFastRun(pair);
+                        toenter.pair = pairProcessList.addPairFastRun(pair);
                     } else {
                         mainApplication.getInstance().log("Trying to auto enter signal with pair: " + pair, true, true);
-                        toenter.pair = paircontroller.addPair(pair);
+                        toenter.pair = pairProcessList.addPair(pair);
                     }
                     toenter.pair.setSignalOrder(item);
                     entered.put(pair, toenter);
@@ -99,7 +99,7 @@ public class SignalOrderController extends PeriodicProcessThread {
                             )
                     ) {
                         mainApplication.getInstance().log("Exit from order: " + rentered.pair.getSymbol(), true, true);
-                        paircontroller.removePair(rentered.pair.getSymbol());
+                        pairProcessList.removePair(rentered.pair.getSymbol());
                         if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0 || !rentered.pair.isTriedBuy()) {
                             rentered.rating_inc -= 1;
                         } else {
@@ -118,7 +118,7 @@ public class SignalOrderController extends PeriodicProcessThread {
                 String worst_free_pair = getWorstFreeEnteredSignal();
                 if (worst_free_pair != null && !worst_free_pair.isEmpty()) {
                     mainApplication.getInstance().log("Exit from worst order: " + worst_free_pair, true, true);
-                    paircontroller.removePair(worst_free_pair);
+                    pairProcessList.removePair(worst_free_pair);
                     listRemove.add(worst_free_pair);
                     entered.get(worst_free_pair).pair = null;
                 }

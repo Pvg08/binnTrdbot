@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  *
  * @author EVG_Adminer
  */
-public class TradePairProcessController {
+public class TradePairProcessList {
     
     private OrdersController ordersController = null;
     private final List<TradePairProcess> pairs = new ArrayList<>(0);
@@ -37,7 +37,7 @@ public class TradePairProcessController {
     private int buyStopLimitedTimeout;
     private int sellStopLimitedTimeout;
     
-    public TradePairProcessController() {
+    public TradePairProcessList() {
         this.ordersController = OrdersController.getInstance();
     }
     

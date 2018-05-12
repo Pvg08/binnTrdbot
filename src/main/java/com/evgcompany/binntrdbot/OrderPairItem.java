@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
 
@@ -31,6 +32,8 @@ public class OrderPairItem {
     private String marker = "";
     
     private int listIndex = -1;
+    private PairOrderEvent orderEvent = null;
+    private TradePairProcess pairProcess = null;
     
     public OrderPairItem(CoinBalanceItem base_item, CoinBalanceItem quote_item, String symbolPair) {
         this.base_item = base_item;
@@ -117,6 +120,18 @@ public class OrderPairItem {
     
     public void setInitialValue(BigDecimal val) {
         base_item.setInitialValue(val);
+        runBaseCoinEvent();
+    }
+    
+    private void runBaseCoinEvent() {
+        if (base_item.getCoinEvent() != null) base_item.getCoinEvent().onCoinUpdate(base_item);
+    }
+    private void runQuoteCoinEvent() {
+        if (quote_item.getCoinEvent() != null) quote_item.getCoinEvent().onCoinUpdate(quote_item);
+    }
+    private void runCoinEvents() {
+        runBaseCoinEvent();
+        runQuoteCoinEvent();
     }
     
     public void preBuyTransaction(BigDecimal summBase, BigDecimal summQuote, boolean change_initial_values) {
@@ -131,6 +146,7 @@ public class OrderPairItem {
             in_sell_order = false;
             summOrderBase = BigDecimal.ZERO;
             summOrderQuote = BigDecimal.ZERO;
+            runCoinEvents();
         }
     }
 
@@ -146,6 +162,7 @@ public class OrderPairItem {
             in_sell_order = false;
             in_order_buy_sell_cycle = true;
             order_pending = true;
+            runCoinEvents();
         }
     }
     public void startSellTransaction(BigDecimal summBase, BigDecimal summQuote) {
@@ -158,6 +175,7 @@ public class OrderPairItem {
             quote_item.incActiveOrders();
             in_sell_order = true;
             order_pending = true;
+            runCoinEvents();
         }
     }
     public void confirmTransaction() {
@@ -178,6 +196,7 @@ public class OrderPairItem {
         order_pending = false;
         base_item.decActiveOrders();
         quote_item.decActiveOrders();
+        runCoinEvents();
     }
 
     public void confirmTransactionPart(BigDecimal summPartBase, BigDecimal summPartQuote) {
@@ -190,6 +209,7 @@ public class OrderPairItem {
         }
         summOrderBase = summOrderBase.subtract(summPartBase);
         summOrderQuote = summOrderQuote.subtract(summPartQuote);
+        runCoinEvents();
     }
 
     public void rollbackTransaction() {
@@ -208,6 +228,7 @@ public class OrderPairItem {
         order_pending = false;
         base_item.decActiveOrders();
         quote_item.decActiveOrders();
+        runCoinEvents();
     }
     
     public void simpleBuy(BigDecimal summBase, BigDecimal summQuote) {
@@ -216,6 +237,7 @@ public class OrderPairItem {
         summOrderQuote = summQuote;
         quote_item.addFreeValue(summOrderQuote.multiply(new BigDecimal("-1")));
         base_item.addFreeValue(summOrderBase);
+        runCoinEvents();
     }
 
     public void simpleSell(BigDecimal summBase, BigDecimal summQuote) {
@@ -224,6 +246,7 @@ public class OrderPairItem {
         summOrderQuote = summQuote;
         quote_item.addFreeValue(summOrderQuote);
         base_item.addFreeValue(summOrderBase.multiply(new BigDecimal("-1")));
+        runCoinEvents();
     }
     
     /**
@@ -315,5 +338,33 @@ public class OrderPairItem {
      */
     public void setMarker(String marker) {
         this.marker = marker;
+    }
+
+    /**
+     * @return the orderEvent
+     */
+    public PairOrderEvent getOrderEvent() {
+        return orderEvent;
+    }
+
+    /**
+     * @param orderEvent the orderEvent to set
+     */
+    public void setOrderEvent(PairOrderEvent orderEvent) {
+        this.orderEvent = orderEvent;
+    }
+
+    /**
+     * @return the pairProcess
+     */
+    public TradePairProcess getPairProcess() {
+        return pairProcess;
+    }
+
+    /**
+     * @param pairProcess the pairProcess to set
+     */
+    public void setPairProcess(TradePairProcess pairProcess) {
+        this.pairProcess = pairProcess;
     }
 }

@@ -3,16 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.api;
+package com.evgcompany.binntrdbot.events;
 
-import com.binance.api.client.domain.account.AssetBalance;
-import java.util.List;
+import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
 
 /**
  *
  * @author EVG_Adminer
  */
 @FunctionalInterface
-public interface BalanceEvent {
-    void onUpdate(List<AssetBalance> assetBalances);
+public interface OrderEvent {
+    void onUpdate(OrderTradeUpdateEvent event);
 }

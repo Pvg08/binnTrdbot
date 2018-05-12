@@ -9,7 +9,10 @@ import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
+import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
@@ -17,6 +20,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -57,6 +62,7 @@ public class OrdersController extends PeriodicProcessThread {
     private boolean autoPickStrategyParams = false;
 
     private TradingAPIAbstractInterface client = null;
+    private Closeable ordersSocket = null;
 
     private OrdersController() {
         app = mainApplication.getInstance();
@@ -418,7 +424,7 @@ public class OrdersController extends PeriodicProcessThread {
                 cpair.setListIndex(listPairOrdersModel.size());
                 pairOrders.put(orderCID, cpair);
                 if (updateBalance) {
-                    balance.updateAllBalances(false);
+                    balance.updateAllBalances();
                 }
                 listPairOrdersModel.addElement(cpair.toString());
                 balance.setCoinVisible(cbase.getSymbol());
@@ -464,6 +470,13 @@ public class OrdersController extends PeriodicProcessThread {
     protected void runStart() {
         info.StartAndWaitForInit();
         balance.StartAndWaitForInit();
+        
+        if (!isTestMode) {
+            ordersSocket = client.OnOrderEvent(null, event -> {
+                mainApplication.getInstance().log("OrderEvent: " + event.getType().name() + " " + event.getSide().name() + " " + event.getSymbol() + "; Qty=" + event.getAccumulatedQuantity() + "; Price=" + event.getPrice(), true, true);
+                mainApplication.getInstance().systemSound();
+            });
+        }
     }
 
     @Override
@@ -474,6 +487,13 @@ public class OrdersController extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         mainApplication.getInstance().log("Stopping orders update thread...");
+        if (ordersSocket != null) {
+            try {
+                ordersSocket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }
 
     /**

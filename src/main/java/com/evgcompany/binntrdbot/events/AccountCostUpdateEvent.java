@@ -3,13 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.evgcompany.binntrdbot.coinrating;
+package com.evgcompany.binntrdbot.events;
+
+import com.evgcompany.binntrdbot.BalanceController;
 
 /**
  *
  * @author EVG_adm_T
  */
 @FunctionalInterface
-public interface GlobalTrendUpdateEvent {
-    void onUpdate(double trend_up, double trend_down);
+public interface AccountCostUpdateEvent {
+    void onUpdate(BalanceController agg);
 }

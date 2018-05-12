@@ -34,7 +34,7 @@ public class mainApplication extends javax.swing.JFrame {
     private static final Semaphore SEMAPHORE_LOG = new Semaphore(1, true);
     
     private ComponentsConfigController config = null;
-    private TradePairProcessController pairProcessController = null;
+    private TradePairProcessList pairProcessController = null;
     private CoinRatingController coinRatingController = null;
     
     private boolean is_paused = false;
@@ -57,7 +57,7 @@ public class mainApplication extends javax.swing.JFrame {
     public mainApplication() {
         instance = this;
         config = new ComponentsConfigController(this);
-        pairProcessController = new TradePairProcessController();
+        pairProcessController = new TradePairProcessList();
         coinRatingController = new CoinRatingController(this, pairProcessController);
         initComponents();
         DefaultCaret caret = (DefaultCaret)logTextarea.getCaret();
@@ -184,7 +184,7 @@ public class mainApplication extends javax.swing.JFrame {
         log(txt, is_main, false);
     }
     
-    public TradePairProcessController getPairProcessController() {
+    public TradePairProcessList getPairProcessController() {
         return pairProcessController;
     }
     
@@ -1699,7 +1699,7 @@ public class mainApplication extends javax.swing.JFrame {
             OrdersController.getInstance().setStopLossPercent(checkBoxStopLoss.isSelected() ? BigDecimal.valueOf((Integer) spinnerStopLoss.getValue()) : null);
             OrdersController.getInstance().setLowHold(checkBoxLowHold.isSelected());
             OrdersController.getInstance().setDelayTime((Integer) spinnerUpdateDelay.getValue());
-            BalanceController.getInstance().setDelayTime(720);
+            BalanceController.getInstance().setDelayTime(240);
             BalanceController.getInstance().setTestMode(checkboxTestMode.isSelected());
 
             BalanceController.getInstance().start();
