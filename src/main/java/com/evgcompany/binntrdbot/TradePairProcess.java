@@ -37,7 +37,7 @@ import org.ta4j.core.TimeSeries;
  *
  * @author EVG_adm_T
  */
-public class TradePairProcess extends PeriodicProcessThread {
+public class TradePairProcess extends PeriodicProcessThread implements ControllableOrderProcess {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     protected final TradingAPIAbstractInterface client;
@@ -51,7 +51,8 @@ public class TradePairProcess extends PeriodicProcessThread {
     private final String symbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
-    private Long orderCID;
+    
+    private Long orderCID = null;
     
     private boolean isTryingToSellUp = false;
     private boolean isTryingToBuyDip = false;
@@ -62,15 +63,11 @@ public class TradePairProcess extends PeriodicProcessThread {
     private final List<Long> orderToCancelOnSellUp = new ArrayList<>();
     private long last_time = 0;
     
-    private long limitOrderId = 0;
-    
     private BigDecimal tradingBalancePercent = new BigDecimal("50");
     
     private TimeSeries series = null;
     
     private boolean is_hodling = false;
-    private BigDecimal sold_price = BigDecimal.ZERO;
-    private BigDecimal sold_amount = BigDecimal.ZERO;
     private BigDecimal last_trade_profit = BigDecimal.ZERO;
     
     private CurrencyPlot plot = null;
@@ -97,7 +94,12 @@ public class TradePairProcess extends PeriodicProcessThread {
     private BigDecimal currentPrice = BigDecimal.ZERO;
     private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
+    private BigDecimal lastBuyPrice = BigDecimal.ZERO;
+    private BigDecimal lastBuyAmount = BigDecimal.ZERO;
+    
     private SignalItem init_signal = null;
+    
+    private boolean inAPIOrder = false;
     
     public TradePairProcess(TradingAPIAbstractInterface rclient, String pair) {
         app = mainApplication.getInstance();
@@ -127,32 +129,32 @@ public class TradePairProcess extends PeriodicProcessThread {
         filter.setCurrentPrice(curPrice);
         filter.setCurrentAmount(quote_asset_amount);
         filter.prepareForBuy();
-        sold_price = filter.getCurrentPrice();
-        sold_amount = filter.getCurrentAmount();
-        quote_asset_amount = sold_price.multiply(sold_amount);
+        BigDecimal tobuy_price = filter.getCurrentPrice();
+        BigDecimal tobuy_amount = filter.getCurrentAmount();
+        quote_asset_amount = tobuy_price.multiply(tobuy_amount);
         base_strategy_sell_ignored = false;
-        if (BalanceController.getInstance().canBuy(symbol, sold_amount, sold_price)) {
-            app.log("BYING " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(sold_price) + ")", true, true);
-            long result = ordersController.Buy(orderCID, sold_amount, sold_price);
+        if (BalanceController.getInstance().canBuy(symbol, tobuy_amount, tobuy_price)) {
+            app.log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
+            long result = ordersController.Buy(orderCID, tobuy_amount, tobuy_price);
             if (result < 0) {
                 app.log("Error!", true, true);
             }
         } else {
-            app.log("Can't buy " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(curPrice) + ")");
+            app.log("Can't buy " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")");
         }
     }
-    private void doExit(BigDecimal curPrice, boolean skip_check) {
-        if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
+    private void doExit(BigDecimal price, boolean skip_check) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        filter.setCurrentPrice(curPrice);
-        filter.setCurrentAmount(sold_amount);
+        filter.setCurrentPrice(price);
+        filter.setCurrentAmount(lastBuyAmount);
         filter.prepareForSell();
-        curPrice = filter.getCurrentPrice();
-        sold_amount = filter.getCurrentAmount();
-        BigDecimal quote_asset_amount = sold_amount.multiply(curPrice);
-        BigDecimal incomeWithoutComission = sold_amount.multiply(curPrice.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(sold_price));
-        BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price.multiply(sold_amount), RoundingMode.HALF_DOWN);
+        BigDecimal tosell_price = filter.getCurrentPrice();
+        BigDecimal tosell_amount = filter.getCurrentAmount();
+        BigDecimal quote_asset_amount = tosell_amount.multiply(tosell_price);
+        BigDecimal incomeWithoutComission = tosell_price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
+        BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(lastBuyPrice, RoundingMode.HALF_DOWN);
         if (
                 skip_check || 
                 !ordersController.isLowHold() || 
@@ -163,15 +165,15 @@ public class TradePairProcess extends PeriodicProcessThread {
                     incomeWithoutComissionPercent.compareTo(ordersController.getStopLossPercent().multiply(BigDecimal.valueOf(-1))) < 0
                 )
             ) {
-            if (BalanceController.getInstance().canSell(symbol, sold_amount)) {
+            if (BalanceController.getInstance().canSell(symbol, tosell_amount)) {
                 base_strategy_sell_ignored = false;
-                app.log("SELLING " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(curPrice) + ")", true, true);
-                long result = ordersController.Sell(orderCID, sold_amount, curPrice, orderToCancelOnSellUp);
+                app.log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
+                long result = ordersController.Sell(orderCID, tosell_amount, tosell_price, orderToCancelOnSellUp);
                 if (result < 0) {
                     app.log("Error!", true, true);
                 }
             } else {
-                app.log("Can't sell " + NumberFormatter.df8.format(sold_amount) + " " + symbol + "", false, true);
+                app.log("Can't sell " + NumberFormatter.df8.format(tosell_amount) + " " + symbol + "", false, true);
             }
         } else {
             app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(incomeWithoutComissionPercent)+"%) is too low. Waiting...", false, true);
@@ -179,8 +181,8 @@ public class TradePairProcess extends PeriodicProcessThread {
         }
     }
     
-    private void checkOrder() {
-        /*if (ordersController.isTestMode()) {
+    /*private void checkOrder() {
+        if (ordersController.isTestMode()) {
             ordersController.finishOrder(orderCID, true, currentPrice);
             return;
         }
@@ -254,8 +256,8 @@ public class TradePairProcess extends PeriodicProcessThread {
                 }
             }
         }
-        ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);*/
-    }
+        ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
+    }*/
 
     private boolean canBuyForCoinRating() {
         return app.getCoinRatingController() == null || 
@@ -277,7 +279,8 @@ public class TradePairProcess extends PeriodicProcessThread {
                 doExit(lastStrategyCheckPrice, false);
             }
         }
-        ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
+        info.setLatestPrice(symbol, currentPrice);
+        ordersController.updatePairTrade(orderCID);
     }
     
     private void addBars(List<Bar> nbars) {
@@ -325,17 +328,18 @@ public class TradePairProcess extends PeriodicProcessThread {
 
             if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !orderToCancelOnSellUp.isEmpty())) {
                 BigDecimal res_cnt = free_cnt.add(order_cnt);
+                inAPIOrder = false;
                 base_strategy_sell_ignored = true;
-                sold_price = lastBuyPrice;
-                sold_amount = res_cnt;
+                this.lastBuyPrice = lastBuyPrice;
+                lastBuyAmount = res_cnt;
                 stopAfterSell = true;
-                app.log("START WAITING to sell " + NumberFormatter.df8.format(sold_amount) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
-                long result = ordersController.PreBuySell(orderCID, sold_amount, lastBuyPrice, currentLimitSellQty, currentLimitSellPrice);
-                if (result >= 0) {
-                    limitOrderId = result;
+                app.log("START WAITING to sell " + NumberFormatter.df8.format(lastBuyAmount) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
+                boolean result = ordersController.PreBuySell(orderCID, lastBuyAmount, lastBuyPrice, currentLimitSellQty, currentLimitSellPrice);
+                if (result) {
                     app.log("Successful waiting start!", true, true);
                     is_hodling = true;
-                    ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
+                    info.setLatestPrice(symbol, currentPrice);
+                    ordersController.updatePairTrade(orderCID);
                 } else {
                     app.log("Error in Buy method!", true, true);
                 }
@@ -377,6 +381,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
             info.setLatestPrice(symbol, currentPrice);
+            ordersController.updatePairTrade(orderCID);
         }
 
         if (predictor != null && predictor.isHaveNetworkInFile()) {
@@ -390,7 +395,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             }
             currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
             info.setLatestPrice(symbol, currentPrice);
-            ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
+            ordersController.updatePairTrade(orderCID);
             if (is_fin && (predictor == null || !predictor.isLearning())) {
                 app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
             }
@@ -450,7 +455,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             BigDecimal executedQty) 
     {
         if (isNew) {
-            limitOrderId = orderPair.getOrderAPIID();
+            inAPIOrder = true;
             if (isBuying) {
                 app.log("Buying...!", true, true);
                 is_hodling = true;
@@ -464,8 +469,9 @@ public class TradePairProcess extends PeriodicProcessThread {
         if (!isFinished) {
             return;
         }
-        limitOrderId = 0;
 
+        inAPIOrder = false;
+        
         if (isCancelled || executedQty.compareTo(qty) < 0) {
             // just cancelled or partially filled and then cancelled
             if(isBuying) {
@@ -481,28 +487,40 @@ public class TradePairProcess extends PeriodicProcessThread {
                 app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is cancelled!", true, true);
                 ordersController.finishOrder(orderCID, false, price);
             } else {
+                if(isBuying) {
+                    lastBuyPrice = price;
+                    lastBuyAmount = executedQty;
+                } else {
+                    lastBuyAmount = lastBuyAmount.subtract(executedQty);
+                }
                 ordersController.finishOrderPart(orderCID, price, executedQty);
                 ordersController.finishOrder(orderCID, false, price);
-                sold_amount = sold_amount.subtract(executedQty);
                 app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is partially finished! Price = " + NumberFormatter.df8.format(price) + "; Quantity = " + NumberFormatter.df8.format(executedQty), true, true);
             }
 
         } else {
             // filled
+            
+            String profitStr = "";
+            
             if(isBuying) {
+                lastBuyPrice = price;
+                lastBuyAmount = executedQty;
                 strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
             } else {
                 strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
                 fullOrdersCount++;
+                
+                BigDecimal incomeWithoutComission = price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
+                BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(lastBuyPrice, RoundingMode.HALF_DOWN);
+                last_trade_profit = incomeWithoutComissionPercent;
+                profitStr = "; Profit = " + NumberFormatter.df4.format(incomeWithoutComissionPercent) + "%";
             }
 
-            BigDecimal incomeWithoutComission = price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(sold_price);
-            BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(sold_price, RoundingMode.HALF_DOWN);
-            last_trade_profit = incomeWithoutComissionPercent;
             lastOrderMillis = System.currentTimeMillis();
 
             ordersController.finishOrder(orderCID, true, price);
-            app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is finished! Price = "+NumberFormatter.df8.format(price) + "; Profit = " + NumberFormatter.df4.format(incomeWithoutComissionPercent) + "%", true, true);
+            app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is finished! Price = "+NumberFormatter.df8.format(price) + profitStr, true, true);
             if (stopAfterSell && !isBuying) {
                 doStop();
             }
@@ -511,7 +529,6 @@ public class TradePairProcess extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
-        limitOrderId = 0;
 
         if (!buyOnStart) {
             doWait(ThreadLocalRandom.current().nextLong(100, 500));
@@ -534,7 +551,7 @@ public class TradePairProcess extends PeriodicProcessThread {
             return;
         }
 
-        orderCID = ordersController.registerPairTrade(symbol, this::onOrderEvent);
+        orderCID = ordersController.registerPairTrade(symbol, this, this::onOrderEvent);
 
         if (!buyOnStart) {
             doWait(startDelayTime);
@@ -569,9 +586,7 @@ public class TradePairProcess extends PeriodicProcessThread {
                 app.log(symbol + " NEUR prediction = " + NumberFormatter.df8.format(nbar.getClosePrice()));
             }
         }
-        if (limitOrderId > 0) {
-            checkOrder();
-        } else {
+        if (!inAPIOrder) {
             checkStatus();
         }
     }
@@ -601,28 +616,23 @@ public class TradePairProcess extends PeriodicProcessThread {
         return is_hodling;
     }
 
+    @Override
     public void doBuy() {
-        if (!is_hodling && limitOrderId == 0) {
-            this.doEnter(currentPrice);
+        if (!is_hodling && !inAPIOrder) {
+            doEnter(currentPrice);
         }
     }
 
+    @Override
     public void doSell() {
-        if (is_hodling && limitOrderId == 0) {
-            this.doExit(currentPrice, true);
+        if (is_hodling && !inAPIOrder) {
+            doExit(currentPrice, true);
         }
     }
 
-    public void doLimitCancel() {
-        if (limitOrderId > 0) {
-            ordersController.cancelOrder(orderCID, limitOrderId);
-            if (ordersController.isTestMode()) {
-                limitOrderId = 0;
-            } else {
-                doWait(1000);
-                checkOrder();
-            }
-        }
+    @Override
+    public void orderCancel() {
+        ordersController.cancelOrder(orderCID);
     }
     
     public void doShowPlot() {
@@ -852,8 +862,8 @@ public class TradePairProcess extends PeriodicProcessThread {
         return isTriedBuy;
     }
     
-    public boolean isInLimitOrder() {
-        return limitOrderId > 0;
+    public boolean isInAPIOrder() {
+        return inAPIOrder;
     }
 
     /**

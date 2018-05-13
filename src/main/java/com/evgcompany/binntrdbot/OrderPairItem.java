@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot;
 
+import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
@@ -27,13 +28,14 @@ public class OrderPairItem {
     private boolean order_pending;
     private boolean in_sell_order = false;
     private BigDecimal last_order_price = BigDecimal.ZERO;
-    private BigDecimal price = BigDecimal.ZERO;
-    
+    private BigDecimal last_order_amount = BigDecimal.ZERO;
+
     private String marker = "";
     
     private int listIndex = -1;
     private PairOrderEvent orderEvent = null;
-    private TradePairProcess pairProcess = null;
+    private ControllableOrderProcess orderProcess = null;
+    
     private long orderAPIID = 0;
     
     private String lastCheckHashOrder = "";
@@ -48,7 +50,6 @@ public class OrderPairItem {
         listIndex = -1;
         in_order_buy_sell_cycle = false;
         order_pending = false;
-        price = BigDecimal.ZERO;
     }
 
     @Override
@@ -97,11 +98,11 @@ public class OrderPairItem {
             }
         }
  
-        if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
-            txt = txt + " [Cur: "+NumberFormatter.df8.format(price)+ " " + symbolQuote;
+        if (CoinInfoAggregator.getInstance().getLastPrices().containsKey(symbolPair)) {
+            txt = txt + " [Cur: "+NumberFormatter.df8.format(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair))+ " " + symbolQuote;
             
             if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
-                float percent = 100 * (price.floatValue() - last_order_price.floatValue()) / last_order_price.floatValue();
+                double percent = 100 * (CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair) - last_order_price.doubleValue()) / last_order_price.doubleValue();
                 if (Math.abs(percent) > 0.0005) {
                     txt = txt + " " + (percent >= 0 ? "+" : "") + NumberFormatter.df3.format(percent) + "%";
                 }
@@ -139,7 +140,7 @@ public class OrderPairItem {
     
     public void preBuyTransaction(BigDecimal summBase, BigDecimal summQuote, boolean change_initial_values) {
         if (!in_order_buy_sell_cycle) {
-            last_order_price = price;
+            last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
             if (change_initial_values) {
                 base_item.addInitialValue(summBase.multiply(new BigDecimal("-1")));
                 quote_item.addInitialValue(summQuote);
@@ -155,7 +156,7 @@ public class OrderPairItem {
 
     public void startBuyTransaction(BigDecimal summBase, BigDecimal summQuote) {
         if (!in_order_buy_sell_cycle) {
-            last_order_price = price;
+            last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
             summOrderBase = summBase;
             summOrderQuote = summQuote;
             quote_item.addLimitValue(summOrderQuote);
@@ -235,7 +236,7 @@ public class OrderPairItem {
     }
     
     public void simpleBuy(BigDecimal summBase, BigDecimal summQuote) {
-        last_order_price = price;
+        last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
         summOrderBase = summBase;
         summOrderQuote = summQuote;
         quote_item.addFreeValue(summOrderQuote.multiply(new BigDecimal("-1")));
@@ -244,7 +245,7 @@ public class OrderPairItem {
     }
 
     public void simpleSell(BigDecimal summBase, BigDecimal summQuote) {
-        last_order_price = price;
+        last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
         summOrderBase = summBase;
         summOrderQuote = summQuote;
         quote_item.addFreeValue(summOrderQuote);
@@ -302,20 +303,6 @@ public class OrderPairItem {
     }
     
     /**
-     * @param price the price to set
-     */
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
-    
-    /**
-     * @return the price
-     */
-    BigDecimal getPrice() {
-        return price;
-    }
-
-    /**
      * @return the last_order_price
      */
     public BigDecimal getLastOrderPrice() {
@@ -358,20 +345,6 @@ public class OrderPairItem {
     }
 
     /**
-     * @return the pairProcess
-     */
-    public TradePairProcess getPairProcess() {
-        return pairProcess;
-    }
-
-    /**
-     * @param pairProcess the pairProcess to set
-     */
-    public void setPairProcess(TradePairProcess pairProcess) {
-        this.pairProcess = pairProcess;
-    }
-
-    /**
      * @return the orderAPIID
      */
     public long getOrderAPIID() {
@@ -401,5 +374,19 @@ public class OrderPairItem {
 
     public void resetCheckHashOrder() {
         this.lastCheckHashOrder = "";
+    }
+
+    /**
+     * @return the orderProcess
+     */
+    public ControllableOrderProcess getOrderProcess() {
+        return orderProcess;
+    }
+
+    /**
+     * @param orderProcess the orderProcess to set
+     */
+    public void setOrderProcess(ControllableOrderProcess orderProcess) {
+        this.orderProcess = orderProcess;
     }
 }

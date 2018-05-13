@@ -539,14 +539,8 @@ public class mainApplication extends javax.swing.JFrame {
 
         checkboxTestMode.setSelected(true);
         checkboxTestMode.setText("Test mode");
-        checkboxTestMode.addChangeListener(new javax.swing.event.ChangeListener() {
-            public void stateChanged(javax.swing.event.ChangeEvent evt) {
-                checkboxTestModeStateChanged(evt);
-            }
-        });
 
         checkBoxLimitedOrders.setText("Limited orders");
-        checkBoxLimitedOrders.setEnabled(false);
         checkBoxLimitedOrders.addChangeListener(new javax.swing.event.ChangeListener() {
             public void stateChanged(javax.swing.event.ChangeEvent evt) {
                 checkBoxLimitedOrdersStateChanged(evt);
@@ -584,7 +578,6 @@ public class mainApplication extends javax.swing.JFrame {
         jLabel13.setText("sec.");
 
         comboBoxLimitedMode.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Only Sell", "Sell and Buy" }));
-        comboBoxLimitedMode.setEnabled(false);
         comboBoxLimitedMode.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 comboBoxLimitedModeActionPerformed(evt);
@@ -1854,11 +1847,6 @@ public class mainApplication extends javax.swing.JFrame {
             buttonShowPlotActionPerformed(null);
         }
     }//GEN-LAST:event_listCurrenciesMouseClicked
-
-    private void checkboxTestModeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkboxTestModeStateChanged
-        checkBoxLimitedOrders.setEnabled(!checkboxTestMode.isSelected());
-        comboBoxLimitedMode.setEnabled(checkBoxLimitedOrders.isSelected() && !checkboxTestMode.isSelected());
-    }//GEN-LAST:event_checkboxTestModeStateChanged
 
     private void checkBoxLowHoldStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_checkBoxLowHoldStateChanged
         coinRatingController.setLowHold(checkBoxLowHold.isSelected());

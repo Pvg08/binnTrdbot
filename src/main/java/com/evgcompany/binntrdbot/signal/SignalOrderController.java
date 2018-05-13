@@ -78,7 +78,7 @@ public class SignalOrderController extends PeriodicProcessThread {
                 CoinRatingPairLogItem rentered = entry.getValue();
                 if (rentered != null && rentered.pair != null && rentered.pair.isInitialized()) {
                     boolean is_free = !rentered.pair.isHodling() && 
-                                !rentered.pair.isInLimitOrder() &&
+                                !rentered.pair.isInAPIOrder() &&
                                 rentered.pair.getFullOrdersCount() == 0;
                     if (    (
                                 is_free &&
@@ -143,7 +143,7 @@ public class SignalOrderController extends PeriodicProcessThread {
             CoinRatingPairLogItem rentered = entry.getValue();
             if (rentered != null && rentered.pair != null && rentered.pair.isInitialized() && rentered.pair.getSignalItem() != null) {
                 boolean is_free = !rentered.pair.isHodling()
-                        && !rentered.pair.isInLimitOrder()
+                        && !rentered.pair.isInAPIOrder()
                         && rentered.pair.getFullOrdersCount() == 0;
                 if (is_free) {
                     double currCrit = rentered.pair.getSignalItem().getCurrentRating()*rentered.pair.getSignalItem().getPriceProfitPercent(rentered.pair.getLastPrice());

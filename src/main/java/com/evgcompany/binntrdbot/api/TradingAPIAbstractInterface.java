@@ -45,7 +45,7 @@ public abstract class TradingAPIAbstractInterface {
     abstract public boolean connect();
     abstract public boolean disconnect();
     
-    protected String format_num(BigDecimal num) {
+    protected static String numberFormatForOrder(BigDecimal num) {
         return NumberFormatter.df8.format(num).replace(".","").replace(",",".").replace(" ","");
     }
     

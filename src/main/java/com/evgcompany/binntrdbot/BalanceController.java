@@ -112,6 +112,8 @@ public class BalanceController extends PeriodicProcessThread {
     }
     
     public void testPayTradeComission(BigDecimal price, String quoteSymbol) {
+        if (!isTestMode) return;
+        if (quoteSymbol == null) return;
         boolean use_spec_currency = client.getTradeComissionCurrency() != null && !client.getTradeComissionCurrency().equals(quoteSymbol);
         BigDecimal comission_quote;
         if (use_spec_currency) {
@@ -136,11 +138,15 @@ public class BalanceController extends PeriodicProcessThread {
                 use_spec_currency = false;
             }
         }
-        if (!use_spec_currency) {
+        /*if (!use_spec_currency) {
             comission_quote = price.multiply(client.getTradeComissionPercent()).divide(BigDecimal.valueOf(100));
             CoinBalanceItem cquote = coins.get(quoteSymbol);
             cquote.addFreeValue(comission_quote.multiply(BigDecimal.valueOf(-1)));
-        }
+            updateCoinText(quoteSymbol);
+        }*/
+    }
+    public void testPayTradeComissionForPair(BigDecimal price, String pairSymbol) {
+        testPayTradeComission(price, info.getPairQuoteSymbol(pairSymbol));
     }
 
     private void updateCoinText(CoinBalanceItem coinItem) {
@@ -208,9 +214,13 @@ public class BalanceController extends PeriodicProcessThread {
     }
     
     public void updateAllBalances() {
-        if (client != null) {
-            List<AssetBalance> allBalances = client.getAllBalances();
-            updateBalances(allBalances);
+        if (!isTestMode || coins.isEmpty()) {
+            if (client != null) {
+                List<AssetBalance> allBalances = client.getAllBalances();
+                updateBalances(allBalances);
+            }
+        } else {
+            updateAllCoinsTexts();
         }
     }
     

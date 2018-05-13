@@ -179,38 +179,44 @@ public class TradePairProcessList {
     
     private void removePair(int pairIndex) {
         pairs.get(pairIndex).doStop();
-        ordersController.removeCurrencyPair(pairs.get(pairIndex).getOrderCID());
+        //ordersController.removeCurrencyPair(pairs.get(pairIndex).getOrderCID());
         pairs.remove(pairIndex);
     }
     
     public void pairAction(int index, String action) {
         if (pairs.size() > 0 && index >= 0) {
-            String currencyPair = ordersController.getNthCurrencyPair(index);
-            int pair_index = searchCurrencyFirstPair(currencyPair);
-            if (pair_index >= 0 && pair_index < pairs.size()) {
+            ControllableOrderProcess process = ordersController.getNthControllableOrderProcess(index);
+            if (process != null) {
+                TradePairProcess pairProcess = null;
+                if (process instanceof TradePairProcess) {
+                    pairProcess = (TradePairProcess) process;
+                }
                 switch (action) {
                     case "REMOVE":
-                        removePair(pair_index);
+                        process.doStop();
                         break;
                     case "BUY":
-                        pairs.get(pair_index).doBuy();
+                        process.doBuy();
                         break;
                     case "SELL":
-                        pairs.get(pair_index).doSell();
+                        process.doSell();
                         break;
                     case "CANCEL":
-                        pairs.get(pair_index).doLimitCancel();
+                        process.orderCancel();
                         break;
                     case "STATISTICS":
-                        pairs.get(pair_index).doShowStatistics();
+                        if (pairProcess == null) break;
+                        pairProcess.doShowStatistics();
                         break;
                     case "PLOT":
-                        pairs.get(pair_index).doShowPlot();
+                        if (pairProcess == null) break;
+                        pairProcess.doShowPlot();
                         break;
                     case "BROWSER":
+                        if (pairProcess == null) break;
                         if (Desktop.isDesktopSupported()) {
                             try {
-                                String url = "https://www.binance.com/tradeDetail.html?symbol="+pairs.get(pair_index).getBaseSymbol()+"_"+pairs.get(pair_index).getQuoteSymbol();
+                                String url = "https://www.binance.com/tradeDetail.html?symbol="+pairProcess.getBaseSymbol()+"_"+pairProcess.getQuoteSymbol();
                                 Desktop.getDesktop().browse(new URI(url));
                             } catch (URISyntaxException | IOException ex) {
                                 Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);
@@ -218,16 +224,20 @@ public class TradePairProcessList {
                         }
                         break;
                     case "NNBTRAIN":
-                        pairs.get(pair_index).doNetworkAction("TRAIN", "BASE");
+                        if (pairProcess == null) break;
+                        pairProcess.doNetworkAction("TRAIN", "BASE");
                         break;
                     case "NNCTRAIN":
-                        pairs.get(pair_index).doNetworkAction("TRAIN", "COIN");
+                        if (pairProcess == null) break;
+                        pairProcess.doNetworkAction("TRAIN", "COIN");
                         break;
                     case "NNBADD":
-                        pairs.get(pair_index).doNetworkAction("ADDSET", "BASE");
+                        if (pairProcess == null) break;
+                        pairProcess.doNetworkAction("ADDSET", "BASE");
                         break;
                     case "NNCADD":
-                        pairs.get(pair_index).doNetworkAction("ADDSET", "COIN");
+                        if (pairProcess == null) break;
+                        pairProcess.doNetworkAction("ADDSET", "COIN");
                         break;
                     default:
                         break;

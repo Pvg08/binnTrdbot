@@ -758,7 +758,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                             ) || (
                                 rentered.pair.isTriedBuy() && 
                                 !rentered.pair.isHodling() && 
-                                !rentered.pair.isInLimitOrder()
+                                !rentered.pair.isInAPIOrder()
                             ) || (
                                 !rentered.pair.isAlive()
                             )

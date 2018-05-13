@@ -163,15 +163,15 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         NewOrderResponse newOrderResponse = null;
         if (is_buy) {
             if (is_market) {
-                newOrderResponse = client.newOrder(marketBuy(pair, format_num(amount)));
+                newOrderResponse = client.newOrder(marketBuy(pair, numberFormatForOrder(amount)));
             } else {
-                newOrderResponse = client.newOrder(limitBuy(pair, TimeInForce.GTC, format_num(amount), format_num(price)));
+                newOrderResponse = client.newOrder(limitBuy(pair, TimeInForce.GTC, numberFormatForOrder(amount), numberFormatForOrder(price)));
             }
         } else {
             if (is_market) {
-                newOrderResponse = client.newOrder(marketSell(pair, format_num(amount)));
+                newOrderResponse = client.newOrder(marketSell(pair, numberFormatForOrder(amount)));
             } else {
-                newOrderResponse = client.newOrder(limitSell(pair, TimeInForce.GTC, format_num(amount), format_num(price)));
+                newOrderResponse = client.newOrder(limitSell(pair, TimeInForce.GTC, numberFormatForOrder(amount), numberFormatForOrder(price)));
             }
         }
         return (newOrderResponse != null && newOrderResponse.getOrderId()>0) ? newOrderResponse.getOrderId() : -1;

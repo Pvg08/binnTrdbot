@@ -5,11 +5,11 @@
  */
 package com.evgcompany.binntrdbot.cycles;
 
-import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.BalanceController;
 import com.evgcompany.binntrdbot.CoinFilters;
+import com.evgcompany.binntrdbot.ControllableOrderProcess;
 import com.evgcompany.binntrdbot.OrdersController;
 import com.evgcompany.binntrdbot.PeriodicProcessThread;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
@@ -29,14 +29,14 @@ import java.util.Set;
  *
  * @author EVG_adm_T
  */
-public class TradeCycleProcess extends PeriodicProcessThread {
+public class TradeCycleProcess extends PeriodicProcessThread implements ControllableOrderProcess {
     
     TradingAPIAbstractInterface client = null;
     CoinCycleController cycleController = null;
 
     private int cycleIndex = 0; 
     
-    private String symbol;
+    private String pairAssetSymbol;
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
     private String mainAsset;
@@ -53,7 +53,6 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     private int cycleStep;
 
     private int switchesCount = 0;
-    private long limitOrderId = 0;
     private OrdersController ordersController = null;
     private long startMillis = 0;
     private long lastOrderMillis = 0;
@@ -67,6 +66,8 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     private double profitAim;
     
     private boolean reverting = false;
+    private boolean nextDoAbort = false;
+    private boolean inAPIOrder = false;
 
     public TradeCycleProcess(CoinCycleController cycleController) {
         this.cycleController = cycleController;
@@ -89,7 +90,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     public void cutChain() {
         for(int i = cycle.size()-1; i >= cycleStep; i--) {
             String pair = getChainPair(cycle.get(i));
-            ordersController.removeCurrencyPair(orderCIDs.get(pair));
+            ordersController.unregisterPairTrade(orderCIDs.get(pair));
             orderCIDs.remove(pair);
             usedPairs.remove(pair);
             cycle.remove(i);
@@ -121,28 +122,16 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     private void doPreStep(int from) {
         for(int i = from; i<cycle.size(); i++) {
             String cpair = getChainPair(cycle.get(i));
-            if (orderCIDs.containsKey(cpair)) {
-                Long orderCID = ordersController.registerPairTrade(cpair, null);
-                orderCIDs.put(cpair, orderCID);
-            } else {
-                ordersController.updatePairTrade(orderCIDs.get(cpair), true);
-            }
-            ordersController.setPairOrderCurrentPrice(orderCIDs.get(cpair), prices.get(i));
+            Long orderCID = ordersController.registerPairTrade(cpair, this, this::onOrderEvent);
+            orderCIDs.put(cpair, orderCID);
         }
-        ordersController.updateAllPairTexts(!ordersController.isTestMode());
         updateOrderPairPrices();
     }
 
-    private void doInitWaitNextStep() {
-        lastPriceMillis = 0;
-        limitOrderId = 0;
-        ordersController.updateAllPairTexts(!ordersController.isTestMode());
-    }
-    
     private void doPostStep() {
-        for(int i = 0; i<cycle.size(); i++) {
-            ordersController.removeCurrencyPair(orderCIDs.get(getChainPair(cycle.get(i))));
-        }
+        orderCIDs.forEach((pair, orderCID)->{
+            ordersController.unregisterPairTrade(orderCID);
+        });
     }
     
     private void doSwitchStep() {
@@ -150,24 +139,15 @@ public class TradeCycleProcess extends PeriodicProcessThread {
             return;
         }
         if (cycleController.doCycleSwap(this)) {
-            mainApplication.getInstance().log("We wait too long. Need to switch "+symbol+"'s cycle order...");
-            if (limitOrderId > 0) {
-                if (!ordersController.isTestMode()) {
-                    Order order = client.getOrderStatus(symbol, limitOrderId);
-                    if (order.getStatus() == OrderStatus.FILLED || 
-                        order.getStatus() == OrderStatus.PARTIALLY_FILLED || 
-                        order.getStatus() == OrderStatus.CANCELED ||
-                        order.getStatus() == OrderStatus.EXPIRED ||
-                        order.getStatus() == OrderStatus.REJECTED
-                    ) {
-                        return;
-                    }
-                    ordersController.cancelOrder(orderCIDs.get(symbol), limitOrderId);
-                }
+            mainApplication.getInstance().log("We wait too long. Need to switch "+pairAssetSymbol+"'s cycle order...");
+            if (inAPIOrder) {
+                Order order = ordersController.getAPIOrder(orderCIDs.get(pairAssetSymbol));
+                if (order.getStatus() != OrderStatus.NEW) return;
+                ordersController.cancelOrder(orderCIDs.get(pairAssetSymbol));
                 doWait(1000);
             }
-            limitOrderId = 0;
-            ordersController.finishOrder(orderCIDs.get(symbol), false, null);
+            inAPIOrder = false;
+            ordersController.finishOrder(orderCIDs.get(pairAssetSymbol), false, null);
             switchesCount++;
             doPreStep(cycleStep);
             initAndOrderStep();
@@ -177,19 +157,19 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     private void initAndOrderStep() {
         updateOrderPairPrices();
         lastOrderMillis = System.currentTimeMillis();
-        symbol = cycle.get(cycleStep);
-        isBuy = chainIsBuy(symbol);
-        symbol = getChainPair(symbol);
-        filter = info.getPairFilters().get(symbol);
+        pairAssetSymbol = cycle.get(cycleStep);
+        isBuy = chainIsBuy(pairAssetSymbol);
+        pairAssetSymbol = getChainPair(pairAssetSymbol);
+        filter = info.getPairFilters().get(pairAssetSymbol);
         baseAssetSymbol = filter.getBaseAssetSymbol();
         quoteAssetSymbol = filter.getQuoteAssetSymbol();
         if (mainAsset.isEmpty()) {
             mainAsset = isBuy ? quoteAssetSymbol : baseAssetSymbol;
         }
-        symbol = baseAssetSymbol+quoteAssetSymbol;
+        pairAssetSymbol = baseAssetSymbol+quoteAssetSymbol;
         
         current_order_price = prices.get(cycleStep);
-        ordersController.setPairOrderCurrentPrice(orderCIDs.get(symbol), current_order_price);
+        ordersController.setPairOrderPrice(orderCIDs.get(pairAssetSymbol), current_order_price);
         if (cycleStep == 0) {
             if (isBuy) {
                 current_order_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, cycleController.getTradingBalancePercent());
@@ -206,25 +186,26 @@ public class TradeCycleProcess extends PeriodicProcessThread {
             }
         }
         if (!isBuy) {
-            ordersController.PreBuy(orderCIDs.get(symbol), current_order_amount, current_order_price);
+            ordersController.PreBuy(orderCIDs.get(pairAssetSymbol), current_order_amount, current_order_price);
         }
         lastPriceMillis = 0;
         doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, false, current_order_price, current_order_amount);
     }
     
     private void doNextStep() {
+        if (nextDoAbort) {
+            orderAbort();
+            return;
+        }
         if (need_stop) {
             return;
         }
-        if (limitOrderId != 0) {
+        if (inAPIOrder) {
             return;
         }
         if (cycleStep >= 0 && isBuy) {
-            ordersController.finishOrder(orderCIDs.get(symbol), true, current_order_price);
-            ordersController.updateAllPairTexts(!ordersController.isTestMode());
-        }
-        if (ordersController.isTestMode()) {
-            doWait(10000);
+            ordersController.finishOrder(orderCIDs.get(pairAssetSymbol), true, current_order_price);
+            ordersController.updateAllPairTexts(true);
         }
         cycleStep++;
         if (cycleStep >= cycle.size()) {
@@ -240,32 +221,18 @@ public class TradeCycleProcess extends PeriodicProcessThread {
         }
     }
     
-    private void orderSuccessfullyFinish() {
-        lastPriceMillis = 0;
-        limitOrderId = 0;
-        ordersController.finishOrder(orderCIDs.get(symbol), true, null);
-        if (!ordersController.isTestMode()) {
-            BalanceController.getInstance().updateAllBalances();
-        } else {
-            ordersController.updateAllPairTexts(!ordersController.isTestMode());
-        }
-    }
     private void orderAbort() {
-        if (limitOrderId > 0) {
-            if (!ordersController.isTestMode()) {
-                ordersController.cancelOrder(orderCIDs.get(symbol), limitOrderId);
-            }
+        if (inAPIOrder) {
+            ordersController.cancelOrder(orderCIDs.get(pairAssetSymbol));
             doWait(1000);
         }
-        ordersController.finishOrder(orderCIDs.get(symbol), false, null);
-        limitOrderId = -1;
+        ordersController.finishOrder(orderCIDs.get(pairAssetSymbol), false, null);
+        inAPIOrder = false;
         lastPriceMillis = 0;
         
         revertCoinCycle();
         
-        if (!BalanceController.getInstance().isTestMode()) {
-            BalanceController.getInstance().updateAllBalances();
-        }
+        BalanceController.getInstance().updateAllBalances();
         doStop();
         mainApplication.getInstance().log("Cycle "+cycle+" is aborted!", true, true);
     }
@@ -290,12 +257,8 @@ public class TradeCycleProcess extends PeriodicProcessThread {
             doRevertOrder(failurePart, failureRevertPath);
         }
         
-        ordersController.finishOrder(orderCIDs.get(symbol), true, null);
-        if (!BalanceController.getInstance().isTestMode()) {
-            BalanceController.getInstance().updateAllBalances();
-        } else {
-            ordersController.updateAllPairTexts(!ordersController.isTestMode());
-        }
+        ordersController.finishOrder(orderCIDs.get(pairAssetSymbol), true, null);
+        ordersController.updateAllPairTexts(true);
     }
     
     private void doRevertOrder(BigDecimal amount, List<String> path) {
@@ -305,87 +268,92 @@ public class TradeCycleProcess extends PeriodicProcessThread {
             // @todo
         }
         if (cycleStep >= 0 && isBuy) {
-            ordersController.finishOrder(orderCIDs.get(symbol), true, null);
-            ordersController.updateAllPairTexts(!ordersController.isTestMode());
+            ordersController.finishOrder(orderCIDs.get(pairAssetSymbol), true, null);
+            ordersController.updateAllPairTexts(true);
         }
-        symbol = path.get(0);
-        isBuy = chainIsBuy(symbol);
-        symbol = getChainPair(symbol);
-        filter = new CoinFilters(symbol, client);
+        pairAssetSymbol = path.get(0);
+        isBuy = chainIsBuy(pairAssetSymbol);
+        pairAssetSymbol = getChainPair(pairAssetSymbol);
+        filter = new CoinFilters(pairAssetSymbol, client);
         filter.logFiltersInfo();
-        
-        if (orderCIDs.containsKey(symbol)) {
-            Long orderCID = ordersController.registerPairTrade(symbol, null);
-            orderCIDs.put(symbol, orderCID);
-        } else {
-            ordersController.updatePairTrade(orderCIDs.get(symbol), true);
-        }
-        
+
+        Long orderCID = ordersController.registerPairTrade(pairAssetSymbol, this, this::onOrderEvent);
+        orderCIDs.put(pairAssetSymbol, orderCID);
+
         baseAssetSymbol = filter.getBaseAssetSymbol();
         quoteAssetSymbol = filter.getQuoteAssetSymbol();
         current_order_amount = amount;
-        if (info.getLastPrices().containsKey(symbol)) {
-            current_order_price = BigDecimal.valueOf(info.getLastPrices().get(symbol));
+        if (info.getLastPrices().containsKey(pairAssetSymbol)) {
+            current_order_price = BigDecimal.valueOf(info.getLastPrices().get(pairAssetSymbol));
         }
         if (!isBuy) {
-            ordersController.PreBuy(orderCIDs.get(symbol), current_order_amount, current_order_price);
+            ordersController.PreBuy(orderCIDs.get(pairAssetSymbol), current_order_amount, current_order_price);
         }
         doOrder(baseAssetSymbol, quoteAssetSymbol, isBuy, true, current_order_price, current_order_amount);
         doWait(2000);
     }
     
-    private void setOrderCoins(Order order) {
-        String orderCoins[] = info.getCoinPairs().get(order.getSymbol());
-        BigDecimal executed = new BigDecimal(order.getExecutedQty());
-        BigDecimal original = new BigDecimal(order.getOrigQty());
-        BigDecimal price = new BigDecimal(order.getPrice());
-        if (order.getSide() == OrderSide.SELL) {
-            cycleCoins.put(orderCoins[0], original.subtract(executed).stripTrailingZeros());
-            cycleCoins.put(orderCoins[1], executed.multiply(price).stripTrailingZeros());
+    private void onOrderEvent(
+            Long pairOrderCID, 
+            OrderPairItem orderPair, 
+            boolean isNew, 
+            boolean isBuying, 
+            boolean isCancelled, 
+            boolean isFinished, 
+            BigDecimal price, 
+            BigDecimal qty, 
+            BigDecimal executedQty) 
+    {
+        if (isNew) {
+            inAPIOrder = true;
+            lastOrderMillis = System.currentTimeMillis();
+            if (isBuying) {
+                mainApplication.getInstance().log("Buying "+orderPair.getSymbolPair()+"...", true, true);
+            } else {
+                mainApplication.getInstance().log("Selling "+orderPair.getSymbolPair()+"...", true, true);
+            }
+        }
+        
+        String orderCoins[] = info.getCoinPairs().get(orderPair.getSymbolPair());
+        if (!isBuying) {
+            cycleCoins.put(orderCoins[0], qty.subtract(executedQty).stripTrailingZeros());
+            cycleCoins.put(orderCoins[1], executedQty.multiply(price).stripTrailingZeros());
         } else {
-            cycleCoins.put(orderCoins[0], executed.stripTrailingZeros());
-            cycleCoins.put(orderCoins[1], original.subtract(executed).multiply(price).stripTrailingZeros());
+            cycleCoins.put(orderCoins[0], executedQty.stripTrailingZeros());
+            cycleCoins.put(orderCoins[1], qty.subtract(executedQty).multiply(price).stripTrailingZeros());
+        }
+        
+        if (!isFinished) {
+            return;
+        }
+        inAPIOrder = false;
+        
+        if (isCancelled || executedQty.compareTo(qty) < 0) {
+            // just cancelled or partially filled and then cancelled
+            if (!reverting) nextDoAbort = true;
+        } else {
+            // filled
+            lastPriceMillis = 0;
+            ordersController.finishOrder(orderCIDs.get(pairAssetSymbol), true, null);
         }
     }
     
     private void checkOrders() {
-        if (need_stop) {
+        if (need_stop || !inAPIOrder) {
             return;
         }
-        if (limitOrderId <= 0) {
+        Order order = ordersController.getAPIOrder(orderCIDs.get(pairAssetSymbol));
+        if (order == null || order.getStatus() == OrderStatus.CANCELED || order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.PARTIALLY_FILLED) {
             return;
         }
-        Order order = client.getOrderStatus(symbol, limitOrderId);
 
         System.out.println(order);
         
-        if (order == null) {
-            return;
-        }
-        
-        setOrderCoins(order);
-        
-        if (order.getStatus() == OrderStatus.PARTIALLY_FILLED && 
-            Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())
+        if (cycleStep >= 1 && 
+                Double.parseDouble(order.getExecutedQty()) <= 0 && 
+                cycleController.getAbortMarketApproxProfit(initialQty, new BigDecimal(order.getOrigQty()), initialAsset, baseAssetSymbol, quoteAssetSymbol) > profitAim
         ) {
-            return;
-        }
-
-        if (
-            order.getStatus() == OrderStatus.FILLED || 
-            order.getStatus() == OrderStatus.PARTIALLY_FILLED || 
-            order.getStatus() == OrderStatus.CANCELED ||
-            order.getStatus() == OrderStatus.EXPIRED ||
-            order.getStatus() == OrderStatus.REJECTED
-        ) {
-            if (order.getStatus() == OrderStatus.FILLED && Double.parseDouble(order.getExecutedQty()) >= Double.parseDouble(order.getOrigQty())) {
-                orderSuccessfullyFinish();
-            } else {
-                limitOrderId = 0;
-                if (!reverting) orderAbort();
-            }
-        } else if (cycleStep >= 1 && Double.parseDouble(order.getExecutedQty()) <= 0 && cycleController.getAbortMarketApproxProfit(initialQty, new BigDecimal(order.getOrigQty()), initialAsset, baseAssetSymbol, quoteAssetSymbol) > profitAim) {
-            mainApplication.getInstance().log("We'll have more profit if abort this "+symbol+" cycle order...");
+            mainApplication.getInstance().log("We'll have more profit if abort this "+pairAssetSymbol+" cycle order...");
             if (!reverting) orderAbort();
         } else {
             if (cycleController.isUseStopLimited() && (
@@ -393,9 +361,13 @@ public class TradeCycleProcess extends PeriodicProcessThread {
                     (cycleStep == 0 && Double.parseDouble(order.getExecutedQty()) <= 0 && (System.currentTimeMillis()-lastOrderMillis) > cycleController.getStopFirstLimitTimeout() * 1000)
                 )
             ) {
-                mainApplication.getInstance().log("We wait too long. Need to stop this "+symbol+"'s cycle order...");
+                mainApplication.getInstance().log("We wait too long. Need to stop this "+pairAssetSymbol+"'s cycle order...");
                 if (!reverting) orderAbort();
-            } else if (cycleStep >= 1 && cycleStep < (cycle.size() - 1) && Double.parseDouble(order.getExecutedQty()) <= 0 && (System.currentTimeMillis()-lastOrderMillis) > cycleController.getSwitchLimitTimeout() * 1000) {
+            } else if (cycleStep >= 1 && 
+                    cycleStep < (cycle.size() - 1) && 
+                    Double.parseDouble(order.getExecutedQty()) <= 0 && 
+                    (System.currentTimeMillis()-lastOrderMillis) > cycleController.getSwitchLimitTimeout() * 1000
+            ) {
                 if (!reverting) doSwitchStep();
             }
         }
@@ -418,16 +390,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
                 
                 mainApplication.getInstance().log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseSymbol + " for " + NumberFormatter.df8.format(tobuy_amount.multiply(tobuy_price)) + " " + quoteSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
                 long result = ordersController.Buy(orderCIDs.get(symbol_order), tobuy_amount, isMarket ? null : tobuy_price);
-                if (result >= 0) {
-                    limitOrderId = result;
-                    mainApplication.getInstance().log("Successful!", true, true);
-                    lastOrderMillis = System.currentTimeMillis();
-                    if (limitOrderId == 0) {
-                        cycleCoins.put(baseSymbol, tobuy_amount.stripTrailingZeros());
-                        cycleCoins.put(quoteSymbol, amount.compareTo(tobuy_amount) > 0 ? amount.subtract(tobuy_amount).multiply(tobuy_price).stripTrailingZeros() : BigDecimal.ZERO);
-                        if (!reverting) doInitWaitNextStep();
-                    }
-                } else {
+                if (result < 0) {
                     mainApplication.getInstance().log("Error!", true, true);
                     if (!reverting) orderAbort();
                 }
@@ -452,19 +415,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
                 
                 mainApplication.getInstance().log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseSymbol + " for " + NumberFormatter.df8.format(tosell_amount.multiply(tosell_price)) + " " + quoteSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
                 long result = ordersController.Sell(orderCIDs.get(symbol_order), tosell_amount, isMarket ? null : tosell_price, null);
-                if (result >= 0) {
-                    limitOrderId = result;
-                    mainApplication.getInstance().log("Successful!", true, true);
-                    lastOrderMillis = System.currentTimeMillis();
-                    if (limitOrderId == 0) {
-                        cycleCoins.put(baseSymbol, amount.compareTo(tosell_amount) > 0 ? amount.subtract(tosell_amount).stripTrailingZeros() : BigDecimal.ZERO);
-                        cycleCoins.put(quoteSymbol, tosell_amount.multiply(tosell_price).stripTrailingZeros());
-                        if (!BalanceController.getInstance().isTestMode()) {
-                            BalanceController.getInstance().updateAllBalances();
-                        }
-                        if (!reverting) doInitWaitNextStep();
-                    }
-                } else {
+                if (result < 0) {
                     mainApplication.getInstance().log("Error!", true, true);
                     if (!reverting) orderAbort();
                 }
@@ -489,7 +440,6 @@ public class TradeCycleProcess extends PeriodicProcessThread {
             String cpair = getChainPair(cycle.get(i));
             OrderPairItem item = ordersController.getPairOrderInfo(orderCIDs.get(cpair));
             if (item != null) {
-                item.setPrice(null);
                 item.setLastOrderPrice(null);
                 item.setMarker("CYCLE" + cycleIndex + " PAIR" + (i+1) + " CLOSED");
                 ordersController.updatePairTrade(orderCIDs.get(cpair), false);
@@ -499,7 +449,6 @@ public class TradeCycleProcess extends PeriodicProcessThread {
             String cpair = getChainPair(cycle.get(i));
             OrderPairItem item = ordersController.getPairOrderInfo(orderCIDs.get(cpair));
             if (item != null) {
-                item.setPrice(BigDecimal.valueOf(info.getLastPrices().get(cpair)));
                 item.setLastOrderPrice(prices.get(i));
                 item.setMarker("CYCLE" + cycleIndex + " PAIR" + (i+1) + (cycleStep == i ? " ACTIVE" : " WAIT"));
                 ordersController.updatePairTrade(orderCIDs.get(cpair), false);
@@ -514,7 +463,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     @Override
     protected void runStart() {
         info.StartAndWaitForInit();
-        limitOrderId = 0;
+        inAPIOrder = false;
         cycleStep = -1;
         lastPriceMillis = 0;
 
@@ -548,7 +497,7 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     }
 
     public boolean isInLimitOrder() {
-        return limitOrderId>0;
+        return inAPIOrder;
     }
 
     /**
@@ -620,5 +569,22 @@ public class TradeCycleProcess extends PeriodicProcessThread {
     public void setCycleIndex(int cycleIndex) {
         this.cycleIndex = cycleIndex;
         lastPriceMillis = 0;
+    }
+
+    @Override
+    public void orderCancel() {
+        if (inAPIOrder) {
+            ordersController.cancelOrder(orderCIDs.get(pairAssetSymbol));
+        }
+    }
+
+    @Override
+    public void doBuy() {
+        // nothing
+    }
+
+    @Override
+    public void doSell() {
+        // nothing
     }
 }
