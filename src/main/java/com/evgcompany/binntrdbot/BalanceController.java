@@ -204,6 +204,7 @@ public class BalanceController extends PeriodicProcessThread {
                     if (!coins.containsKey(symbol)) {
                         coins.put(symbol, curr);
                     }
+                    updateCoinText(curr);
                 }
             }
         } catch (InterruptedException ex) {

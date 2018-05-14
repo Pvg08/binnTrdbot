@@ -13,7 +13,6 @@ import com.evgcompany.binntrdbot.misc.JsonReader;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalOrderController;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
-import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;

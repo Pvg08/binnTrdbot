@@ -34,6 +34,13 @@ import org.jgrapht.graph.DefaultWeightedEdge;
  * @author EVG_adm_T
  */
 public class CoinCycleController extends PeriodicProcessThread {
+    
+    public class SwapInfo {
+        public List<String> cycle;
+        public int pre_size;
+        public double new_weight;
+    }
+    
     private CoinRatingController coinRatingController = null;
     private TradePairProcessList pairProcessController = null;
     private final List<TradeCycleProcess> cycleProcesses = new ArrayList<>();
@@ -576,12 +583,11 @@ public class CoinCycleController extends PeriodicProcessThread {
         return mainCoinProfit * 0.95;
     }
     
-    public boolean doCycleSwap(TradeCycleProcess process) {
+    public SwapInfo doCycleSwap(TradeCycleProcess process) {
+        SwapInfo result = null;
         if (process.getCycleStep() >= process.getCycle().size()-1) {
-            return false;
+            return result;
         }
-        
-        boolean result = false;
         
         List<String> pre_cycle = new ArrayList<>();
         double pre_weight = 1;
@@ -609,7 +615,7 @@ public class CoinCycleController extends PeriodicProcessThread {
         System.out.println("Pre weight: " + pre_weight);
         
         if (pre_cycle.isEmpty()) {
-            return false;
+            return result;
         }
         
         try {
@@ -626,10 +632,10 @@ public class CoinCycleController extends PeriodicProcessThread {
                     mainApplication.getInstance().log("Cycle description: " + getCycleDescription(cycle), true, false);
                     mainApplication.getInstance().log("Profit: " + new_weight, true, false);
 
-                    process.setProfitAim(new_weight);
-                    process.cutChain();
-                    process.addCycleToCycleChain(cycle, pre_cycle.size());
-                    result = true;
+                    result = new SwapInfo();
+                    result.cycle = cycle;
+                    result.new_weight = new_weight;
+                    result.pre_size = pre_cycle.size();
                 }
             }
         

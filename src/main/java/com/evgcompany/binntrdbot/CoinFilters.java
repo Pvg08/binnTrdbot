@@ -21,6 +21,7 @@ import java.util.List;
 public class CoinFilters implements java.io.Serializable {
     private String baseAssetSymbol;
     private String quoteAssetSymbol;
+    private String pairAssetSymbol;
     
     private boolean filterPrice = false;
     private BigDecimal filterPriceTickSize = BigDecimal.ZERO;
@@ -64,10 +65,12 @@ public class CoinFilters implements java.io.Serializable {
     }
     
     public CoinFilters(String baseAsset, String quoteAsset, List<SymbolFilter> filters) {
+        pairAssetSymbol = (baseAsset+quoteAsset).toUpperCase();
         do_init(baseAsset, quoteAsset, filters);
     }
     
     public CoinFilters(String symbol, TradingAPIAbstractInterface rclient) {
+        pairAssetSymbol = symbol.toUpperCase();
         ExchangeInfo info = rclient.getExchangeInfo();
         SymbolInfo pair_sinfo = info.getSymbolInfo(symbol);
         do_init(pair_sinfo.getBaseAsset(), pair_sinfo.getQuoteAsset(), pair_sinfo.getFilters());
@@ -130,6 +133,13 @@ public class CoinFilters implements java.io.Serializable {
         return quoteAssetSymbol;
     }
 
+    /**
+     * @return the pairAssetSymbol
+     */
+    public String getPairAssetSymbol() {
+        return pairAssetSymbol;
+    }
+    
     /**
      * @return the filterPrice
      */

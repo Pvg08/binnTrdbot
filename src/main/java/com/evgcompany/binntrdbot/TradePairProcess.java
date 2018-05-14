@@ -280,7 +280,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             }
         }
         info.setLatestPrice(symbol, currentPrice);
-        ordersController.updatePairTrade(orderCID);
+        ordersController.updatePairTradeText(orderCID);
     }
     
     private void addBars(List<Bar> nbars) {
@@ -339,7 +339,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                     app.log("Successful waiting start!", true, true);
                     is_hodling = true;
                     info.setLatestPrice(symbol, currentPrice);
-                    ordersController.updatePairTrade(orderCID);
+                    ordersController.updatePairTradeText(orderCID);
                 } else {
                     app.log("Error in Buy method!", true, true);
                 }
@@ -381,7 +381,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             lastStrategyCheckPrice = new BigDecimal(bars.get(bars.size() - 1).getClosePrice().floatValue());
             currentPrice = lastStrategyCheckPrice;
             info.setLatestPrice(symbol, currentPrice);
-            ordersController.updatePairTrade(orderCID);
+            ordersController.updatePairTradeText(orderCID);
         }
 
         if (predictor != null && predictor.isHaveNetworkInFile()) {
@@ -395,7 +395,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             }
             currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
             info.setLatestPrice(symbol, currentPrice);
-            ordersController.updatePairTrade(orderCID);
+            ordersController.updatePairTradeText(orderCID);
             if (is_fin && (predictor == null || !predictor.isLearning())) {
                 app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
             }

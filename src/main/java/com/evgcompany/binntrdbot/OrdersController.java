@@ -270,6 +270,7 @@ public class OrdersController extends PeriodicProcessThread {
             } else {
                 pair.rollbackTransaction();
             }
+            updatePairTradeText(orderCID);
         }
     }
     
@@ -279,37 +280,6 @@ public class OrdersController extends PeriodicProcessThread {
             pair.setLastOrderPrice(sold_price);
             pair.confirmTransactionPart(sold_qty, sold_qty.multiply(sold_price));
         }
-    }
-
-    /*public void updateBaseSymbolText(String symbolBase, boolean updateBalance) {
-        if (updateBalance) {
-            balance.updateAllBalances();
-        }
-        boolean symbol_updated = false;
-        for (Map.Entry<Long, OrderPairItem> entry : pairOrders.entrySet()) {
-            OrderPairItem curr = entry.getValue();
-            if (curr != null && curr.getSymbolBase().equals(symbolBase)) {
-                symbol_updated = true;
-                if (curr.getListIndex() >= 0) {
-                    listPairOrdersModel.set(curr.getListIndex(), curr.toString());
-                }
-                if (curr.getQuoteItem().getListIndex() >= 0) {
-                    balance.updateCoinText(curr.getQuoteItem().getSymbol());
-                }
-                if (curr.getBaseItem().getListIndex() >= 0) {
-                    balance.updateCoinText(curr.getBaseItem().getSymbol());
-                }
-            }
-        }
-        if (!symbol_updated) {
-            balance.updateCoinText(symbolBase);
-        }
-    }*/
-
-    public void updateAllPairTexts(boolean updateBalance) {
-        /*pairOrders.forEach((orderCID, item) -> {
-            updatePairTrade(orderCID, updateBalance);
-        });*/
     }
 
     public Long registerPairTrade(String symbolPair, ControllableOrderProcess process, PairOrderEvent orderEvent) {
@@ -517,7 +487,7 @@ public class OrdersController extends PeriodicProcessThread {
         SEMAPHORE_ADDCOIN.release();
     }
     
-    public void updatePairTrade(Long orderCID) {
+    public void updatePairTradeText(Long orderCID) {
         OrderPairItem cpair = pairOrders.get(orderCID);
         if (cpair != null && cpair.getListIndex() >= 0) {
             listPairOrdersModel.set(cpair.getListIndex(), cpair.toString());
