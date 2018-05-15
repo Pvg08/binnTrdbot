@@ -13,6 +13,7 @@ import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
+import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.io.Closeable;
@@ -230,16 +231,21 @@ public class OrdersController extends PeriodicProcessThread {
         return result;
     }
 
-    public void cancelOrder(Long orderCID) {
+    public void cancelOrder(Long orderCID, boolean doRecheck) {
         if (pairOrders.containsKey(orderCID) && pairOrders.get(orderCID).getOrderAPIID() > 0) {
             if (!isTestMode) {
                 client.cancelOrder(pairOrders.get(orderCID).getSymbolPair(), pairOrders.get(orderCID).getOrderAPIID());
             } else {
                 emulator.cancelOrder(pairOrders.get(orderCID).getOrderAPIID());
             }
-            doWait(500);
-            checkOrder(orderCID, pairOrders.get(orderCID));
+            if (doRecheck) {
+                doWait(500);
+                checkOrder(orderCID, pairOrders.get(orderCID));
+            }
         }
+    }
+    public void cancelOrder(Long orderCID) {
+        cancelOrder(orderCID, true);
     }
     
     public Order getAPIOrder(Long orderCID) {
@@ -282,7 +288,12 @@ public class OrdersController extends PeriodicProcessThread {
         }
     }
 
-    public Long registerPairTrade(String symbolPair, ControllableOrderProcess process, PairOrderEvent orderEvent) {
+    public Long registerPairTrade(
+        String symbolPair, 
+        ControllableOrderProcess process, 
+        PairOrderEvent orderEvent, 
+        PairOrderCheckEvent orderCancelCheckEvent
+    ) {
         Long orderCID = null;
         try {
             SEMAPHORE_ADDCOIN.acquire();
@@ -295,6 +306,7 @@ public class OrdersController extends PeriodicProcessThread {
                 OrderPairItem cpair = new OrderPairItem(cbase, cquote, symbolPair);
                 cpair.setListIndex(listPairOrdersModel.size());
                 cpair.setOrderEvent(orderEvent);
+                cpair.setOrderCancelCheckEvent(orderCancelCheckEvent);
                 cpair.setOrderProcess(process);
                 pairOrders.put(orderCID, cpair);
                 balance.updateAllBalances();
@@ -405,11 +417,11 @@ public class OrdersController extends PeriodicProcessThread {
         }
     }
     
-    private boolean checkOrder(Long orderCID, OrderPairItem pairItem) {
-        if (orderCID == null || pairItem == null) return false;
-        if (pairItem.getOrderAPIID() <= 0) return false;
+    private Order checkOrder(Long orderCID, OrderPairItem pairItem) {
+        if (orderCID == null || pairItem == null) return null;
+        if (pairItem.getOrderAPIID() <= 0) return null;
 
-        boolean result = false;
+        Order result = null;
         try {
             SEMAPHORE_CHECK.acquire();
             Order order = null;
@@ -448,7 +460,7 @@ public class OrdersController extends PeriodicProcessThread {
                 }
 
                 if (isTestMode) emulator.progressOrder(pairItem.getOrderAPIID());
-                result = true;
+                result = order;
             }
         } catch (InterruptedException ex) {
             Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, ex);
@@ -460,7 +472,18 @@ public class OrdersController extends PeriodicProcessThread {
     
     private void checkOrders() {
         for (Map.Entry<Long, OrderPairItem> entry : pairOrders.entrySet()) {
-            if (checkOrder(entry.getKey(), entry.getValue())) doWait(500);
+            Order checked = checkOrder(entry.getKey(), entry.getValue());
+            if (checked != null) {
+                if (entry.getValue().getOrderCancelCheckEvent() != null) {
+                    if (entry.getValue().getOrderCancelCheckEvent().onOrderCancelCheck(entry.getKey(), entry.getValue(), checked)) {
+                        cancelOrder(entry.getKey(), false);
+                        doWait(500);
+                        checkOrder(entry.getKey(), entry.getValue());
+                    }
+                } else {
+                    doWait(500);
+                }
+            }
         }
     }
     

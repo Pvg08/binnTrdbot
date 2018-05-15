@@ -6,6 +6,7 @@
 package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
+import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
@@ -34,6 +35,7 @@ public class OrderPairItem {
     
     private int listIndex = -1;
     private PairOrderEvent orderEvent = null;
+    private PairOrderCheckEvent orderCancelCheckEvent = null;
     private ControllableOrderProcess orderProcess = null;
     
     private long orderAPIID = 0;
@@ -388,5 +390,19 @@ public class OrderPairItem {
      */
     public void setOrderProcess(ControllableOrderProcess orderProcess) {
         this.orderProcess = orderProcess;
+    }
+
+    /**
+     * @return the orderCancelCheckEvent
+     */
+    public PairOrderCheckEvent getOrderCancelCheckEvent() {
+        return orderCancelCheckEvent;
+    }
+
+    /**
+     * @param orderCancelCheckEvent the orderCancelCheckEvent to set
+     */
+    public void setOrderCancelCheckEvent(PairOrderCheckEvent orderCancelCheckEvent) {
+        this.orderCancelCheckEvent = orderCancelCheckEvent;
     }
 }

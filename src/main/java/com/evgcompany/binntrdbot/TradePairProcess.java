@@ -41,18 +41,18 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     protected final TradingAPIAbstractInterface client;
-    private final mainApplication app;
-    private OrdersController ordersController = null;
-    private StrategiesController strategiesController = null;
-    private CoinInfoAggregator info = null;
+    protected final mainApplication app;
+    protected OrdersController ordersController = null;
+    protected StrategiesController strategiesController = null;
+    protected CoinInfoAggregator info = null;
     private NeuralNetworkStockPredictor predictor = null;
 
-    private CoinFilters filter = null;
-    private final String symbol;
-    private String baseAssetSymbol;
-    private String quoteAssetSymbol;
+    protected CoinFilters filter = null;
+    protected final String symbol;
+    protected String baseAssetSymbol;
+    protected String quoteAssetSymbol;
     
-    private Long orderCID = null;
+    protected Long orderCID = null;
     
     private boolean isTryingToSellUp = false;
     private boolean isTryingToBuyDip = false;
@@ -89,17 +89,17 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     private int fullOrdersCount = 0;
     private int stopSellLimitTimeout = 1200;
     
-    private long lastOrderMillis = 0;
-    private long startMillis = 0;
-    private BigDecimal currentPrice = BigDecimal.ZERO;
-    private BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
+    protected long lastOrderMillis = 0;
+    protected long startMillis = 0;
+    protected BigDecimal currentPrice = BigDecimal.ZERO;
+    protected BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
-    private BigDecimal lastBuyPrice = BigDecimal.ZERO;
-    private BigDecimal lastBuyAmount = BigDecimal.ZERO;
+    protected BigDecimal lastBuyPrice = BigDecimal.ZERO;
+    protected BigDecimal lastBuyAmount = BigDecimal.ZERO;
     
     private SignalItem init_signal = null;
     
-    private boolean inAPIOrder = false;
+    protected boolean inAPIOrder = false;
     
     public TradePairProcess(TradingAPIAbstractInterface rclient, String pair) {
         app = mainApplication.getInstance();
@@ -180,84 +180,6 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             base_strategy_sell_ignored = true;
         }
     }
-    
-    /*private void checkOrder() {
-        if (ordersController.isTestMode()) {
-            ordersController.finishOrder(orderCID, true, currentPrice);
-            return;
-        }
-        Order order = client.getOrderStatus(symbol, limitOrderId);
-        if(order != null) {
-            System.out.println(order);
-            if (order.getStatus() == OrderStatus.PARTIALLY_FILLED && Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())) {
-                return;
-            }
-            if (
-                order.getStatus() == OrderStatus.FILLED || 
-                order.getStatus() == OrderStatus.PARTIALLY_FILLED || 
-                order.getStatus() == OrderStatus.CANCELED ||
-                order.getStatus() == OrderStatus.EXPIRED ||
-                order.getStatus() == OrderStatus.REJECTED
-            ) {
-                limitOrderId = 0;
-                if (
-                        order.getStatus() != OrderStatus.FILLED ||
-                        Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())
-                    ) 
-                {
-                    if(order.getSide() == OrderSide.BUY) {
-                        isTryingToSellUp = false;
-                        is_hodling = false;
-                        orderToCancelOnSellUp.clear();
-                        base_strategy_sell_ignored = false;
-                    } else {
-                        is_hodling = true;
-                    }
-                    if (
-                            (order.getStatus() == OrderStatus.FILLED || order.getStatus() == OrderStatus.PARTIALLY_FILLED) &&
-                            Double.parseDouble(order.getExecutedQty()) < Double.parseDouble(order.getOrigQty())
-                        ) 
-                    {
-                        ordersController.finishOrderPart(orderCID, new BigDecimal(order.getPrice()), new BigDecimal(order.getExecutedQty()));
-                        sold_amount = sold_amount.subtract(new BigDecimal(order.getExecutedQty()));
-                        app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is partially finished! Price = "+order.getPrice() + "; Quantity = " + order.getExecutedQty(), true, true);
-                        BalanceController.getInstance().updateAllBalances();
-                        return;
-                    }
-                } else {
-                    if(order.getSide() == OrderSide.BUY) {
-                        strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
-                    } else {
-                        strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(order.getPrice()), Decimal.valueOf(sold_amount));
-                        fullOrdersCount++;
-                    }
-                }
-                ordersController.finishOrder(orderCID, order.getStatus() == OrderStatus.FILLED, new BigDecimal(order.getPrice()));
-                BalanceController.getInstance().updateAllBalances();
-                app.log("Limit order for "+order.getSide().name().toLowerCase()+" "+symbol+" is finished! Status="+order.getStatus().name()+"; Price = "+order.getPrice(), true, true);
-                if (stopAfterSell && order.getSide() == OrderSide.SELL && order.getStatus() == OrderStatus.FILLED) {
-                    doStop();
-                }
-            } else {
-                if(order.getSide() == OrderSide.BUY) {
-                    if (useBuyStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopBuyLimitTimeout) {
-                        app.log("We wait too long. Need to stop this "+symbol+"'s BUY order...");
-                        lastOrderMillis = System.currentTimeMillis();
-                        doLimitCancel();
-                        return;
-                    }
-                } else {
-                    if (useSellStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopSellLimitTimeout) {
-                        app.log("We wait too long. Need to stop this "+symbol+"'s SELL order...");
-                        lastOrderMillis = System.currentTimeMillis();
-                        doLimitCancel();
-                        return;
-                    }
-                }
-            }
-        }
-        ordersController.setPairOrderCurrentPrice(orderCID, currentPrice);
-    }*/
 
     private boolean canBuyForCoinRating() {
         return app.getCoinRatingController() == null || 
@@ -443,6 +365,37 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         }
     }
     
+    private boolean onOrderCheckEvent(
+        Long pairOrderCID, 
+        OrderPairItem orderPair, 
+        Order order
+    ) {
+        if (
+                need_stop || 
+                !inAPIOrder ||
+                order == null || 
+                order.getStatus() == OrderStatus.CANCELED || 
+                order.getStatus() == OrderStatus.FILLED || 
+                order.getStatus() == OrderStatus.PARTIALLY_FILLED
+        ) {
+            return false;
+        }
+        if(order.getSide() == OrderSide.BUY) {
+            if (useBuyStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopBuyLimitTimeout) {
+                app.log("We wait too long. Need to stop this "+symbol+"'s BUY order...");
+                lastOrderMillis = System.currentTimeMillis();
+                return true;
+            }
+        } else {
+            if (useSellStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopSellLimitTimeout) {
+                app.log("We wait too long. Need to stop this "+symbol+"'s SELL order...");
+                lastOrderMillis = System.currentTimeMillis();
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private void onOrderEvent(
             Long pairOrderCID, 
             OrderPairItem orderPair, 
@@ -457,10 +410,10 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         if (isNew) {
             inAPIOrder = true;
             if (isBuying) {
-                app.log("Buying...!", true, true);
+                app.log("Buying "+symbol+"...", true, true);
                 is_hodling = true;
             } else {
-                app.log("Selling...", true, true);
+                app.log("Selling "+symbol+"...", true, true);
                 is_hodling = false;
                 orderToCancelOnSellUp.clear();
                 isTryingToSellUp = false;
@@ -551,7 +504,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             return;
         }
 
-        orderCID = ordersController.registerPairTrade(symbol, this, this::onOrderEvent);
+        orderCID = ordersController.registerPairTrade(symbol, this, this::onOrderEvent, this::onOrderCheckEvent);
 
         if (!buyOnStart) {
             doWait(startDelayTime);
