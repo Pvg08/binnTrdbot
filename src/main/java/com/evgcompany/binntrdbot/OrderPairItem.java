@@ -10,6 +10,7 @@ import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
+import java.util.Arrays;
 
 /**
  *
@@ -22,14 +23,15 @@ public class OrderPairItem {
     private CoinBalanceItem base_item = null;
     private CoinBalanceItem quote_item = null;
     
-    private BigDecimal summOrderBase = BigDecimal.ZERO;
-    private BigDecimal summOrderQuote = BigDecimal.ZERO;
+    private BigDecimal transactionOrderBase = BigDecimal.ZERO;
+    private BigDecimal transactionOrderQuote = BigDecimal.ZERO;
     
-    private boolean in_order_buy_sell_cycle;
-    private boolean order_pending;
-    private boolean in_sell_order = false;
-    private BigDecimal last_order_price = BigDecimal.ZERO;
-    private BigDecimal last_order_amount = BigDecimal.ZERO;
+    private boolean inTransaction = false;
+    private boolean inLong = false;
+    private boolean inShort = false;
+    private boolean lastTransactionSell = false;
+
+    private BigDecimal lastOrderPrice = BigDecimal.ZERO;
 
     private String marker = "";
     
@@ -48,10 +50,8 @@ public class OrderPairItem {
         symbolBase = base_item.getSymbol();
         symbolQuote = quote_item.getSymbol();
         this.symbolPair = symbolPair;
-        in_sell_order = false;
+        lastTransactionSell = false;
         listIndex = -1;
-        in_order_buy_sell_cycle = false;
-        order_pending = false;
     }
 
     @Override
@@ -65,7 +65,7 @@ public class OrderPairItem {
             txt = txt + " ["+symbolPair+"]";
         }
         txt = txt + "  ";
-        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || in_order_buy_sell_cycle || order_pending || !marker.isEmpty();
+        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || inLong || inShort || !marker.isEmpty();
         if (is_changed) {
             
             if (base_item.getInitialValue().compareTo(BigDecimal.ZERO) > 0) {
@@ -88,23 +88,25 @@ public class OrderPairItem {
             }*/
             
             if (marker.isEmpty()) {
-                if (order_pending) {
-                    txt = txt + " [PENDING "+(in_sell_order ? "SELL" : "BUY")+"]";
-                } else if (in_order_buy_sell_cycle) {
-                    txt = txt + " [ORDER]";
+                if (inTransaction) {
+                    txt = txt + " [PENDING "+(lastTransactionSell ? "SELL" : "BUY")+"]";
+                } else if (inShort) {
+                    txt = txt + " [ORDER SHORT]";
+                } else if (inLong) {
+                    txt = txt + " [ORDER LONG]";
                 }
-            }
-            
-            if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
-                txt = txt + " [Ord: "+NumberFormatter.df8.format(last_order_price)+ " " + symbolQuote + "]";
             }
         }
  
+        if (lastOrderPrice != null && lastOrderPrice.compareTo(BigDecimal.ZERO) > 0) {
+            txt = txt + " [Ord: "+NumberFormatter.df8.format(lastOrderPrice)+ " " + symbolQuote + "]";
+        }
+        
         if (CoinInfoAggregator.getInstance().getLastPrices().containsKey(symbolPair)) {
             txt = txt + " [Cur: "+NumberFormatter.df8.format(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair))+ " " + symbolQuote;
             
-            if (last_order_price != null && last_order_price.compareTo(BigDecimal.ZERO) > 0) {
-                double percent = 100 * (CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair) - last_order_price.doubleValue()) / last_order_price.doubleValue();
+            if (lastOrderPrice != null && lastOrderPrice.compareTo(BigDecimal.ZERO) > 0) {
+                double percent = 100 * (CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair) - lastOrderPrice.doubleValue()) / lastOrderPrice.doubleValue();
                 if (Math.abs(percent) > 0.0005) {
                     txt = txt + " " + (percent >= 0 ? "+" : "") + NumberFormatter.df3.format(percent) + "%";
                 }
@@ -140,119 +142,149 @@ public class OrderPairItem {
         runQuoteCoinEvent();
     }
     
-    public void preBuyTransaction(BigDecimal summBase, BigDecimal summQuote, boolean change_initial_values) {
-        if (!in_order_buy_sell_cycle) {
-            last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
+    public void preBuyTransaction(BigDecimal summBase, BigDecimal summQuote, BigDecimal transactionPrice, boolean change_initial_values) {
+        System.out.println("preBuyTransaction");
+        if (!inTransaction) {
+            lastOrderPrice = transactionPrice;
             if (change_initial_values) {
                 base_item.addInitialValue(summBase.multiply(new BigDecimal("-1")));
                 quote_item.addInitialValue(summQuote);
             }
-            in_order_buy_sell_cycle = true;
-            order_pending = false;
-            in_sell_order = false;
-            summOrderBase = BigDecimal.ZERO;
-            summOrderQuote = BigDecimal.ZERO;
+            inShort = false;
+            inLong = true;
+            lastTransactionSell = false;
+            transactionOrderBase = BigDecimal.ZERO;
+            transactionOrderQuote = BigDecimal.ZERO;
             runCoinEvents();
+        } else {
+            System.out.println("Trying to preBuyTransaction but not in transaction...");
+            try { new Exception().printStackTrace();} catch(Exception e) {}
         }
     }
 
-    public void startBuyTransaction(BigDecimal summBase, BigDecimal summQuote) {
-        if (!in_order_buy_sell_cycle) {
-            last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
-            summOrderBase = summBase;
-            summOrderQuote = summQuote;
-            quote_item.addLimitValue(summOrderQuote);
-            quote_item.addFreeValue(summOrderQuote.multiply(new BigDecimal("-1")));
+    public void startBuyTransaction(BigDecimal summBase, BigDecimal summQuote, BigDecimal transactionPrice) {
+        System.out.println("startBuyTransaction");
+        if (!inTransaction) {
+            inTransaction = true;
+            lastOrderPrice = transactionPrice;
+            transactionOrderBase = summBase;
+            transactionOrderQuote = summQuote;
+            quote_item.addLimitValue(transactionOrderQuote);
+            quote_item.addFreeValue(transactionOrderQuote.multiply(new BigDecimal("-1")));
             base_item.incActiveOrders();
             quote_item.incActiveOrders();
-            in_sell_order = false;
-            in_order_buy_sell_cycle = true;
-            order_pending = true;
+            lastTransactionSell = false;
+            if (!inLong && !inShort) {
+                inLong = true;
+            } else {
+                inShort = false;
+            }
             runCoinEvents();
+        } else {
+            System.out.println("Trying to startBuyTransaction but already in transaction...");
+            try { new Exception().printStackTrace();} catch(Exception e) {}
         }
     }
-    public void startSellTransaction(BigDecimal summBase, BigDecimal summQuote) {
-        if (in_order_buy_sell_cycle) {
-            summOrderBase = summBase;
-            summOrderQuote = summQuote;
-            base_item.addLimitValue(summOrderBase);
-            base_item.addFreeValue(summOrderBase.multiply(new BigDecimal("-1")));
+    public void startSellTransaction(BigDecimal summBase, BigDecimal summQuote, BigDecimal transactionPrice) {
+        System.out.println("startSellTransaction");
+        if (!inTransaction) {
+            inTransaction = true;
+            lastOrderPrice = transactionPrice;
+            transactionOrderBase = summBase;
+            transactionOrderQuote = summQuote;
+            base_item.addLimitValue(transactionOrderBase);
+            base_item.addFreeValue(transactionOrderBase.multiply(new BigDecimal("-1")));
             base_item.incActiveOrders();
             quote_item.incActiveOrders();
-            in_sell_order = true;
-            order_pending = true;
+            lastTransactionSell = true;
+            if (!inLong && !inShort) {
+                inShort = true;
+            } else {
+                inLong = false;
+            }
             runCoinEvents();
+        } else {
+            System.out.println("Trying to startSellTransaction but already in transaction...");
+            try { new Exception().printStackTrace();} catch(Exception e) {}
         }
     }
     public void confirmTransaction() {
-        if (in_sell_order) {
-            base_item.addLimitValue(summOrderBase.multiply(new BigDecimal("-1")));
-            quote_item.addFreeValue(summOrderQuote);
-            in_order_buy_sell_cycle = false;
-            last_order_price = BigDecimal.ZERO;
+        System.out.println("confirmTransaction");
+        if (inTransaction) {
+            if (lastTransactionSell) {
+                base_item.addLimitValue(transactionOrderBase.multiply(new BigDecimal("-1")));
+                quote_item.addFreeValue(transactionOrderQuote);
+                inLong = false;
+            } else {
+                quote_item.addLimitValue(transactionOrderQuote.multiply(new BigDecimal("-1")));
+                base_item.addFreeValue(transactionOrderBase);
+                inShort = false;
+            }
             base_item.incOrderCount();
             quote_item.incOrderCount();
+            base_item.decActiveOrders();
+            quote_item.decActiveOrders();
+            transactionOrderBase = BigDecimal.ZERO;
+            transactionOrderQuote = BigDecimal.ZERO;
+            inTransaction = false;
+            lastTransactionSell = false;
+            runCoinEvents();
         } else {
-            quote_item.addLimitValue(summOrderQuote.multiply(new BigDecimal("-1")));
-            base_item.addFreeValue(summOrderBase);
+            System.out.println("Trying to confirmTransaction but not in transaction...");
+            try { new Exception().printStackTrace();} catch(Exception e) {}
         }
-        summOrderBase = BigDecimal.ZERO;
-        summOrderQuote = BigDecimal.ZERO;
-        in_sell_order = false;
-        order_pending = false;
-        base_item.decActiveOrders();
-        quote_item.decActiveOrders();
-        runCoinEvents();
     }
 
     public void confirmTransactionPart(BigDecimal summPartBase, BigDecimal summPartQuote) {
-        if (in_sell_order) {
-            base_item.addLimitValue(summPartBase.multiply(new BigDecimal("-1")));
-            quote_item.addFreeValue(summPartQuote);
+        System.out.println("confirmTransactionPart");
+        if (inTransaction) {
+            if (lastTransactionSell) {
+                base_item.addLimitValue(summPartBase.multiply(new BigDecimal("-1")));
+                quote_item.addFreeValue(summPartQuote);
+            } else {
+                quote_item.addLimitValue(summPartQuote.multiply(new BigDecimal("-1")));
+                base_item.addFreeValue(summPartBase);
+            }
+            transactionOrderBase = transactionOrderBase.subtract(summPartBase);
+            transactionOrderQuote = transactionOrderQuote.subtract(summPartQuote);
+            runCoinEvents();
         } else {
-            quote_item.addLimitValue(summPartQuote.multiply(new BigDecimal("-1")));
-            base_item.addFreeValue(summPartBase);
+            System.out.println("Trying to confirmTransactionPart but not in transaction...");
+            try { new Exception().printStackTrace();} catch(Exception e) {}
         }
-        summOrderBase = summOrderBase.subtract(summPartBase);
-        summOrderQuote = summOrderQuote.subtract(summPartQuote);
-        runCoinEvents();
     }
 
     public void rollbackTransaction() {
-        if (in_sell_order) {
-            base_item.addLimitValue(summOrderBase.multiply(new BigDecimal("-1")));
-            base_item.addFreeValue(summOrderBase);
+        System.out.println("rollbackTransaction");
+        if (inTransaction) {
+            if (lastTransactionSell) {
+                base_item.addLimitValue(transactionOrderBase.multiply(new BigDecimal("-1")));
+                base_item.addFreeValue(transactionOrderBase);
+                if (!inLong) {
+                    inShort = false;
+                } else {
+                    inLong = true;
+                }
+            } else {
+                quote_item.addLimitValue(transactionOrderQuote.multiply(new BigDecimal("-1")));
+                quote_item.addFreeValue(transactionOrderQuote);
+                if (!inLong) {
+                    inShort = true;
+                } else {
+                    inLong = false;
+                }
+            }
+            transactionOrderBase = BigDecimal.ZERO;
+            transactionOrderQuote = BigDecimal.ZERO;
+            inTransaction = false;
+            lastTransactionSell = false;
+            base_item.decActiveOrders();
+            quote_item.decActiveOrders();
+            runCoinEvents();
         } else {
-            quote_item.addLimitValue(summOrderQuote.multiply(new BigDecimal("-1")));
-            quote_item.addFreeValue(summOrderQuote);
-            in_order_buy_sell_cycle = false;
-            last_order_price = BigDecimal.ZERO;
+            System.out.println("Trying to rollbackTransaction but not in transaction...");
+            try { new Exception().printStackTrace();} catch(Exception e) {}
         }
-        summOrderBase = BigDecimal.ZERO;
-        summOrderQuote = BigDecimal.ZERO;
-        in_sell_order = false;
-        order_pending = false;
-        base_item.decActiveOrders();
-        quote_item.decActiveOrders();
-        runCoinEvents();
-    }
-    
-    public void simpleBuy(BigDecimal summBase, BigDecimal summQuote) {
-        last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
-        summOrderBase = summBase;
-        summOrderQuote = summQuote;
-        quote_item.addFreeValue(summOrderQuote.multiply(new BigDecimal("-1")));
-        base_item.addFreeValue(summOrderBase);
-        runCoinEvents();
-    }
-
-    public void simpleSell(BigDecimal summBase, BigDecimal summQuote) {
-        last_order_price = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(symbolPair));
-        summOrderBase = summBase;
-        summOrderQuote = summQuote;
-        quote_item.addFreeValue(summOrderQuote);
-        base_item.addFreeValue(summOrderBase.multiply(new BigDecimal("-1")));
-        runCoinEvents();
     }
     
     /**
@@ -308,14 +340,14 @@ public class OrderPairItem {
      * @return the last_order_price
      */
     public BigDecimal getLastOrderPrice() {
-        return last_order_price;
+        return lastOrderPrice;
     }
 
     /**
      * @param last_order_price the last_order_price to set
      */
     public void setLastOrderPrice(BigDecimal last_order_price) {
-        this.last_order_price = last_order_price;
+        this.lastOrderPrice = last_order_price;
     }
 
     /**

@@ -8,10 +8,13 @@ package com.evgcompany.binntrdbot.misc;
 import com.evgcompany.binntrdbot.mainApplication;
 import java.awt.Component;
 import java.awt.Window;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.prefs.Preferences;
+import javax.swing.AbstractButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JList;
@@ -71,6 +74,11 @@ public class ComponentsConfigController {
                     Integer.parseInt(prefs.get(name+"_size_x", String.valueOf(Math.round(cb.getBounds().getWidth())))),
                     Integer.parseInt(prefs.get(name+"_size_y", String.valueOf(Math.round(cb.getBounds().getHeight()))))
                 );
+            }
+            if (cb instanceof AbstractButton) {
+                for(ActionListener a: ((AbstractButton)cb).getActionListeners()) {
+                    a.actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, null) {});
+                }
             }
         } catch(Exception e) {}
     }

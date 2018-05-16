@@ -59,11 +59,12 @@ public class TradePairProcessList {
     }
 
     private TradePairProcess initializePair(String symbol, boolean run) {
+        boolean has_short = symbol.contains("_");
         boolean has_wave = symbol.contains("~");
         boolean has_plus = symbol.contains("+");
         boolean has_2plus = symbol.contains("++");
         boolean has_minus = !has_plus && symbol.contains("-");
-        symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "").replaceAll("\\~", "");
+        symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "").replaceAll("\\~", "").replaceAll("\\_", "");
         int pair_index = searchCurrencyFirstPair(symbol);
         TradePairProcess nproc;
         if (pair_index < 0) {
@@ -73,8 +74,8 @@ public class TradePairProcessList {
                 nproc = new TradePairProcess(ordersController.getClient(), symbol);
             }
             nproc.setStartDelay(pairs.size() * 1000 + 500);
-            nproc.setTryingToSellUp(has_plus);
-            nproc.setSellUpAll(has_2plus);
+            nproc.setTryingToSellOnPeak(has_plus);
+            nproc.setSellOpenOrdersOnPeak(has_2plus);
         } else {
             nproc = pairs.get(pair_index);
         }
@@ -91,6 +92,7 @@ public class TradePairProcessList {
         nproc.setStopBuyLimitTimeout(buyStopLimitedTimeout);
         nproc.setStopSellLimitTimeout(sellStopLimitedTimeout);
         nproc.setBarQueryCount(barAdditionalCount);
+        nproc.setLongMode(!has_short);
         
         if (run && pair_index < 0) {
             nproc.start();
@@ -133,8 +135,8 @@ public class TradePairProcessList {
     public TradePairProcess addPairFastRun(String newPair) {
         if (!hasPair(newPair)) {
             TradePairProcess nproc = initializePair(newPair, false);
-            nproc.setTryingToSellUp(false);
-            nproc.setSellUpAll(false);
+            nproc.setTryingToSellOnPeak(false);
+            nproc.setSellOpenOrdersOnPeak(false);
             nproc.setTryingToBuyDip(false);
             nproc.set_do_remove_flag(false);
             nproc.setTradingBalancePercent(tradingBalancePercent);

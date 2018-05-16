@@ -756,7 +756,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                                 (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
                             ) || (
                                 rentered.pair.isTriedBuy() && 
-                                !rentered.pair.isHodling() && 
+                                !rentered.pair.isInLong() && 
                                 !rentered.pair.isInAPIOrder()
                             ) || (
                                 !rentered.pair.isAlive()

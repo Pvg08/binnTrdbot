@@ -119,6 +119,42 @@ public class CoinFilters implements java.io.Serializable {
         return quantity;
     }
 
+    public void prepareForBuy() {
+        BigDecimal tobuy_price = normalizePrice(currentPrice);
+        BigDecimal tobuy_amount = normalizeQuantity(currentAmount, true);
+        tobuy_amount = normalizeNotionalQuantity(tobuy_amount, tobuy_price);
+        if (!BalanceController.getInstance().canBuy(pairAssetSymbol, tobuy_amount, tobuy_price) && filterQtyStep != null && tobuy_amount.compareTo(filterQtyStep) > 0) {
+            tobuy_amount = tobuy_amount.subtract(filterQtyStep);
+        }
+        currentPrice = tobuy_price;
+        currentAmount = tobuy_amount;
+    }
+    
+    public void prepareForSell() {
+        BigDecimal tosell_price = normalizePrice(currentPrice);
+        BigDecimal tosell_amount = normalizeQuantity(currentAmount, true);
+        tosell_amount = normalizeNotionalQuantity(tosell_amount, tosell_price);
+        if (!BalanceController.getInstance().canSell(pairAssetSymbol, tosell_amount) && filterQtyStep != null && tosell_amount.compareTo(filterQtyStep) > 0) {
+            tosell_amount = tosell_amount.subtract(filterQtyStep);
+        }
+        currentPrice = tosell_price;
+        currentAmount = tosell_amount;
+    }
+    
+    public void logFiltersInfo() {
+        mainApplication.getInstance().log(pairAssetSymbol + " filters:");
+        if (filterPrice) {
+            mainApplication.getInstance().log("Price: min="+NumberFormatter.df8.format(filterMinPrice)+"; max="+NumberFormatter.df8.format(filterMaxPrice)+"; tick=" + NumberFormatter.df8.format(filterPriceTickSize));
+        }
+        if (filterQty) {
+            mainApplication.getInstance().log("Quantity: min="+NumberFormatter.df8.format(filterMinQty)+"; max="+NumberFormatter.df8.format(filterMaxQty)+"; step=" + NumberFormatter.df8.format(filterQtyStep));
+        }
+        if (filterNotional) {
+            mainApplication.getInstance().log("Notional: " + NumberFormatter.df8.format(filterMinNotional));
+        }
+        mainApplication.getInstance().log("");
+    }
+    
     /**
      * @return the baseAssetSymbol
      */
@@ -208,43 +244,6 @@ public class CoinFilters implements java.io.Serializable {
      */
     public BigDecimal getFilterMinNotional() {
         return filterMinNotional;
-    }
-
-    public void logFiltersInfo() {
-        mainApplication.getInstance().log(baseAssetSymbol+quoteAssetSymbol + " filters:");
-        if (filterPrice) {
-            mainApplication.getInstance().log("Price: min="+NumberFormatter.df8.format(filterMinPrice)+"; max="+NumberFormatter.df8.format(filterMaxPrice)+"; tick=" + NumberFormatter.df8.format(filterPriceTickSize));
-        }
-        if (filterQty) {
-            mainApplication.getInstance().log("Quantity: min="+NumberFormatter.df8.format(filterMinQty)+"; max="+NumberFormatter.df8.format(filterMaxQty)+"; step=" + NumberFormatter.df8.format(filterQtyStep));
-        }
-        if (filterNotional) {
-            mainApplication.getInstance().log("Notional: " + NumberFormatter.df8.format(filterMinNotional));
-        }
-        mainApplication.getInstance().log("");
-    }
-
-    public void prepareForBuy() {
-        BigDecimal tobuy_price = normalizePrice(currentPrice);
-        BigDecimal tobuy_amount = currentAmount;
-        tobuy_amount = normalizeQuantity(tobuy_amount.divide(tobuy_price, RoundingMode.HALF_DOWN), true);
-        tobuy_amount = normalizeNotionalQuantity(tobuy_amount, tobuy_price);
-        if (!BalanceController.getInstance().canBuy(baseAssetSymbol+quoteAssetSymbol, tobuy_amount, tobuy_price) && filterQtyStep != null && tobuy_amount.compareTo(filterQtyStep) > 0) {
-            tobuy_amount = tobuy_amount.subtract(filterQtyStep);
-        }
-        currentPrice = tobuy_price;
-        currentAmount = tobuy_amount;
-    }
-    
-    public void prepareForSell() {
-        BigDecimal tosell_price = normalizePrice(currentPrice);
-        BigDecimal tosell_amount = normalizeQuantity(currentAmount, true);
-        tosell_amount = normalizeNotionalQuantity(tosell_amount, tosell_price);
-        if (!BalanceController.getInstance().canSell(baseAssetSymbol+quoteAssetSymbol, tosell_amount) && filterQtyStep != null && tosell_amount.compareTo(filterQtyStep) > 0) {
-            tosell_amount = tosell_amount.subtract(filterQtyStep);
-        }
-        currentPrice = tosell_price;
-        currentAmount = tosell_amount;
     }
     
     /**

@@ -37,7 +37,7 @@ public class StrategiesController {
        NORMAL, BUY_DIP, SELL_UP
     }
     public enum StrategiesAction {
-       DO_NOTHING, DO_ENTER, DO_LEAVE
+       DO_NOTHING, DO_ENTER, DO_EXIT, DO_ENTER_SECONDARY, DO_LEAVE_SECONDARY
     }
     
     private mainApplication app = null;
@@ -517,55 +517,57 @@ public class StrategiesController {
         return subseries;
     }
     
-    public StrategiesAction checkStatus(boolean is_hodling, boolean checkOtherStrategies, StrategiesMode mode) {
+    public StrategiesAction checkStatus(boolean canExit, boolean checkOtherStrategies) {
         int endIndex = series.getEndIndex();
         
-        if (is_hodling) {
-            if (mode != StrategiesMode.BUY_DIP) {
-                if (strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord)) {
-                    addStrategyMarker(false, mainStrategy);
-                    return StrategiesAction.DO_LEAVE;
-                } else if (strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord)) {
-                    addStrategyMarker(true, mainStrategy);
-                    if (app != null) app.log(groupName + " should enter here but already hodling...", false, true);
-                }
+        boolean shouldEnter = strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord);
+        boolean shouldExit = strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord);
+        
+        if (shouldEnter) {
+            addStrategyMarker(true, mainStrategy);
+        }
+        if (shouldExit) {
+            addStrategyMarker(false, mainStrategy);
+        }
+        
+        if (canExit) {
+            if (shouldExit) {
+                return StrategiesAction.DO_EXIT;
+            } else if (shouldEnter) {
+                app.log(groupName + " can enter here but not need it...", false, true);
             }
         } else {
-            if (strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord)) {
-                addStrategyMarker(true, mainStrategy);
+            if (shouldEnter) {
                 return StrategiesAction.DO_ENTER;
-            } else if (strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord)) {
-                addStrategyMarker(false, mainStrategy);
-                if (app != null) app.log(groupName + " should exit here but everything is sold...", false, true);
+            } else if (shouldExit) {
+                app.log(groupName + " can exit here but not need it...", false, true);
             }
         }
 
-        if (checkOtherStrategies && mode != StrategiesMode.BUY_DIP) {
+        if (checkOtherStrategies) {
             for (Map.Entry<String, Strategy> entry : strategies.entrySet()) {
                 if (!entry.getKey().equals(mainStrategy)) {
-                    if (is_hodling) {
+                    if (canExit) {
                         if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
                             addStrategyMarker(false, entry.getKey());
-                            if (app != null) app.log(groupName + " should exit here ("+entry.getKey()+")...", false, true);
-                            if (mode != StrategiesMode.SELL_UP) {
-                                return StrategiesAction.DO_LEAVE;
-                            }
+                            app.log(groupName + " can exit here ("+entry.getKey()+")...", false, true);
                         } else if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
                             addStrategyMarker(true, entry.getKey());
-                            if (app != null) app.log(groupName + " should enter here ("+entry.getKey()+") but already hodling...", false, true);
+                            app.log(groupName + " can enter here ("+entry.getKey()+")...", false, true);
                         }
                     } else {
                         if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
                             addStrategyMarker(true, entry.getKey());
-                            if (app != null) app.log(groupName + " should enter here ("+entry.getKey()+")...", false, true);
+                            app.log(groupName + " can enter here ("+entry.getKey()+")...", false, true);
                         } else if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
                             addStrategyMarker(false, entry.getKey());
-                            if (app != null) app.log(groupName + " should exit here ("+entry.getKey()+") but everything is sold...", false, true);
+                            app.log(groupName + " can exit here ("+entry.getKey()+")...", false, true);
                         }
                     }
                 }
             }
         }
+
         return StrategiesAction.DO_NOTHING;
     }
 

@@ -54,20 +54,23 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     
     protected Long orderCID = null;
     
-    private boolean isTryingToSellUp = false;
-    private boolean isTryingToBuyDip = false;
+    private boolean isTryingToSellOnPeak = false;
+    private boolean isTryingToBuyOnDip = false;
     private boolean stopAfterSell = false;
-    private boolean sellUpAll = false;
+    private boolean sellOpenOrdersOnPeak = false;
     private boolean checkOtherStrategies = true;
     
-    private final List<Long> orderToCancelOnSellUp = new ArrayList<>();
+    private final List<Long> ordersToCancelOnPeakSell = new ArrayList<>();
     private long last_time = 0;
     
     private BigDecimal tradingBalancePercent = new BigDecimal("50");
     
     private TimeSeries series = null;
     
-    private boolean is_hodling = false;
+    private boolean inLong = false;     // Buy for sell on peak
+    private boolean inShort = false;    // Sell for buy on dip
+    private boolean longMode = true;    // Auto long orders
+    
     private BigDecimal last_trade_profit = BigDecimal.ZERO;
     
     private CurrencyPlot plot = null;
@@ -95,7 +98,9 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     protected BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
     
     protected BigDecimal lastBuyPrice = BigDecimal.ZERO;
-    protected BigDecimal lastBuyAmount = BigDecimal.ZERO;
+    protected BigDecimal orderBaseAmount = BigDecimal.ZERO;
+    protected BigDecimal orderQuoteAmount = BigDecimal.ZERO;
+    protected BigDecimal orderAvgPrice = BigDecimal.ZERO;
     
     private SignalItem init_signal = null;
     
@@ -121,20 +126,29 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     }
     
     private void doEnter(BigDecimal curPrice) {
+        if (!inShort && !inLong) {
+            longMode = true;
+        }
         isTriedBuy = true;
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        BigDecimal quote_asset_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent);
+        BigDecimal base_asset_amount;
+        if (longMode) {
+            base_asset_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent, baseAssetSymbol);
+        } else {
+            base_asset_amount = orderQuoteAmount.divide(curPrice, RoundingMode.HALF_DOWN);
+        }
         filter.setCurrentPrice(curPrice);
-        filter.setCurrentAmount(quote_asset_amount);
+        filter.setCurrentAmount(base_asset_amount);
         filter.prepareForBuy();
         BigDecimal tobuy_price = filter.getCurrentPrice();
         BigDecimal tobuy_amount = filter.getCurrentAmount();
-        quote_asset_amount = tobuy_price.multiply(tobuy_amount);
+        BigDecimal quote_asset_amount = tobuy_price.multiply(tobuy_amount);
         base_strategy_sell_ignored = false;
         if (BalanceController.getInstance().canBuy(symbol, tobuy_amount, tobuy_price)) {
             app.log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
+            lastOrderMillis = System.currentTimeMillis();
             long result = ordersController.Buy(orderCID, tobuy_amount, tobuy_price);
             if (result < 0) {
                 app.log("Error!", true, true);
@@ -144,31 +158,42 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         }
     }
     private void doExit(BigDecimal price, boolean skip_check) {
+        if (!inShort && !inLong) {
+            longMode = false;
+        }
         if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
+        
+        BigDecimal base_asset_amount;
+        if (longMode) {
+            base_asset_amount = orderBaseAmount;
+        } else {
+            base_asset_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, tradingBalancePercent, baseAssetSymbol);
+        }
         filter.setCurrentPrice(price);
-        filter.setCurrentAmount(lastBuyAmount);
+        filter.setCurrentAmount(base_asset_amount);
         filter.prepareForSell();
         BigDecimal tosell_price = filter.getCurrentPrice();
         BigDecimal tosell_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tosell_amount.multiply(tosell_price);
-        BigDecimal incomeWithoutComission = tosell_price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
-        BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(lastBuyPrice, RoundingMode.HALF_DOWN);
+        //BigDecimal incomeWithoutComission = tosell_price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
+        //BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(lastBuyPrice, RoundingMode.HALF_DOWN);
         if (
                 skip_check || 
                 !ordersController.isLowHold() || 
-                init_signal != null ||
+                init_signal != null /*||
                 incomeWithoutComissionPercent.compareTo(ordersController.getTradeMinProfitPercent()) > 0 ||
                 (
                     ordersController.getStopLossPercent() != null &&
                     incomeWithoutComissionPercent.compareTo(ordersController.getStopLossPercent().multiply(BigDecimal.valueOf(-1))) < 0
-                )
+                )*/
             ) {
             if (BalanceController.getInstance().canSell(symbol, tosell_amount)) {
                 base_strategy_sell_ignored = false;
                 app.log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
-                long result = ordersController.Sell(orderCID, tosell_amount, tosell_price, orderToCancelOnSellUp);
+                lastOrderMillis = System.currentTimeMillis();
+                long result = ordersController.Sell(orderCID, tosell_amount, tosell_price, ordersToCancelOnPeakSell);
                 if (result < 0) {
                     app.log("Error!", true, true);
                 }
@@ -176,7 +201,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                 app.log("Can't sell " + NumberFormatter.df8.format(tosell_amount) + " " + symbol + "", false, true);
             }
         } else {
-            app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(incomeWithoutComissionPercent)+"%) is too low. Waiting...", false, true);
+            //app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(incomeWithoutComissionPercent)+"%) is too low. Waiting...", false, true);
             base_strategy_sell_ignored = true;
         }
     }
@@ -190,16 +215,13 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
 
     private void checkStatus() {
         StrategiesController.StrategiesAction saction = strategiesController.checkStatus(
-            is_hodling, 
-            !isTryingToBuyDip && !buyOnStart && checkOtherStrategies, 
-            isTryingToBuyDip ? StrategiesController.StrategiesMode.BUY_DIP : (base_strategy_sell_ignored ? StrategiesController.StrategiesMode.SELL_UP : StrategiesController.StrategiesMode.NORMAL)
+            (longMode && inLong) || (!longMode && !inShort), 
+            checkOtherStrategies
         );
-        if (saction == StrategiesController.StrategiesAction.DO_ENTER || saction == StrategiesController.StrategiesAction.DO_LEAVE) {
-            if (saction == StrategiesController.StrategiesAction.DO_ENTER) {
-                if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice);
-            } else {
-                doExit(lastStrategyCheckPrice, false);
-            }
+        if (saction == StrategiesController.StrategiesAction.DO_ENTER) {
+            if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice);
+        } else if (saction == StrategiesController.StrategiesAction.DO_EXIT) {
+            doExit(lastStrategyCheckPrice, false);
         }
         info.setLatestPrice(symbol, currentPrice);
         ordersController.updatePairTradeText(orderCID);
@@ -218,10 +240,10 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         SEMAPHORE_ADD.release();
     }
     
-    private void tryStartSellUpSeq() {
+    private void initSellAllOnPeak() {
         Trade last = client.getLastTrade(symbol);
         if (last != null) {
-            BigDecimal lastBuyPrice = new BigDecimal(last.getPrice());
+            BigDecimal lastTradeBuyPrice = new BigDecimal(last.getPrice());
             
             BigDecimal currentLimitSellPrice = BigDecimal.ZERO;
             BigDecimal currentLimitSellQty = BigDecimal.ZERO;
@@ -230,13 +252,13 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             BigDecimal free_cnt = qbalance.getFreeValue();
             BigDecimal order_cnt = BigDecimal.ZERO;
             
-            orderToCancelOnSellUp.clear();
+            ordersToCancelOnPeakSell.clear();
 
             List<Order> openOrders = client.getOpenOrders(symbol);
-            if (free_cnt.compareTo(BigDecimal.ZERO)==0 || sellUpAll) {
+            if (free_cnt.compareTo(BigDecimal.ZERO)==0 || sellOpenOrdersOnPeak) {
                 for (int i=0; i < openOrders.size(); i++) {
                     if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL) {
-                        orderToCancelOnSellUp.add(openOrders.get(i).getOrderId());
+                        ordersToCancelOnPeakSell.add(openOrders.get(i).getOrderId());
                         order_cnt = order_cnt.add(new BigDecimal(openOrders.get(i).getOrigQty()));
                     }
                 }
@@ -248,19 +270,21 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                 }
             }
 
-            if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !orderToCancelOnSellUp.isEmpty())) {
+            if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !ordersToCancelOnPeakSell.isEmpty())) {
                 BigDecimal res_cnt = free_cnt.add(order_cnt);
                 inAPIOrder = false;
                 base_strategy_sell_ignored = true;
-                this.lastBuyPrice = lastBuyPrice;
-                lastBuyAmount = res_cnt;
+                lastBuyPrice = lastTradeBuyPrice;
+                orderBaseAmount = res_cnt;
+                orderQuoteAmount = res_cnt.multiply(lastTradeBuyPrice);
                 stopAfterSell = true;
-                app.log("START WAITING to sell " + NumberFormatter.df8.format(lastBuyAmount) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(lastBuyPrice) + " " + quoteAssetSymbol, true, true);
-                boolean result = ordersController.PreBuySell(orderCID, lastBuyAmount, lastBuyPrice, currentLimitSellQty, currentLimitSellPrice);
+                app.log("START WAITING to sell " + NumberFormatter.df8.format(orderBaseAmount) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(lastTradeBuyPrice) + " " + quoteAssetSymbol, true, true);
+                boolean result = ordersController.PreBuySell(orderCID, orderBaseAmount, lastTradeBuyPrice, currentLimitSellQty, currentLimitSellPrice);
                 if (result) {
                     app.log("Successful waiting start!", true, true);
-                    is_hodling = true;
-                    info.setLatestPrice(symbol, currentPrice);
+                    longMode = true;
+                    inLong = true;
+                    inShort = false;
                     ordersController.updatePairTradeText(orderCID);
                 } else {
                     app.log("Error in Buy method!", true, true);
@@ -268,8 +292,8 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                 return;
             }
         }
-        isTryingToSellUp = false;
-        app.log("Can't set SellUp mode for " + symbol, true, true);
+        isTryingToSellOnPeak = false;
+        app.log("Can't set SellPeak mode for " + symbol, true, true);
     } 
     
     private void stopSockets() {
@@ -396,6 +420,26 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         return false;
     }
     
+    private void addOrderQuantities(BigDecimal executedQty, BigDecimal price, boolean isBuying) {
+        BigDecimal executedQuoteQty = executedQty.multiply(price);
+        if (orderBaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            orderAvgPrice = price;
+        }
+        if(isBuying && longMode || !isBuying && !longMode) {
+            if (orderBaseAmount.compareTo(BigDecimal.ZERO) > 0) {
+                orderAvgPrice = orderAvgPrice.multiply(orderBaseAmount).add(price.multiply(executedQty)).divide(orderBaseAmount.add(executedQty), RoundingMode.HALF_UP);
+            }
+            orderBaseAmount = orderBaseAmount.add(executedQty);
+            orderQuoteAmount = orderQuoteAmount.add(executedQuoteQty);
+        } else {
+            /*if (orderBaseAmount.compareTo(executedQty) > 0) {
+                orderAvgPrice = orderAvgPrice.multiply(orderBaseAmount).subtract(price.multiply(executedQty)).divide(orderBaseAmount.subtract(executedQty), RoundingMode.HALF_UP);
+            }*/
+            orderBaseAmount = orderBaseAmount.subtract(executedQty);
+            orderQuoteAmount = orderQuoteAmount.subtract(executedQuoteQty);
+        }
+    }
+    
     private void onOrderEvent(
             Long pairOrderCID, 
             OrderPairItem orderPair, 
@@ -411,43 +455,46 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             inAPIOrder = true;
             if (isBuying) {
                 app.log("Buying "+symbol+"...", true, true);
-                is_hodling = true;
+                inLong = longMode;
+                inShort = false;
             } else {
                 app.log("Selling "+symbol+"...", true, true);
-                is_hodling = false;
-                orderToCancelOnSellUp.clear();
-                isTryingToSellUp = false;
+                inLong = false;
+                inShort = !longMode;
+                ordersToCancelOnPeakSell.clear();
+                isTryingToSellOnPeak = false;
             }
+            lastOrderMillis = System.currentTimeMillis();
         }
         if (!isFinished) {
             return;
         }
-
+        
         inAPIOrder = false;
         
         if (isCancelled || executedQty.compareTo(qty) < 0) {
             // just cancelled or partially filled and then cancelled
             if(isBuying) {
-                isTryingToSellUp = false;
-                is_hodling = false;
-                orderToCancelOnSellUp.clear();
+                isTryingToSellOnPeak = false;
+                inLong = false;
+                inShort = !longMode;
+                ordersToCancelOnPeakSell.clear();
                 base_strategy_sell_ignored = false;
             } else {
-                is_hodling = true;
+                inLong = longMode;
+                inShort = false;
             }
 
             if (executedQty.compareTo(BigDecimal.ZERO) <= 0) {
                 app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is cancelled!", true, true);
-                ordersController.finishOrder(orderCID, false, price);
+                ordersController.finishOrder(orderCID, false, orderAvgPrice);
             } else {
                 if(isBuying) {
                     lastBuyPrice = price;
-                    lastBuyAmount = executedQty;
-                } else {
-                    lastBuyAmount = lastBuyAmount.subtract(executedQty);
                 }
-                ordersController.finishOrderPart(orderCID, price, executedQty);
-                ordersController.finishOrder(orderCID, false, price);
+                addOrderQuantities(executedQty, price, isBuying);
+                ordersController.finishOrderPart(orderCID, orderAvgPrice, executedQty);
+                ordersController.finishOrder(orderCID, false, orderAvgPrice);
                 app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is partially finished! Price = " + NumberFormatter.df8.format(price) + "; Quantity = " + NumberFormatter.df8.format(executedQty), true, true);
             }
 
@@ -458,26 +505,27 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             
             if(isBuying) {
                 lastBuyPrice = price;
-                lastBuyAmount = executedQty;
                 strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
             } else {
                 strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
                 fullOrdersCount++;
-                
-                BigDecimal incomeWithoutComission = price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
+                /*BigDecimal incomeWithoutComission = price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
                 BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(lastBuyPrice, RoundingMode.HALF_DOWN);
                 last_trade_profit = incomeWithoutComissionPercent;
-                profitStr = "; Profit = " + NumberFormatter.df4.format(incomeWithoutComissionPercent) + "%";
+                profitStr = "; Profit = " + NumberFormatter.df4.format(incomeWithoutComissionPercent) + "%";*/
             }
+            addOrderQuantities(executedQty, price, isBuying);
 
             lastOrderMillis = System.currentTimeMillis();
 
-            ordersController.finishOrder(orderCID, true, price);
+            ordersController.finishOrder(orderCID, true, orderAvgPrice);
             app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is finished! Price = "+NumberFormatter.df8.format(price) + profitStr, true, true);
             if (stopAfterSell && !isBuying) {
                 doStop();
             }
         }
+        
+        System.out.println("BASE " + orderBaseAmount + "  QUOTE " + orderQuoteAmount + "  AVG " + orderAvgPrice);
     }
     
     @Override
@@ -517,8 +565,8 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         }
         strategiesController.resetStrategies();
         
-        if (isTryingToSellUp) {
-            tryStartSellUpSeq();
+        if (isTryingToSellOnPeak) {
+            initSellAllOnPeak();
         }
         
         startMillis = System.currentTimeMillis();
@@ -565,20 +613,17 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     public String getQuoteSymbol() {
         return quoteAssetSymbol;
     }
-    public boolean isHodling() {
-        return is_hodling;
-    }
 
     @Override
     public void doBuy() {
-        if (!is_hodling && !inAPIOrder) {
+        if (!inAPIOrder) {
             doEnter(currentPrice);
         }
     }
 
     @Override
     public void doSell() {
-        if (is_hodling && !inAPIOrder) {
+        if (!inAPIOrder) {
             doExit(currentPrice, true);
         }
     }
@@ -613,45 +658,45 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     }
     
     /**
-     * @return the isTryingToSellUp
+     * @return the isTryingToSellOnPeak
      */
-    public boolean isTryingToSellUp() {
-        return isTryingToSellUp;
+    public boolean isTryingToSellOnPeak() {
+        return isTryingToSellOnPeak;
     }
 
     /**
-     * @param isTryingToSellUp the isTryingToSellUp to set
+     * @param isTryingToSellOnPeak the isTryingToSellOnPeak to set
      */
-    public void setTryingToSellUp(boolean isTryingToSellUp) {
-        this.isTryingToSellUp = isTryingToSellUp;
+    public void setTryingToSellOnPeak(boolean isTryingToSellOnPeak) {
+        this.isTryingToSellOnPeak = isTryingToSellOnPeak;
     }
 
     /**
      * @return the isTryingToBuyDip
      */
     public boolean isTryingToBuyDip() {
-        return isTryingToBuyDip;
+        return isTryingToBuyOnDip;
     }
 
     /**
      * @param isTryingToBuyDip the isTryingToBuyDip to set
      */
     public void setTryingToBuyDip(boolean isTryingToBuyDip) {
-        this.isTryingToBuyDip = isTryingToBuyDip;
+        this.isTryingToBuyOnDip = isTryingToBuyDip;
     }
 
     /**
-     * @return the sellUpAll
+     * @return the sellOpenOrdersOnPeak
      */
-    public boolean isSellUpAll() {
-        return sellUpAll;
+    public boolean isSellOpenOrdersOnPeak() {
+        return sellOpenOrdersOnPeak;
     }
 
     /**
-     * @param sellUpAll the sellUpAll to set
+     * @param sellOpenOrdersOnPeak the sellOpenOrdersOnPeak to set
      */
-    public void setSellUpAll(boolean sellUpAll) {
-        this.sellUpAll = sellUpAll;
+    public void setSellOpenOrdersOnPeak(boolean sellOpenOrdersOnPeak) {
+        this.sellOpenOrdersOnPeak = sellOpenOrdersOnPeak;
     }
 
     /**
@@ -857,5 +902,33 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
      */
     public Long getOrderCID() {
         return orderCID;
+    }
+
+    /**
+     * @return the inLong
+     */
+    public boolean isInLong() {
+        return inLong;
+    }
+
+    /**
+     * @return the inShort
+     */
+    public boolean isInShort() {
+        return inShort;
+    }
+
+    /**
+     * @return the longMode
+     */
+    public boolean isLongMode() {
+        return longMode;
+    }
+
+    /**
+     * @param longMode the longMode to set
+     */
+    public void setLongMode(boolean longMode) {
+        this.longMode = longMode;
     }
 }

@@ -85,9 +85,9 @@ public class OrdersController extends PeriodicProcessThread {
     
     public boolean PreBuySell(Long orderCID, BigDecimal baseAmount, BigDecimal buyPrice, BigDecimal sellAmount, BigDecimal sellPrice) {
         OrderPairItem pair = pairOrders.get(orderCID);
-        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), true);
+        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), buyPrice, true);
         if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
-            pair.startSellTransaction(sellAmount, sellAmount.multiply(sellPrice));
+            pair.startSellTransaction(sellAmount, sellAmount.multiply(sellPrice), buyPrice);
         }
         updatePairTrade(orderCID, !isTestMode);
         return true;
@@ -95,7 +95,7 @@ public class OrdersController extends PeriodicProcessThread {
     
     public void PreBuy(Long orderCID, BigDecimal baseAmount, BigDecimal buyPrice) {
         OrderPairItem pair = pairOrders.get(orderCID);
-        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), false);
+        pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), buyPrice, false);
         updatePairTrade(orderCID, !isTestMode);
     }
     
@@ -141,7 +141,7 @@ public class OrdersController extends PeriodicProcessThread {
             pair.setOrderAPIID(result);
             if (result > 0) {
                 if (use_transactions)
-                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price));
+                    pair.startBuyTransaction(baseAmount, baseAmount.multiply(price), price);
                 app.log("Order id = " + result, false, true);
                 Thread.sleep(550);
                 checkOrder(orderCID, pair);
@@ -214,7 +214,7 @@ public class OrdersController extends PeriodicProcessThread {
             pair.setOrderAPIID(result);
             if (result > 0) {
                 if (use_transactions)
-                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price));
+                    pair.startSellTransaction(baseAmount, baseAmount.multiply(price), price);
                 app.log("Order id = " + result, false, true);
                 Thread.sleep(550);
                 checkOrder(orderCID, pair);

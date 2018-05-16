@@ -41,6 +41,9 @@ public class BalanceController extends PeriodicProcessThread {
     private double initialAccountCost = -1;
     private AccountCostUpdateEvent accountCostUpdate = null;
 
+    private String startCoin = null;
+    private double startCoinAdditionalBalance = 0;
+    
     private BalanceController() {
         info = CoinInfoAggregator.getInstance();
     }
@@ -73,14 +76,17 @@ public class BalanceController extends PeriodicProcessThread {
         return coins.get(symbolAsset);
     }
     
-    private void showTradeComissionCurrency() {
+    private void showStartCurrencies() {
         if (client != null && client.getTradeComissionCurrency() != null) {
             setCoinVisible(client.getTradeComissionCurrency());
         }
+        if (startCoin != null) {
+            setCoinVisible(startCoin);
+        }
     }
     
-    public BigDecimal getOrderAssetAmount(String symbolAsset, BigDecimal percent) {
-        CoinBalanceItem quote = coins.get(symbolAsset);
+    public BigDecimal getOrderAssetAmount(String symbolQuote, BigDecimal percent, String symbolBase) {
+        CoinBalanceItem quote = coins.get(symbolQuote);
         if (quote != null) {
             BigDecimal quoteBalance;
             if (quote.getInitialValue().compareTo(quote.getValue()) >= 0) {
@@ -92,9 +98,12 @@ public class BalanceController extends PeriodicProcessThread {
             if (quote.getFreeValue().compareTo(quoteBalance) < 0) {
                 quoteBalance = quote.getFreeValue();
             }
-            return quoteBalance;
+            return info.convertSumm(symbolQuote, quoteBalance, symbolBase);
         }
         return BigDecimal.ZERO;
+    }
+    public BigDecimal getOrderAssetAmount(String symbolQuote, BigDecimal percent) {
+        return getOrderAssetAmount(symbolQuote, percent, symbolQuote);
     }
     
     public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {
@@ -195,6 +204,9 @@ public class BalanceController extends PeriodicProcessThread {
                     if (!isTestMode || curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
                         BigDecimal balance_free = new BigDecimal(allBalances.get(i).getFree());
                         BigDecimal balance_limit = new BigDecimal(allBalances.get(i).getLocked());
+                        if (isTestMode && startCoin != null && startCoin.equals(symbol)) {
+                            balance_free = balance_free.add(BigDecimal.valueOf(startCoinAdditionalBalance));
+                        }
                         curr.setFreeValue(balance_free);
                         curr.setLimitValue(balance_limit);
                         if (curr.getInitialValue().compareTo(BigDecimal.ZERO) < 0) {
@@ -227,9 +239,10 @@ public class BalanceController extends PeriodicProcessThread {
     
     @Override
     protected void runStart() {
+        mainApplication.getInstance().log("Starting balance update thread...");
         info.StartAndWaitForInit();
         updateAllBalances();
-        showTradeComissionCurrency();
+        showStartCurrencies();
         if (!isTestMode) {
             socket = client.OnBalanceEvent((balances) -> {
                 System.out.println("Balance changed: " + balances);
@@ -242,6 +255,8 @@ public class BalanceController extends PeriodicProcessThread {
     protected void runBody() {
         if (!isTestMode) {
             updateAllBalances();
+        } else {
+            updateBaseAccountCost();
         }
     }
 
@@ -255,8 +270,8 @@ public class BalanceController extends PeriodicProcessThread {
         }
     }
     
-    public void setClient(TradingAPIAbstractInterface _client) {
-        client = _client;
+    public void setClient(TradingAPIAbstractInterface client) {
+        this.client = client;
     }
 
     public TradingAPIAbstractInterface getClient() {
@@ -315,5 +330,10 @@ public class BalanceController extends PeriodicProcessThread {
     public void resetAccountCost() {
         baseAccountCost = 0;
         initialAccountCost = -1;
+    }
+
+    public void setStartCoinBalance(String startCoin, double startCoinAdditionalBalance) {
+        this.startCoin = startCoin != null ? startCoin.trim().toUpperCase() : null;
+        this.startCoinAdditionalBalance = startCoinAdditionalBalance;
     }
 }

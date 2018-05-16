@@ -77,7 +77,7 @@ public class SignalOrderController extends PeriodicProcessThread {
             for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
                 CoinRatingPairLogItem rentered = entry.getValue();
                 if (rentered != null && rentered.pair != null && rentered.pair.isInitialized()) {
-                    boolean is_free = !rentered.pair.isHodling() && 
+                    boolean is_free = !rentered.pair.isInLong() && 
                                 !rentered.pair.isInAPIOrder() &&
                                 rentered.pair.getFullOrdersCount() == 0;
                     if (    (
@@ -142,7 +142,7 @@ public class SignalOrderController extends PeriodicProcessThread {
         for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
             CoinRatingPairLogItem rentered = entry.getValue();
             if (rentered != null && rentered.pair != null && rentered.pair.isInitialized() && rentered.pair.getSignalItem() != null) {
-                boolean is_free = !rentered.pair.isHodling()
+                boolean is_free = !rentered.pair.isInLong()
                         && !rentered.pair.isInAPIOrder()
                         && rentered.pair.getFullOrdersCount() == 0;
                 if (is_free) {

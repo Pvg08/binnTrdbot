@@ -272,6 +272,10 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
         return convertSumm(symbol1, price, baseCoin);
     }
     
+    public BigDecimal convertSumm(String symbol1, BigDecimal price, String symbol2) {
+        return BigDecimal.valueOf(convertSumm(symbol1, price.doubleValue(), symbol2));
+    }
+    
     private void updatePrices(boolean needSync) {
         try {
             if (needSync) SEMAPHORE_UPDATE.acquire();
