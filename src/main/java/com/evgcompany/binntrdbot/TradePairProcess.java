@@ -71,6 +71,9 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     private boolean inShort = false;    // Sell for buy on dip
     private boolean longMode = true;    // Auto long orders
     
+    private int pyramidSize = 0;
+    private int pyramidAutoMaxSize = 100;
+    
     private BigDecimal last_trade_profit = BigDecimal.ZERO;
     
     private CurrencyPlot plot = null;
@@ -218,9 +221,9 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             (longMode && inLong) || (!longMode && !inShort), 
             checkOtherStrategies
         );
-        if (saction == StrategiesController.StrategiesAction.DO_ENTER) {
+        if (saction == StrategiesController.StrategiesAction.DO_ENTER && pyramidSize < pyramidAutoMaxSize) {
             if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice);
-        } else if (saction == StrategiesController.StrategiesAction.DO_EXIT) {
+        } else if (saction == StrategiesController.StrategiesAction.DO_EXIT && pyramidSize > -pyramidAutoMaxSize) {
             doExit(lastStrategyCheckPrice, false);
         }
         info.setLatestPrice(symbol, currentPrice);
@@ -438,6 +441,11 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             orderBaseAmount = orderBaseAmount.subtract(executedQty);
             orderQuoteAmount = orderQuoteAmount.subtract(executedQuoteQty);
         }
+        if (isBuying) {
+            pyramidSize++;
+        } else {
+            pyramidSize--;
+        }
     }
     
     private void onOrderEvent(
@@ -525,7 +533,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             }
         }
         
-        System.out.println("BASE " + orderBaseAmount + "  QUOTE " + orderQuoteAmount + "  AVG " + orderAvgPrice);
+        System.out.println("PYR_SIZE " + pyramidSize + "  BASE " + orderBaseAmount + "  QUOTE " + orderQuoteAmount + "  AVG " + orderAvgPrice);
     }
     
     @Override
@@ -930,5 +938,26 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
      */
     public void setLongMode(boolean longMode) {
         this.longMode = longMode;
+    }
+
+    /**
+     * @return the pyramidAutoMaxSize
+     */
+    public int getPyramidAutoMaxSize() {
+        return pyramidAutoMaxSize;
+    }
+
+    /**
+     * @param pyramidAutoMaxSize the pyramidAutoMaxSize to set
+     */
+    public void setPyramidAutoMaxSize(int pyramidAutoMaxSize) {
+        this.pyramidAutoMaxSize = pyramidAutoMaxSize;
+    }
+
+    /**
+     * @return the pyramidSize
+     */
+    public int getPyramidSize() {
+        return pyramidSize;
     }
 }

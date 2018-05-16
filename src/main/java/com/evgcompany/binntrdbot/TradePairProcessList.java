@@ -36,6 +36,7 @@ public class TradePairProcessList {
     private boolean allPairsWavesUsage = false;
     private int buyStopLimitedTimeout;
     private int sellStopLimitedTimeout;
+    private int pyramidAutoMaxSize;
     
     public TradePairProcessList() {
         this.ordersController = OrdersController.getInstance();
@@ -93,6 +94,7 @@ public class TradePairProcessList {
         nproc.setStopSellLimitTimeout(sellStopLimitedTimeout);
         nproc.setBarQueryCount(barAdditionalCount);
         nproc.setLongMode(!has_short);
+        nproc.setPyramidAutoMaxSize(pyramidAutoMaxSize);
         
         if (run && pair_index < 0) {
             nproc.start();
@@ -148,6 +150,7 @@ public class TradePairProcessList {
             nproc.setStopSellLimitTimeout(300);
             nproc.setUseBuyStopLimited(true);
             nproc.setUseSellStopLimited(true);
+            nproc.setPyramidAutoMaxSize(1);
             return addPair(nproc);
         }
         return null;
@@ -400,5 +403,19 @@ public class TradePairProcessList {
      */
     public void setAllPairsWavesUsage(boolean wavesUsage) {
         this.allPairsWavesUsage = wavesUsage;
+    }
+
+    /**
+     * @return the pyramidAutoMaxSize
+     */
+    public int getPyramidAutoMaxSize() {
+        return pyramidAutoMaxSize;
+    }
+
+    /**
+     * @param pyramidAutoMaxSize the pyramidAutoMaxSize to set
+     */
+    public void setPyramidAutoMaxSize(int pyramidAutoMaxSize) {
+        this.pyramidAutoMaxSize = pyramidAutoMaxSize;
     }
 }

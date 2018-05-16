@@ -870,11 +870,16 @@
                                   <Component id="jScrollPane7" max="32767" attributes="0"/>
                               </Group>
                               <EmptySpace max="-2" attributes="0"/>
-                              <Component id="checkBoxPyramiding" min="-2" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="spinnerPyramidingMaxC" min="-2" pref="60" max="-2" attributes="0"/>
-                              <EmptySpace max="-2" attributes="0"/>
-                              <Component id="labelAfterPyramidingMax" min="-2" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Group type="102" attributes="0">
+                                      <Component id="checkBoxPyramiding" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="spinnerPyramidingMaxC" min="-2" pref="60" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="labelAfterPyramidingMax" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                                  <Component id="checkBoxDowntrendNoAuto" alignment="0" min="-2" max="-2" attributes="0"/>
+                              </Group>
                           </Group>
                       </Group>
                       <EmptySpace min="-2" pref="162" max="-2" attributes="0"/>
@@ -908,6 +913,8 @@
                                   <Component id="labelAfterPyramidingMax" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="checkBoxPyramiding" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
+                              <EmptySpace type="separate" max="-2" attributes="0"/>
+                              <Component id="checkBoxDowntrendNoAuto" min="-2" max="-2" attributes="0"/>
                               <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                           </Group>
                       </Group>
@@ -993,6 +1000,9 @@
                   <SpinnerModel initial="0" maximum="50" minimum="0" numberType="java.lang.Integer" stepSize="1" type="number"/>
                 </Property>
                 <Property name="enabled" type="boolean" value="false"/>
+                <Property name="value" type="java.lang.Object" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
+                  <Connection code="1" type="code"/>
+                </Property>
               </Properties>
             </Component>
             <Component class="javax.swing.JLabel" name="labelAfterPyramidingMax">
@@ -1000,6 +1010,14 @@
                 <Property name="text" type="java.lang.String" value="max. contracts"/>
                 <Property name="enabled" type="boolean" value="false"/>
               </Properties>
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="checkBoxDowntrendNoAuto">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="No auto orders on downtrend"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxDowntrendNoAutoActionPerformed"/>
+              </Events>
             </Component>
           </SubComponents>
         </Container>
@@ -1024,65 +1042,57 @@
               <Group type="103" groupAlignment="0" attributes="0">
                   <Group type="102" attributes="0">
                       <EmptySpace max="-2" attributes="0"/>
-                      <Group type="103" groupAlignment="1" attributes="0">
-                          <Group type="102" attributes="0">
-                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
-                              <Component id="checkBoxDowntrendNoAuto" min="-2" max="-2" attributes="0"/>
-                          </Group>
-                          <Group type="102" attributes="0">
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="checkBoxAutoAnalyzer" min="-2" max="-2" attributes="0"/>
-                                  <Group type="103" groupAlignment="0" attributes="0">
-                                      <Group type="102" alignment="1" attributes="0">
-                                          <Component id="jLabel38" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace max="-2" attributes="0"/>
-                                          <Component id="spinnerScanTrendUpdateTime" min="-2" pref="70" max="-2" attributes="0"/>
-                                      </Group>
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="checkboxAutoOrder" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                          <Component id="checkboxAutoFastorder" min="-2" max="-2" attributes="0"/>
-                                      </Group>
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Group type="103" groupAlignment="1" attributes="0">
-                                              <Component id="jLabel16" min="-2" max="-2" attributes="0"/>
-                                              <Component id="jLabel15" min="-2" max="-2" attributes="0"/>
-                                          </Group>
-                                          <EmptySpace max="-2" attributes="0"/>
-                                          <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                              <Component id="spinnerScanRatingDelayTime" max="32767" attributes="0"/>
-                                              <Component id="spinnerScanRatingUpdateTime" max="32767" attributes="0"/>
-                                          </Group>
-                                      </Group>
-                                  </Group>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Component id="checkBoxAutoAnalyzer" min="-2" max="-2" attributes="0"/>
+                          <Group type="103" groupAlignment="0" attributes="0">
+                              <Group type="102" alignment="1" attributes="0">
+                                  <Component id="jLabel38" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace max="-2" attributes="0"/>
+                                  <Component id="spinnerScanTrendUpdateTime" min="-2" pref="70" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace max="32767" attributes="0"/>
-                              <Group type="103" groupAlignment="0" attributes="0">
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="jLabel32" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="spinnerPricesUpdateDelay" min="-2" pref="70" max="-2" attributes="0"/>
+                              <Group type="102" alignment="0" attributes="0">
+                                  <Component id="checkboxAutoOrder" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                  <Component id="checkboxAutoFastorder" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <Group type="102" alignment="0" attributes="0">
+                                  <Group type="103" groupAlignment="1" attributes="0">
+                                      <Component id="jLabel16" min="-2" max="-2" attributes="0"/>
+                                      <Component id="jLabel15" min="-2" max="-2" attributes="0"/>
                                   </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <EmptySpace min="20" pref="20" max="-2" attributes="0"/>
-                                      <Group type="103" groupAlignment="1" attributes="0">
-                                          <Component id="jLabel21" min="-2" max="-2" attributes="0"/>
-                                          <Component id="jLabel19" min="-2" max="-2" attributes="0"/>
-                                          <Component id="jLabel22" min="-2" max="-2" attributes="0"/>
-                                          <Component id="jLabel40" min="-2" max="-2" attributes="0"/>
-                                      </Group>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Group type="103" groupAlignment="1" max="-2" attributes="0">
-                                          <Component id="spinnerRatingMinForOrder" alignment="0" max="32767" attributes="0"/>
-                                          <Component id="spinnerRatingMaxOrderWait" alignment="0" max="32767" attributes="0"/>
-                                          <Component id="spinnerRatingMaxOrders" alignment="0" max="32767" attributes="0"/>
-                                          <Component id="spinnerRatingMinBaseVolume" min="-2" pref="70" max="-2" attributes="0"/>
-                                      </Group>
+                                  <EmptySpace max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                      <Component id="spinnerScanRatingDelayTime" max="32767" attributes="0"/>
+                                      <Component id="spinnerScanRatingUpdateTime" max="32767" attributes="0"/>
                                   </Group>
                               </Group>
                           </Group>
                       </Group>
-                      <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
+                      <EmptySpace pref="158" max="32767" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Group type="102" alignment="0" attributes="0">
+                              <Component id="jLabel32" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="spinnerPricesUpdateDelay" min="-2" pref="70" max="-2" attributes="0"/>
+                          </Group>
+                          <Group type="102" alignment="0" attributes="0">
+                              <EmptySpace min="20" pref="20" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="1" attributes="0">
+                                  <Component id="jLabel21" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel19" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel22" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel40" min="-2" max="-2" attributes="0"/>
+                              </Group>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="1" max="-2" attributes="0">
+                                  <Component id="spinnerRatingMinForOrder" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="spinnerRatingMaxOrderWait" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="spinnerRatingMaxOrders" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="spinnerRatingMinBaseVolume" min="-2" pref="70" max="-2" attributes="0"/>
+                              </Group>
+                          </Group>
+                      </Group>
+                      <EmptySpace min="0" pref="154" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1140,9 +1150,7 @@
                               </Group>
                           </Group>
                       </Group>
-                      <EmptySpace min="-2" pref="28" max="-2" attributes="0"/>
-                      <Component id="checkBoxDowntrendNoAuto" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace max="32767" attributes="0"/>
+                      <EmptySpace pref="104" max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -1233,14 +1241,6 @@
                   <Connection code="5" type="code"/>
                 </Property>
               </Properties>
-            </Component>
-            <Component class="javax.swing.JCheckBox" name="checkBoxDowntrendNoAuto">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="No auto orders on downtrend"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="checkBoxDowntrendNoAutoActionPerformed"/>
-              </Events>
             </Component>
             <Component class="javax.swing.JSpinner" name="spinnerPricesUpdateDelay">
               <Properties>
