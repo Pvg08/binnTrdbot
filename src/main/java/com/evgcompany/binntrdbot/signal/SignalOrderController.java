@@ -61,7 +61,7 @@ public class SignalOrderController extends PeriodicProcessThread {
                         mainApplication.getInstance().log("Trying to auto enter signal with pair: " + pair, true, true);
                         toenter.pair = pairProcessList.addPair(pair);
                     }
-                    toenter.pair.setSignalOrder(item);
+                    toenter.pair.setSignalItem(item);
                     entered.put(pair, toenter);
                     doWait(1000);
                     return true;

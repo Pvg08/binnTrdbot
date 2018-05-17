@@ -85,7 +85,7 @@ public class BalanceController extends PeriodicProcessThread {
         }
     }
     
-    public BigDecimal getOrderAssetAmount(String symbolQuote, BigDecimal percent, String symbolBase) {
+    public BigDecimal getOrderAssetAmount(String symbolQuote, BigDecimal percent, String symbolBase, BigDecimal mainValue) {
         CoinBalanceItem quote = coins.get(symbolQuote);
         if (quote != null) {
             BigDecimal quoteBalance;
@@ -95,6 +95,7 @@ public class BalanceController extends PeriodicProcessThread {
                 quoteBalance = quote.getValue();
             }
             quoteBalance = quoteBalance.multiply(percent.divide(BigDecimal.valueOf(100)));
+            quoteBalance = quoteBalance.add(info.convertSumm(info.getBaseCoin(), mainValue, symbolQuote));
             if (quote.getFreeValue().compareTo(quoteBalance) < 0) {
                 quoteBalance = quote.getFreeValue();
             }
@@ -103,7 +104,7 @@ public class BalanceController extends PeriodicProcessThread {
         return BigDecimal.ZERO;
     }
     public BigDecimal getOrderAssetAmount(String symbolQuote, BigDecimal percent) {
-        return getOrderAssetAmount(symbolQuote, percent, symbolQuote);
+        return getOrderAssetAmount(symbolQuote, percent, symbolQuote, BigDecimal.ZERO);
     }
     
     public boolean canBuy(String symbolPair, BigDecimal baseAmount, BigDecimal price) {

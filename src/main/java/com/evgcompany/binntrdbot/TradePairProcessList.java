@@ -29,6 +29,7 @@ public class TradePairProcessList {
     private String barsInterval;
     private int barAdditionalCount;
     private int tradingBalancePercent;
+    private double tradingBalanceMainValue;
     private long updateDelay;
     private boolean checkOtherStrategies = false;
     private boolean buyStop = false;
@@ -82,8 +83,9 @@ public class TradePairProcessList {
         }
 
         nproc.setTryingToBuyDip(has_minus);
-        nproc.set_do_remove_flag(false);
+        nproc.setNeedToRemove(false);
         nproc.setTradingBalancePercent(tradingBalancePercent);
+        nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
         nproc.setMainStrategy(mainStrategy);
         nproc.setBarInterval(barsInterval);
         nproc.setDelayTime(updateDelay);
@@ -106,7 +108,7 @@ public class TradePairProcessList {
     
     public void initBasePairs(String pairstxt) {
         pairs.forEach((pair)->{
-            pair.set_do_remove_flag(true);
+            pair.setNeedToRemove(true);
         });
         List<String> items = Arrays.asList(pairstxt.toUpperCase().split("\\s*,\\s*")).stream().distinct().collect(Collectors.toList());
         if (items.size() > 0) {
@@ -118,7 +120,7 @@ public class TradePairProcessList {
         }
         int i = 0;
         while (i<pairs.size()) {
-            if (pairs.get(i).is_do_remove_flag()) {
+            if (pairs.get(i).needToRemove()) {
                 removePair(i);
             } else {
                 i++;
@@ -140,8 +142,9 @@ public class TradePairProcessList {
             nproc.setTryingToSellOnPeak(false);
             nproc.setSellOpenOrdersOnPeak(false);
             nproc.setTryingToBuyDip(false);
-            nproc.set_do_remove_flag(false);
+            nproc.setNeedToRemove(false);
             nproc.setTradingBalancePercent(tradingBalancePercent);
+            nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
             nproc.setMainStrategy("Auto");
             nproc.setBarInterval("5m");
             nproc.setDelayTime(8);
@@ -417,5 +420,19 @@ public class TradePairProcessList {
      */
     public void setPyramidAutoMaxSize(int pyramidAutoMaxSize) {
         this.pyramidAutoMaxSize = pyramidAutoMaxSize;
+    }
+
+    /**
+     * @return the tradingBalanceMainValue
+     */
+    public double getTradingBalanceMainValue() {
+        return tradingBalanceMainValue;
+    }
+
+    /**
+     * @param tradingBalanceMainValue the tradingBalanceMainValue to set
+     */
+    public void setTradingBalanceMainValue(double tradingBalanceMainValue) {
+        this.tradingBalanceMainValue = tradingBalanceMainValue;
     }
 }

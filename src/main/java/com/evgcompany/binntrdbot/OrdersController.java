@@ -83,12 +83,12 @@ public class OrdersController extends PeriodicProcessThread {
         return instance;
     }
     
-    public boolean PreBuySell(Long orderCID, BigDecimal baseAmount, BigDecimal buyPrice, BigDecimal sellAmount, BigDecimal sellPrice) {
+    public boolean PreBuySell(Long orderCID, BigDecimal baseAmount, BigDecimal buyPrice/*, BigDecimal sellAmount, BigDecimal sellPrice*/) {
         OrderPairItem pair = pairOrders.get(orderCID);
         pair.preBuyTransaction(baseAmount, baseAmount.multiply(buyPrice), buyPrice, true);
-        if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
+        /*if (sellAmount != null && sellAmount.compareTo(BigDecimal.ZERO) > 0) {
             pair.startSellTransaction(sellAmount, sellAmount.multiply(sellPrice), buyPrice);
-        }
+        }*/
         updatePairTrade(orderCID, !isTestMode);
         return true;
     }
@@ -231,17 +231,47 @@ public class OrdersController extends PeriodicProcessThread {
         return result;
     }
 
-    public void cancelOrder(Long orderCID, boolean doRecheck) {
-        if (pairOrders.containsKey(orderCID) && pairOrders.get(orderCID).getOrderAPIID() > 0) {
+    private void transferLimit(Long orderCID, long orderAPIID) {
+        OrderPairItem pair = pairOrders.get(orderCID);
+        if (pair == null) return;
+        Order order = client.getOrderStatus(pair.getSymbolPair(), orderAPIID);
+        if (order == null || order.getStatus() == OrderStatus.CANCELED || order.getStatus() == OrderStatus.FILLED) return;
+        BigDecimal orderValue = new BigDecimal(order.getOrigQty()).subtract(new BigDecimal(order.getExecutedQty()));
+        if (orderValue.compareTo(pair.getBaseItem().getLimitValue()) < 0) orderValue = pair.getBaseItem().getLimitValue();
+        pair.getBaseItem().addFreeValue(orderValue);
+        pair.getBaseItem().addLimitValue(orderValue.multiply(BigDecimal.valueOf(-1)));
+    }
+    
+    public boolean cancelOrdersList(Long orderCID, List<Long> ordersToCancel) {
+        OrderPairItem pair = pairOrders.get(orderCID);
+        if (ordersToCancel != null && !ordersToCancel.isEmpty()) {
+            ordersToCancel.forEach((orderId) -> {
+                cancelOrder(orderCID, orderId, false);
+            });
+            doWait(500);
+            checkOrder(orderCID, pairOrders.get(orderCID));
+        }
+        updatePairTrade(orderCID, !isTestMode);
+        return true;
+    }
+    public void cancelOrder(Long orderCID, long orderAPIID, boolean doRecheck) {
+        if (pairOrders.containsKey(orderCID) && orderAPIID > 0) {
             if (!isTestMode) {
-                client.cancelOrder(pairOrders.get(orderCID).getSymbolPair(), pairOrders.get(orderCID).getOrderAPIID());
+                client.cancelOrder(pairOrders.get(orderCID).getSymbolPair(), orderAPIID);
             } else {
-                emulator.cancelOrder(pairOrders.get(orderCID).getOrderAPIID());
+                if (!emulator.cancelOrder(orderAPIID)) {
+                    transferLimit(orderCID, orderAPIID);
+                }
             }
             if (doRecheck) {
                 doWait(500);
                 checkOrder(orderCID, pairOrders.get(orderCID));
             }
+        }
+    }
+    public void cancelOrder(Long orderCID, boolean doRecheck) {
+        if (pairOrders.containsKey(orderCID) && pairOrders.get(orderCID).getOrderAPIID() > 0) {
+            cancelOrder(orderCID, pairOrders.get(orderCID).getOrderAPIID(), doRecheck);
         }
     }
     public void cancelOrder(Long orderCID) {
@@ -387,6 +417,7 @@ public class OrdersController extends PeriodicProcessThread {
                     if (newHash == null || !newHash.equals(pairItem.getLastCheckHashOrder())) {
                         pairItem.setLastCheckHashOrder(newHash);
                         BigDecimal price = new BigDecimal(event.getPrice());
+                        if (price.compareTo(BigDecimal.ZERO) <= 0) price = new BigDecimal(event.getPriceOfLastFilledTrade());
                         BigDecimal executedQty = new BigDecimal(event.getAccumulatedQuantity());
                         BigDecimal qty = new BigDecimal(event.getOriginalQuantity());
                         boolean isCanceled = event.getOrderStatus() == OrderStatus.CANCELED || 

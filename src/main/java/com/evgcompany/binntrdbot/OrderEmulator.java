@@ -28,7 +28,7 @@ public class OrderEmulator {
         return NumberFormatter.df8.format(num).replace(".","").replace(",",".").replace(" ","");
     }
     
-    public long emulateOrder(boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price) {
+    public long emulateOrder(Long orderId, boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price) {
         Order order = new Order();
         order.setSymbol(pair);
         order.setStatus(OrderStatus.NEW);
@@ -37,9 +37,21 @@ public class OrderEmulator {
         order.setExecutedQty("0");
         order.setOrigQty(numberFormatForOrder(amount));
         order.setPrice(numberFormatForOrder(price));
-        order.setOrderId(++orderIdCounter);
+        
+        if (orderId == null) {
+            do {
+                orderIdCounter++;
+            } while (orders.containsKey(orderIdCounter));
+            order.setOrderId(orderIdCounter);
+        } else {
+            order.setOrderId(orderId);
+        }
+        
         orders.put(order.getOrderId(), order);
         return order.getOrderId();
+    }
+    public long emulateOrder(boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price) {
+        return emulateOrder(null, is_buy, is_market, pair, amount, price);
     }
     
     public Order getEmulatedOrder(long orderID) {
@@ -87,9 +99,10 @@ public class OrderEmulator {
         }
     }
     
-    public void cancelOrder(long orderID) {
+    public boolean cancelOrder(long orderID) {
         Order order = orders.get(orderID);
-        if (order == null) return;
+        if (order == null) return false;
         order.setStatus(OrderStatus.CANCELED);
+        return true;
     }
 }
