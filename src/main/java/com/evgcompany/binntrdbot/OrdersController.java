@@ -12,12 +12,9 @@ import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
-import com.evgcompany.binntrdbot.coinrating.CoinRatingController;
 import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
@@ -34,7 +31,7 @@ import java.util.logging.Logger;
  *
  * @author EVG_Adminer
  */
-public class OrdersController extends PeriodicProcessThread {
+public class OrdersController extends PeriodicProcessSocketUpdateThread {
 
     public enum LimitedOrderMode {
         LOMODE_SELL, LOMODE_BUY, LOMODE_SELLANDBUY
@@ -71,12 +68,12 @@ public class OrdersController extends PeriodicProcessThread {
     private boolean autoPickStrategyParams = false;
 
     private TradingAPIAbstractInterface client = null;
-    private Closeable ordersSocket = null;
 
     private OrdersController() {
         app = mainApplication.getInstance();
         info = CoinInfoAggregator.getInstance();
         balance = BalanceController.getInstance();
+        doExceptionsStop = false;
     }
     
     public static OrdersController getInstance(){
@@ -549,6 +546,13 @@ public class OrdersController extends PeriodicProcessThread {
     }
     
     @Override
+    protected void initSocket() {
+        if (!isTestMode) {
+            setSocket(client.OnOrderEvent(null, this::orderEvent, this::socketClosed));
+        }
+    }
+    
+    @Override
     protected void runStart() {
         try {
             SEMAPHORE_ADDCOIN.acquire();
@@ -558,9 +562,6 @@ public class OrdersController extends PeriodicProcessThread {
             Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, ex);
         }
         SEMAPHORE_ADDCOIN.release();
-        if (!isTestMode) {
-            ordersSocket = client.OnOrderEvent(null, this::orderEvent);
-        }
     }
 
     @Override
@@ -571,13 +572,6 @@ public class OrdersController extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         mainApplication.getInstance().log("Stopping orders update thread...");
-        if (ordersSocket != null) {
-            try {
-                ordersSocket.close();
-            } catch (IOException ex) {
-                Logger.getLogger(CoinRatingController.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
     }
 
     /**

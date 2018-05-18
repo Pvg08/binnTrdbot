@@ -654,13 +654,13 @@ public class CoinRatingController extends PeriodicProcessThread {
                 
                 if (null != sortby) switch (sortby) {
                     case CR_MARKET_CAP:
-                        text += NumberFormatter.df3.format(curr.base_rating.market_cap);
+                        text += NumberFormatter.formatVolume(curr.base_rating.market_cap) + "$";
                         break;
                     case CR_VOLUME_HOUR:
-                        text += NumberFormatter.df8.format(curr.hour_volume_base);
+                        text += NumberFormatter.formatVolume(curr.hour_volume_base);
                         break;
                     case CR_VOLUME_DAY:
-                        text += NumberFormatter.df8.format(curr.day_volume_base);
+                        text += NumberFormatter.formatVolume(curr.day_volume_base);
                         break;
                     case CR_PROGSTART_PRICEUP:
                         text += NumberFormatter.df3p.format(curr.percent_from_begin);
@@ -783,7 +783,7 @@ public class CoinRatingController extends PeriodicProcessThread {
                                 (System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 // max wait time = 10min
                             ) || (
                                 rentered.pair.isTriedBuy() && 
-                                !rentered.pair.isInLong() && 
+                                !rentered.pair.isInOrder() && 
                                 !rentered.pair.isInAPIOrder()
                             ) || (
                                 !rentered.pair.isAlive()

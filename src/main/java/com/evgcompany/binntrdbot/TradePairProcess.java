@@ -7,7 +7,6 @@ package com.evgcompany.binntrdbot;
 
 import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
-import com.binance.api.client.domain.OrderType;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
 import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
@@ -18,12 +17,11 @@ import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import com.evgcompany.binntrdbot.strategies.core.StrategyItem;
-import java.io.Closeable;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
@@ -37,7 +35,7 @@ import org.ta4j.core.TimeSeries;
  *
  * @author EVG_adm_T
  */
-public class TradePairProcess extends PeriodicProcessThread implements ControllableOrderProcess {
+public class TradePairProcess extends PeriodicProcessSocketUpdateThread implements ControllableOrderProcess {
     private static final Semaphore SEMAPHORE_ADD = new Semaphore(1, true);
     
     protected final TradingAPIAbstractInterface client;
@@ -56,7 +54,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     
     private boolean isTryingToSellOnPeak = false;
     private boolean isTryingToBuyOnDip = false;
-    private boolean stopAfterSell = false;
+    private boolean stopAfterFinish = false;
     private boolean sellOpenOrdersOnPeak = false;
     private boolean checkOtherStrategies = true;
     
@@ -67,10 +65,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     
     private TimeSeries series = null;
     
-    private boolean inLong = false;     // Buy for sell on peak
-    private boolean inShort = false;    // Sell for buy on dip
-    private boolean longMode = true;    // Auto long orders
-    
+    private boolean longModeAuto = true;
     private int pyramidSize = 0;
     private int pyramidAutoMaxSize = 100;
     
@@ -81,7 +76,6 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     private String barInterval = "15m";
     private int barQueryCount = 1;
     private boolean need_bar_reset = false;
-    private Closeable socket = null;
     
     private boolean buyOnStart = false;
     
@@ -109,6 +103,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     protected boolean inAPIOrder = false;
     
     public TradePairProcess(TradingAPIAbstractInterface rclient, String pair) {
+        super(pair);
         app = mainApplication.getInstance();
         symbol = pair;
         client = rclient;
@@ -118,25 +113,17 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         info = CoinInfoAggregator.getInstance();
         if (info.getClient() == null) info.setClient(client);
     }
-
-    @Override
-    public void finalize() throws Throwable {
-        if (socket != null) {
-            socket.close();
-        }
-        super.finalize();
-    }
     
     private void doEnter(BigDecimal curPrice) {
-        if (!inShort && !inLong) {
-            longMode = true;
+        if (pyramidSize == 0) {
+            longModeAuto = true;
         }
         isTriedBuy = true;
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
         BigDecimal base_asset_amount;
-        if (longMode) {
+        if (longModeAuto) {
             base_asset_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, tradingBalanceQuotePercent, baseAssetSymbol, tradingBalanceMainValue);
         } else {
             base_asset_amount = orderQuoteAmount.divide(curPrice, RoundingMode.HALF_DOWN);
@@ -159,15 +146,15 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         }
     }
     private void doExit(BigDecimal price, boolean skip_check) {
-        if (!inShort && !inLong) {
-            longMode = false;
+        if (pyramidSize == 0) {
+            longModeAuto = false;
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
         
         BigDecimal base_asset_amount;
-        if (longMode) {
+        if (longModeAuto) {
             base_asset_amount = orderBaseAmount;
         } else {
             base_asset_amount = BalanceController.getInstance().getOrderAssetAmount(quoteAssetSymbol, tradingBalanceQuotePercent, baseAssetSymbol, tradingBalanceMainValue);
@@ -213,8 +200,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
     }
 
     private void checkStatus() {
-        StrategiesController.StrategiesAction saction = strategiesController.checkStatus(
-            (longMode && inLong) || (!longMode && !inShort), 
+        StrategiesController.StrategiesAction saction = strategiesController.checkStatus((pyramidSize != 0 || !longModeAuto), 
             checkOtherStrategies
         );
         if (saction == StrategiesController.StrategiesAction.DO_ENTER && pyramidSize < pyramidAutoMaxSize) {
@@ -239,18 +225,41 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         SEMAPHORE_ADD.release();
     }
     
+    private void initBuyOnDip() {
+        isTryingToSellOnPeak = false;
+        stopAfterFinish = true;
+        longModeAuto = true;
+    }
+    
     private void initSellAllOnPeak() {
-        Trade last = client.getLastTrade(symbol);
-        if (last != null) {
-            BigDecimal lastTradeBuyPrice = new BigDecimal(last.getPrice());
-            
-            /*BigDecimal currentLimitSellPrice = BigDecimal.ZERO;
-            BigDecimal currentLimitSellQty = BigDecimal.ZERO;*/
+        isTryingToBuyOnDip = false;
+        List<Trade> trades = client.getAllTrades(symbol);
+        if (trades != null && !trades.isEmpty()) {
+            Collections.sort(
+                trades, 
+                (Trade lhs, Trade rhs) -> (
+                    lhs.getTime() > rhs.getTime() ? -1 : (lhs.getTime() < rhs.getTime()) ? 1 : 0
+                )
+            );
+            BigDecimal avgTradeBuyPrice = BigDecimal.ZERO;
             
             CoinBalanceItem qbalance = BalanceController.getInstance().getCoinBalanceInfo(baseAssetSymbol);
             BigDecimal free_cnt = qbalance.getFreeValue();
             BigDecimal order_cnt = BigDecimal.ZERO;
+            BigDecimal acc_cnt = BigDecimal.ZERO;
             
+            for (Trade trade : trades) {
+                if (trade.isBuyer() && acc_cnt.compareTo(free_cnt) < 0) {
+                    BigDecimal ctprice = new BigDecimal(trade.getPrice());
+                    BigDecimal ctvol = new BigDecimal(trade.getQty());
+                    if (acc_cnt.add(ctvol).compareTo(free_cnt) > 0) {
+                        ctvol = free_cnt.subtract(acc_cnt);
+                    }
+                    avgTradeBuyPrice = ctprice.multiply(ctvol).add(avgTradeBuyPrice.multiply(acc_cnt)).divide(ctvol.add(acc_cnt), RoundingMode.HALF_UP);
+                    acc_cnt = acc_cnt.add(ctvol);
+                }
+            }
+
             List<Long> ordersToCancel = new ArrayList<>();
 
             if (sellOpenOrdersOnPeak) {
@@ -261,12 +270,6 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                         order_cnt = order_cnt.add(new BigDecimal(openOrders.get(i).getOrigQty()));
                     }
                 }
-                /*for (int i=0; i < openOrders.size(); i++) {
-                    if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL && openOrders.get(i).getType() == OrderType.LIMIT) {
-                        currentLimitSellPrice = new BigDecimal(openOrders.get(i).getPrice());
-                        currentLimitSellQty = new BigDecimal(openOrders.get(i).getOrigQty());
-                    }
-                }*/
             }
 
             if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !ordersToCancel.isEmpty())) {
@@ -278,19 +281,17 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                     free_cnt = qbalance.getFreeValue();
                 }
                 if (free_cnt.compareTo(BigDecimal.ZERO) > 0) {
-                    boolean result = ordersController.PreBuySell(orderCID, free_cnt, lastTradeBuyPrice/*, currentLimitSellQty, currentLimitSellPrice*/);
+                    boolean result = ordersController.PreBuySell(orderCID, free_cnt, avgTradeBuyPrice/*, currentLimitSellQty, currentLimitSellPrice*/);
                     if (result) {
-                        app.log("START WAITING to sell " + NumberFormatter.df8.format(free_cnt) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(lastTradeBuyPrice) + " " + quoteAssetSymbol, true, true);
+                        app.log("START WAITING to sell " + NumberFormatter.df8.format(free_cnt) + " " + baseAssetSymbol + " for price more than " + NumberFormatter.df8.format(avgTradeBuyPrice) + " " + quoteAssetSymbol, true, true);
                         inAPIOrder = false;
-                        lastBuyPrice = lastTradeBuyPrice;
+                        lastBuyPrice = avgTradeBuyPrice;
                         orderBaseAmount = free_cnt;
-                        orderQuoteAmount = free_cnt.multiply(lastTradeBuyPrice);
-                        orderAvgPrice = lastTradeBuyPrice;
-                        stopAfterSell = true;
-                        longMode = true;
-                        inLong = true;
+                        orderQuoteAmount = free_cnt.multiply(avgTradeBuyPrice);
+                        orderAvgPrice = avgTradeBuyPrice;
+                        stopAfterFinish = true;
+                        longModeAuto = true;
                         pyramidSize = 1;
-                        inShort = false;
                         ordersController.updatePairTradeText(orderCID);
                         return;
                     } else {
@@ -299,21 +300,27 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                 }
             }
         }
-        isTryingToSellOnPeak = false;
         app.log("Can't set SellAllPeak mode for " + symbol, true, true);
-    } 
-    
-    private void stopSockets() {
-        if (socket != null) {
-            try {
-                socket.close();
-            } catch (IOException ex) {
-                Logger.getLogger(TradePairProcess.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            socket = null;
-        }
     }
 
+    @Override
+    protected void initSocket() {
+        setSocket(
+            client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, (nbar, is_fin) -> {
+                addBars(Arrays.asList(nbar));
+                if (lastBarTime < nbar.getBeginTime().toInstant().toEpochMilli()) {
+                    lastBarTime = nbar.getBeginTime().toInstant().toEpochMilli();
+                }
+                currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
+                info.setLatestPrice(symbol, currentPrice);
+                ordersController.updatePairTradeText(orderCID);
+                if (is_fin && (predictor == null || !predictor.isLearning())) {
+                    app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
+                }
+            }, this::socketClosed)
+        );
+    }
+    
     private void resetSeries() {
         need_bar_reset = false;
         series = strategiesController.resetSeries();
@@ -325,7 +332,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             }
         }
         
-        stopSockets();
+        if (isInitialized) stopSocket();
 
         List<Bar> bars = client.getBars(symbol, barInterval, 500, barQueryCount);
         if (bars.size() > 0) {
@@ -341,18 +348,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             predictor.initMinMax(series);
         }
         
-        socket = client.OnBarUpdateEvent(symbol.toLowerCase(), barInterval, (nbar, is_fin) -> {
-            addBars(Arrays.asList(nbar));
-            if (lastBarTime < nbar.getBeginTime().toInstant().toEpochMilli()) {
-                lastBarTime = nbar.getBeginTime().toInstant().toEpochMilli();
-            }
-            currentPrice = new BigDecimal(nbar.getClosePrice().floatValue());
-            info.setLatestPrice(symbol, currentPrice);
-            ordersController.updatePairTradeText(orderCID);
-            if (is_fin && (predictor == null || !predictor.isLearning())) {
-                app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
-            }
-        });
+        if (isInitialized) initSocket();
     }
 
     private void nextBars() {
@@ -432,7 +428,7 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         if (orderBaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
             orderAvgPrice = price;
         }
-        if(isBuying && longMode || !isBuying && !longMode) {
+        if(isBuying && longModeAuto || !isBuying && !longModeAuto) {
             if (orderBaseAmount.compareTo(BigDecimal.ZERO) > 0) {
                 orderAvgPrice = orderAvgPrice.multiply(orderBaseAmount).add(price.multiply(executedQty)).divide(orderBaseAmount.add(executedQty), RoundingMode.HALF_UP);
             }
@@ -451,10 +447,14 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
                 orderBaseAmount = BigDecimal.ZERO;
             }
         }
-        if (isBuying) {
-            pyramidSize++;
+        if (orderBaseAmount.compareTo(BigDecimal.ZERO) > 0) {
+            if (isBuying) {
+                pyramidSize++;
+            } else {
+                pyramidSize--;
+            }
         } else {
-            pyramidSize--;
+            pyramidSize = 0;
         }
     }
     
@@ -473,13 +473,8 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
             inAPIOrder = true;
             if (isBuying) {
                 app.log("Buying "+symbol+"...", true, true);
-                inLong = longMode;
-                inShort = false;
             } else {
                 app.log("Selling "+symbol+"...", true, true);
-                inLong = false;
-                inShort = !longMode;
-                isTryingToSellOnPeak = false;
             }
             lastOrderMillis = System.currentTimeMillis();
         }
@@ -491,15 +486,6 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         
         if (isCancelled || executedQty.compareTo(qty) < 0) {
             // just cancelled or partially filled and then cancelled
-            if(isBuying) {
-                isTryingToSellOnPeak = false;
-                inLong = false;
-                inShort = !longMode;
-            } else {
-                inLong = longMode;
-                inShort = false;
-            }
-
             if (executedQty.compareTo(BigDecimal.ZERO) <= 0) {
                 app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is cancelled!", true, true);
                 ordersController.finishOrder(orderCID, false, orderAvgPrice);
@@ -535,9 +521,8 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
 
             ordersController.finishOrder(orderCID, true, orderAvgPrice);
             app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is finished! Price = "+NumberFormatter.df8.format(price) + profitStr, true, true);
-            if (stopAfterSell && !isBuying) {
-                doStop();
-            }
+            
+            if (stopAfterFinish && pyramidSize == 0) doStop();
         }
         
         System.out.println("PYR_SIZE " + pyramidSize + "  BASE " + orderBaseAmount + "  QUOTE " + orderQuoteAmount + "  AVG " + orderAvgPrice);
@@ -582,6 +567,8 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         
         if (isTryingToSellOnPeak) {
             initSellAllOnPeak();
+        } else if (isTryingToBuyOnDip) {
+            initBuyOnDip();
         }
         
         startMillis = System.currentTimeMillis();
@@ -609,7 +596,6 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
 
     @Override
     protected void runFinish() {
-        stopSockets();
         info.stopDepthCheckForPair(symbol);
         ordersController.unregisterPairTrade(orderCID);
         app.log("");
@@ -913,32 +899,22 @@ public class TradePairProcess extends PeriodicProcessThread implements Controlla
         return orderCID;
     }
 
-    /**
-     * @return the inLong
-     */
-    public boolean isInLong() {
-        return inLong;
+    public boolean isInOrder() {
+        return pyramidSize != 0;
     }
 
     /**
-     * @return the inShort
+     * @return the longModeAuto
      */
-    public boolean isInShort() {
-        return inShort;
+    public boolean isLongModeAuto() {
+        return longModeAuto;
     }
 
     /**
-     * @return the longMode
+     * @param longModeAuto the longModeAuto to set
      */
-    public boolean isLongMode() {
-        return longMode;
-    }
-
-    /**
-     * @param longMode the longMode to set
-     */
-    public void setLongMode(boolean longMode) {
-        this.longMode = longMode;
+    public void setLongModeAuto(boolean longModeAuto) {
+        this.longModeAuto = longModeAuto;
     }
 
     /**

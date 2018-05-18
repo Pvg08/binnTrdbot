@@ -95,7 +95,7 @@ public class TradePairProcessList {
         nproc.setStopBuyLimitTimeout(buyStopLimitedTimeout);
         nproc.setStopSellLimitTimeout(sellStopLimitedTimeout);
         nproc.setBarQueryCount(barAdditionalCount);
-        nproc.setLongMode(!has_short);
+        nproc.setLongModeAuto(!has_short);
         nproc.setPyramidAutoMaxSize(pyramidAutoMaxSize);
         
         if (run && pair_index < 0) {

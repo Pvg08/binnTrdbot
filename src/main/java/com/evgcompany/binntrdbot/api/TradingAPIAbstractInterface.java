@@ -15,6 +15,7 @@ import com.binance.api.client.domain.market.TickerPrice;
 import com.evgcompany.binntrdbot.events.BalanceEvent;
 import com.evgcompany.binntrdbot.events.BarEvent;
 import com.evgcompany.binntrdbot.events.OrderEvent;
+import com.evgcompany.binntrdbot.events.SocketClosedEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.io.Closeable;
 import java.math.BigDecimal;
@@ -216,12 +217,13 @@ public abstract class TradingAPIAbstractInterface {
     abstract public void cancelOrder(String pair, long order_id);
     
     abstract public Trade getLastTrade(String pair);
+    abstract public List<Trade> getAllTrades(String pair);
     abstract public List<Order> getOpenOrders(String pair);
     
     abstract public BigDecimal getLastTradePrice(String symbolPair, boolean isBuyer);
     abstract public BigDecimal getCurrentPrice(String symbolPair);
     
-    abstract public Closeable OnBarUpdateEvent(String pair, String barInterval, BarEvent evt);
-    abstract public Closeable OnOrderEvent(String symbol, OrderEvent evt);
-    abstract public Closeable OnBalanceEvent(BalanceEvent evt);
+    abstract public Closeable OnBarUpdateEvent(String pair, String barInterval, BarEvent evt, SocketClosedEvent onClosed);
+    abstract public Closeable OnOrderEvent(String symbol, OrderEvent evt, SocketClosedEvent onClosed);
+    abstract public Closeable OnBalanceEvent(BalanceEvent evt, SocketClosedEvent onClosed);
 }

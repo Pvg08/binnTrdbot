@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot.api;
 
+import com.binance.api.client.BinanceApiCallback;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
@@ -18,6 +19,8 @@ import com.binance.api.client.domain.account.Trade;
 import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
+import com.binance.api.client.domain.event.CandlestickEvent;
+import com.binance.api.client.domain.event.UserDataUpdateEvent;
 import com.binance.api.client.domain.event.UserDataUpdateEvent.UserDataUpdateEventType;
 import com.binance.api.client.domain.general.ExchangeInfo;
 import com.binance.api.client.domain.general.RateLimit;
@@ -29,6 +32,7 @@ import com.binance.api.client.domain.market.TickerStatistics;
 import com.evgcompany.binntrdbot.events.BalanceEvent;
 import com.evgcompany.binntrdbot.events.BarEvent;
 import com.evgcompany.binntrdbot.events.OrderEvent;
+import com.evgcompany.binntrdbot.events.SocketClosedEvent;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -227,71 +231,121 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
     }
 
     @Override
+    public List<Trade> getAllTrades(String pair) {
+        return client.getMyTrades(pair);
+    }
+
+    @Override
     public BigDecimal getCurrentPrice(String symbolPair) {
         TickerStatistics tc = client.get24HrPriceStatistics(symbolPair);
         return tc != null ? (new BigDecimal(tc.getLastPrice())) : null;
     }
 
     @Override
-    public Closeable OnBarUpdateEvent(String symbol, String barInterval, BarEvent evt) {
+    public Closeable OnBarUpdateEvent(String symbol, String barInterval, BarEvent evt, SocketClosedEvent onClosed) {
         if (client_s == null) {
             client_s = factory.newWebSocketClient();
         }
-        Closeable socket = client_s.onCandlestickEvent(symbol.toLowerCase(), getCandlestickIntervalByString(barInterval), response -> {
-            Duration barDuration = Duration.ofSeconds(barIntervalToSeconds(barInterval));
-            ZonedDateTime endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(response.getCloseTime()), ZoneId.systemDefault());
-            Bar nbar = new BaseBar(
-                    barDuration, 
-                    endTime, 
-                    Decimal.valueOf(response.getOpen()), 
-                    Decimal.valueOf(response.getHigh()), 
-                    Decimal.valueOf(response.getLow()), 
-                    Decimal.valueOf(response.getClose()), 
-                    Decimal.valueOf(response.getVolume()), 
-                    Decimal.valueOf(response.getQuoteAssetVolume())
-            );
-            evt.onUpdate(nbar, response.getBarFinal());
-        });
-        return socket;
+        
+        BinanceApiCallback<CandlestickEvent> event = new BinanceApiCallback<CandlestickEvent>() {
+            @Override
+            public void onResponse(CandlestickEvent response) {
+                Duration barDuration = Duration.ofSeconds(barIntervalToSeconds(barInterval));
+                ZonedDateTime endTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(response.getCloseTime()), ZoneId.systemDefault());
+                Bar nbar = new BaseBar(
+                        barDuration, 
+                        endTime, 
+                        Decimal.valueOf(response.getOpen()), 
+                        Decimal.valueOf(response.getHigh()), 
+                        Decimal.valueOf(response.getLow()), 
+                        Decimal.valueOf(response.getClose()), 
+                        Decimal.valueOf(response.getVolume()), 
+                        Decimal.valueOf(response.getQuoteAssetVolume())
+                );
+                evt.onUpdate(nbar, response.getBarFinal());
+            }
+            
+            @Override
+            public void onFailure(Throwable cause) {
+                if (onClosed != null) onClosed.onClosed(cause.toString());
+            }
+
+            @Override
+            public void onClosed(String reason) {
+                if (onClosed != null) onClosed.onClosed(reason);
+            }
+        };
+        
+        return client_s.onCandlestickEvent(symbol.toLowerCase(), getCandlestickIntervalByString(barInterval), event);
     }
     
     @Override
-    public Closeable OnOrderEvent(String symbol, OrderEvent evt) {
+    public Closeable OnOrderEvent(String symbol, OrderEvent evt, SocketClosedEvent onClosed) {
         if (client_s == null) {
             client_s = factory.newWebSocketClient();
         }
         String listenKey = client.startUserDataStream();
-        Closeable socket = client_s.onUserDataUpdateEvent(listenKey, response -> {
-            if (response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE) {
-                System.out.println(response.getOrderTradeUpdateEvent());
+        
+        BinanceApiCallback<UserDataUpdateEvent> event = new BinanceApiCallback<UserDataUpdateEvent>() {
+            @Override
+            public void onResponse(UserDataUpdateEvent response) {
+                if (response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE) {
+                    System.out.println(response.getOrderTradeUpdateEvent());
+                }
+                if (
+                        response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE &&
+                        response.getOrderTradeUpdateEvent().getEventType().equals("executionReport") && 
+                        response.getOrderTradeUpdateEvent().getOrderId() > 0 &&
+                        //Double.parseDouble(response.getOrderTradeUpdateEvent().getAccumulatedQuantity()) > 0 &&
+                        (
+                            symbol == null ||
+                            response.getOrderTradeUpdateEvent().getSymbol().toUpperCase().equals(symbol)
+                        )
+                ) {
+                    evt.onUpdate(response.getOrderTradeUpdateEvent());
+                }
             }
-            if (
-                    response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE &&
-                    response.getOrderTradeUpdateEvent().getEventType().equals("executionReport") && 
-                    response.getOrderTradeUpdateEvent().getOrderId() > 0 &&
-                    //Double.parseDouble(response.getOrderTradeUpdateEvent().getAccumulatedQuantity()) > 0 &&
-                    (
-                        symbol == null ||
-                        response.getOrderTradeUpdateEvent().getSymbol().toUpperCase().equals(symbol)
-                    )
-            ) {
-                evt.onUpdate(response.getOrderTradeUpdateEvent());
+            
+            @Override
+            public void onFailure(Throwable cause) {
+                if (onClosed != null) onClosed.onClosed(cause.toString());
             }
-        });
-        return socket;
+
+            @Override
+            public void onClosed(String reason) {
+                if (onClosed != null) onClosed.onClosed(reason);
+            }
+        };
+        
+        return client_s.onUserDataUpdateEvent(listenKey, event);
     }
     
     @Override
-    public Closeable OnBalanceEvent(BalanceEvent evt) {
+    public Closeable OnBalanceEvent(BalanceEvent evt, SocketClosedEvent onClosed) {
         if (client_s == null) {
             client_s = factory.newWebSocketClient();
         }
         String listenKey = client.startUserDataStream();
-        Closeable socket = client_s.onUserDataUpdateEvent(listenKey, response -> {
-            if (response.getEventType() == UserDataUpdateEventType.ACCOUNT_UPDATE) {
-                evt.onUpdate(response.getAccountUpdateEvent().getBalances());
+        
+        BinanceApiCallback<UserDataUpdateEvent> event = new BinanceApiCallback<UserDataUpdateEvent>() {
+            @Override
+            public void onResponse(UserDataUpdateEvent response) {
+                if (response.getEventType() == UserDataUpdateEventType.ACCOUNT_UPDATE) {
+                    evt.onUpdate(response.getAccountUpdateEvent().getBalances());
+                }
             }
-        });
-        return socket;
+            
+            @Override
+            public void onFailure(Throwable cause) {
+                if (onClosed != null) onClosed.onClosed(cause.toString());
+            }
+
+            @Override
+            public void onClosed(String reason) {
+                if (onClosed != null) onClosed.onClosed(reason);
+            }
+        };
+        
+        return client_s.onUserDataUpdateEvent(listenKey, event);
     }
 }

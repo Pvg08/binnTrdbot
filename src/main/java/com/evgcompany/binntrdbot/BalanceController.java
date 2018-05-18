@@ -9,8 +9,6 @@ import com.binance.api.client.domain.account.AssetBalance;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.events.AccountCostUpdateEvent;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.List;
 import javax.swing.DefaultListModel;
 import java.math.BigDecimal;
@@ -25,7 +23,7 @@ import java.util.logging.Logger;
  *
  * @author EVG_Adminer
  */
-public class BalanceController extends PeriodicProcessThread {
+public class BalanceController extends PeriodicProcessSocketUpdateThread {
     
     private static final Semaphore SEMAPHORE = new Semaphore(1, true);
     private static final BalanceController instance = new BalanceController();
@@ -35,7 +33,6 @@ public class BalanceController extends PeriodicProcessThread {
     private final DefaultListModel<String> listProfitModel = new DefaultListModel<>();
 
     private boolean isTestMode = false;
-    private Closeable socket = null;
     
     private double baseAccountCost = 0;
     private double initialAccountCost = -1;
@@ -46,6 +43,7 @@ public class BalanceController extends PeriodicProcessThread {
     
     private BalanceController() {
         info = CoinInfoAggregator.getInstance();
+        doExceptionsStop = false;
     }
     
     public static BalanceController getInstance(){
@@ -239,17 +237,21 @@ public class BalanceController extends PeriodicProcessThread {
     }
     
     @Override
+    protected void initSocket() {
+        if (!isTestMode) {
+            setSocket(client.OnBalanceEvent((balances) -> {
+                System.out.println("Balance changed: " + balances);
+                updateBalances(balances);
+            }, this::socketClosed));
+        }
+    }
+    
+    @Override
     protected void runStart() {
         mainApplication.getInstance().log("Starting balance update thread...");
         info.StartAndWaitForInit();
         updateAllBalances();
         showStartCurrencies();
-        if (!isTestMode) {
-            socket = client.OnBalanceEvent((balances) -> {
-                System.out.println("Balance changed: " + balances);
-                updateBalances(balances);
-            });
-        }
     }
 
     @Override
@@ -264,11 +266,6 @@ public class BalanceController extends PeriodicProcessThread {
     @Override
     protected void runFinish() {
         mainApplication.getInstance().log("Stopping balance update thread...");
-        if (socket != null) try {
-            socket.close();
-        } catch (IOException ex) {
-            Logger.getLogger(BalanceController.class.getName()).log(Level.SEVERE, null, ex);
-        }
     }
     
     public void setClient(TradingAPIAbstractInterface client) {

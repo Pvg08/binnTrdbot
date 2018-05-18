@@ -21,9 +21,18 @@ abstract public class PeriodicProcessThread extends Thread {
     protected boolean paused = false;
     protected long delayTime = 10;
     protected int startDelayTime = 0;
-    protected int maxExceptionsToStop = 4;
+    protected int maxExceptions = 4;
+    protected boolean doExceptionsStop = true;
     protected boolean isInitialized = false;
+    protected String threadName;
 
+    public PeriodicProcessThread(String threadName) {
+        this.threadName = threadName;
+    }
+    public PeriodicProcessThread() {
+        this.threadName = this.getClass().toString();
+    }
+    
     protected void doWait(long ms) {
         try { Thread.sleep(ms);} catch(InterruptedException e) {}
     }
@@ -98,32 +107,60 @@ abstract public class PeriodicProcessThread extends Thread {
     @Override
     public void run(){  
         isInitialized = false;
-        int exceptions_cnt = 0;
-        doWait(startDelayTime);
-        runStart();
-        isInitialized = true;
-        while (!need_stop) {
-            if (paused) {
-                doWait(12000);
-                continue;
-            }
-            try { 
-                runBody();
-            } catch(Exception exx) {
-                exx.printStackTrace(System.out);
-                mainApplication.getInstance().log("");
-                mainApplication.getInstance().log("EXCEPTION in " + getClass() + " - " + exx.getClass() + ": " + exx.getLocalizedMessage(), false, true);
-                exceptions_cnt++;
-                if (exceptions_cnt >= maxExceptionsToStop) {
-                    break;
+        try {
+            preStart();
+            int exceptions_cnt = 0;
+            doWait(startDelayTime);
+            runStart();
+            isInitialized = true;
+            postInit();
+            while (!need_stop) {
+                if (paused) {
+                    doWait(12000);
+                    continue;
                 }
-                doWait(delayTime * 1000 * exceptions_cnt * exceptions_cnt);
-                continue;
+                try { 
+                    preBody();
+                    runBody();
+                    postBody();
+                } catch(Exception exx) {
+                    exx.printStackTrace(System.out);
+                    mainApplication.getInstance().log("");
+                    mainApplication.getInstance().log("EXCEPTION in thread " + threadName + " - " + exx.getClass() + ": " + exx.getLocalizedMessage(), false, true);
+                    exceptions_cnt++;
+                    if (exceptions_cnt >= maxExceptions) {
+                        if (doExceptionsStop) {
+                            break;
+                        } else {
+                            exceptions_cnt = maxExceptions;
+                        }
+                    }
+                    doWait(delayTime * 1000 * exceptions_cnt * exceptions_cnt);
+                    continue;
+                }
+                doWait(delayTime * 1000);
+                exceptions_cnt = 0;
             }
-            doWait(delayTime * 1000);
-            exceptions_cnt = 0;
+            runFinish();
+        } finally {
+            postFinish();
         }
-        runFinish();
+    }
+
+    protected void preStart() {
+        // nothing
+    }
+    protected void preBody() {
+        // nothing
+    }
+    protected void postInit() {
+        // nothing
+    }
+    protected void postBody() {
+        // nothing
+    }
+    protected void postFinish() {
+        // nothing
     }
 
     /**
