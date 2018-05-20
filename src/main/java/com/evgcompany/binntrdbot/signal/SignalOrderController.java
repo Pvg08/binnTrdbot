@@ -61,7 +61,7 @@ public class SignalOrderController extends PeriodicProcessThread {
                         mainApplication.getInstance().log("Trying to auto enter signal with pair: " + pair, true, true);
                         toenter.pair = pairProcessList.addPair(pair);
                     }
-                    toenter.pair.setSignalItem(item);
+                    if (toenter.pair instanceof TradeSignalProcessInterface) ((TradeSignalProcessInterface)toenter.pair).setSignalItem(item);
                     entered.put(pair, toenter);
                     doWait(1000);
                     return true;
@@ -76,7 +76,7 @@ public class SignalOrderController extends PeriodicProcessThread {
             List<String> listRemove = new ArrayList<>();
             for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
                 CoinRatingPairLogItem rentered = entry.getValue();
-                if (rentered != null && rentered.pair != null && rentered.pair.isInitialized()) {
+                if (rentered != null && rentered.pair != null && rentered.pair.isInitialized() && rentered.pair instanceof TradeSignalProcessInterface) {
                     boolean is_free = !rentered.pair.isInOrder() && 
                                 !rentered.pair.isInAPIOrder() &&
                                 rentered.pair.getFullOrdersCount() == 0;
@@ -87,8 +87,8 @@ public class SignalOrderController extends PeriodicProcessThread {
                                 is_free &&
                                 rentered.pair.getLastPrice() != null &&
                                 rentered.pair.getLastPrice().compareTo(BigDecimal.ZERO) > 0 &&
-                                rentered.pair.getSignalItem() != null &&
-                                rentered.pair.getSignalItem().getPriceTarget().compareTo(rentered.pair.getLastPrice()) < 0
+                                ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null &&
+                                ((TradeSignalProcessInterface)rentered.pair).getSignalItem().getPriceTarget().compareTo(rentered.pair.getLastPrice()) < 0
                             ) || (
                                 is_free &&
                                 signalcontroller.getPairSignalRating(rentered.pair.getSymbol()) < minSignalRatingForOrder
@@ -107,8 +107,8 @@ public class SignalOrderController extends PeriodicProcessThread {
                         }
                         rentered.calculateRating();
                         listRemove.add(rentered.pair.getSymbol());
-                        if (rentered.pair.getSignalItem() != null && rentered.pair.getFullOrdersCount() > 0) {
-                            rentered.pair.getSignalItem().setAutopick(false);
+                        if (((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null && rentered.pair.getFullOrdersCount() > 0) {
+                            ((TradeSignalProcessInterface)rentered.pair).getSignalItem().setAutopick(false);
                         }
                         rentered.pair = null;
                     }
@@ -141,12 +141,18 @@ public class SignalOrderController extends PeriodicProcessThread {
         double minCrit = 0;
         for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
             CoinRatingPairLogItem rentered = entry.getValue();
-            if (rentered != null && rentered.pair != null && rentered.pair.isInitialized() && rentered.pair.getSignalItem() != null) {
+            if (
+                    rentered != null && 
+                    rentered.pair != null && 
+                    rentered.pair instanceof TradeSignalProcessInterface && 
+                    rentered.pair.isInitialized() && 
+                    ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null
+            ) {
                 boolean is_free = !rentered.pair.isInOrder()
                         && !rentered.pair.isInAPIOrder()
                         && rentered.pair.getFullOrdersCount() == 0;
                 if (is_free) {
-                    double currCrit = rentered.pair.getSignalItem().getCurrentRating()*rentered.pair.getSignalItem().getPriceProfitPercent(rentered.pair.getLastPrice());
+                    double currCrit = ((TradeSignalProcessInterface)rentered.pair).getSignalItem().getCurrentRating()*((TradeSignalProcessInterface)rentered.pair).getSignalItem().getPriceProfitPercent(rentered.pair.getLastPrice());
                     if (result == null || minCrit > currCrit) {
                         result = entry.getKey();
                         minCrit = currCrit;

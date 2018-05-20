@@ -6,22 +6,40 @@
 package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
+import com.evgcompany.binntrdbot.signal.SignalItem;
+import java.math.BigDecimal;
 
 /**
  *
  * @author EVG_Adminer
  */
-public class TradePairWaveProcess extends TradePairProcess {
+public class TradePairWaveProcess extends AbstractTradePairProcess {
     
     private double wavesPrimaryBuy = 10;
     private boolean wavesPrimaryBasePercent = true;
     private double wavesSecondaryPercent = 25;
     private double wavesIncKoef = 59;
     
-    public TradePairWaveProcess(TradingAPIAbstractInterface rclient, String pair) {
-        super(rclient, pair);
+    private BigDecimal lastPrice = BigDecimal.ZERO;
+    private BigDecimal minPrice = BigDecimal.ZERO;
+    private BigDecimal aimPrice = BigDecimal.ZERO;
+    
+    private SignalItem signalItem = null;
+    
+    public TradePairWaveProcess(TradingAPIAbstractInterface client, String pair) {
+        super(client, pair);
+        pyramidAutoMaxSize = Integer.MAX_VALUE;
+        longModeAuto = true;
     }
 
+    @Override
+    protected void checkStatus() {
+        // doEnter(lastStrategyCheckPrice);
+        // doExit(lastStrategyCheckPrice, false);
+        super.checkStatus();
+        
+    }
+    
     /**
      * @return the wavesPrimaryBuy
      */

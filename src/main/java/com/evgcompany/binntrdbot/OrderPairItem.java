@@ -27,8 +27,7 @@ public class OrderPairItem {
     private BigDecimal transactionOrderQuote = BigDecimal.ZERO;
     
     private boolean inTransaction = false;
-    private boolean inLong = false;
-    private boolean inShort = false;
+    private int pyramidSize = 0;
     private boolean lastTransactionSell = false;
 
     private BigDecimal lastOrderPrice = BigDecimal.ZERO;
@@ -65,7 +64,7 @@ public class OrderPairItem {
             txt = txt + " ["+symbolPair+"]";
         }
         txt = txt + "  ";
-        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || inLong || inShort || !marker.isEmpty();
+        boolean is_changed = base_item.getValue().compareTo(base_item.getInitialValue()) != 0 || pyramidSize != 0 || inTransaction || !marker.isEmpty();
         if (is_changed) {
             
             if (base_item.getInitialValue().compareTo(BigDecimal.ZERO) > 0) {
@@ -89,11 +88,11 @@ public class OrderPairItem {
             
             if (marker.isEmpty()) {
                 if (inTransaction) {
-                    txt = txt + " [PENDING "+(lastTransactionSell ? "SELL" : "BUY")+"]";
-                } else if (inShort) {
-                    txt = txt + " [ORDER SHORT]";
-                } else if (inLong) {
-                    txt = txt + " [ORDER LONG]";
+                    txt = txt + " [PENDING "+(lastTransactionSell ? "SELL" : "BUY")+" "+(Math.abs(pyramidSize) + 1)+"]";
+                } else if (pyramidSize < 0) {
+                    txt = txt + " [ORDER SHORT "+(-pyramidSize)+"]";
+                } else if (pyramidSize > 0) {
+                    txt = txt + " [ORDER LONG "+(pyramidSize)+"]";
                 }
             }
         }
@@ -150,8 +149,7 @@ public class OrderPairItem {
                 base_item.addInitialValue(summBase.multiply(new BigDecimal("-1")));
                 quote_item.addInitialValue(summQuote);
             }
-            inShort = false;
-            inLong = true;
+            pyramidSize++;
             lastTransactionSell = false;
             transactionOrderBase = BigDecimal.ZERO;
             transactionOrderQuote = BigDecimal.ZERO;
@@ -174,11 +172,6 @@ public class OrderPairItem {
             base_item.incActiveOrders();
             quote_item.incActiveOrders();
             lastTransactionSell = false;
-            if (!inLong && !inShort) {
-                inLong = true;
-            } else {
-                inShort = false;
-            }
             runCoinEvents();
         } else {
             System.out.println("Trying to startBuyTransaction but already in transaction...");
@@ -197,11 +190,6 @@ public class OrderPairItem {
             base_item.incActiveOrders();
             quote_item.incActiveOrders();
             lastTransactionSell = true;
-            if (!inLong && !inShort) {
-                inShort = true;
-            } else {
-                inLong = false;
-            }
             runCoinEvents();
         } else {
             System.out.println("Trying to startSellTransaction but already in transaction...");
@@ -212,13 +200,13 @@ public class OrderPairItem {
         System.out.println("confirmTransaction");
         if (inTransaction) {
             if (lastTransactionSell) {
+                pyramidSize--;
                 base_item.addLimitValue(transactionOrderBase.multiply(new BigDecimal("-1")));
                 quote_item.addFreeValue(transactionOrderQuote);
-                inLong = false;
             } else {
+                pyramidSize++;
                 quote_item.addLimitValue(transactionOrderQuote.multiply(new BigDecimal("-1")));
                 base_item.addFreeValue(transactionOrderBase);
-                inShort = false;
             }
             base_item.incOrderCount();
             quote_item.incOrderCount();
@@ -239,9 +227,11 @@ public class OrderPairItem {
         System.out.println("confirmTransactionPart");
         if (inTransaction) {
             if (lastTransactionSell) {
+                pyramidSize--;
                 base_item.addLimitValue(summPartBase.multiply(new BigDecimal("-1")));
                 quote_item.addFreeValue(summPartQuote);
             } else {
+                pyramidSize++;
                 quote_item.addLimitValue(summPartQuote.multiply(new BigDecimal("-1")));
                 base_item.addFreeValue(summPartBase);
             }
@@ -260,19 +250,9 @@ public class OrderPairItem {
             if (lastTransactionSell) {
                 base_item.addLimitValue(transactionOrderBase.multiply(new BigDecimal("-1")));
                 base_item.addFreeValue(transactionOrderBase);
-                if (!inLong) {
-                    inShort = false;
-                } else {
-                    inLong = true;
-                }
             } else {
                 quote_item.addLimitValue(transactionOrderQuote.multiply(new BigDecimal("-1")));
                 quote_item.addFreeValue(transactionOrderQuote);
-                if (!inLong) {
-                    inShort = true;
-                } else {
-                    inLong = false;
-                }
             }
             transactionOrderBase = BigDecimal.ZERO;
             transactionOrderQuote = BigDecimal.ZERO;
@@ -436,5 +416,12 @@ public class OrderPairItem {
      */
     public void setOrderCancelCheckEvent(PairOrderCheckEvent orderCancelCheckEvent) {
         this.orderCancelCheckEvent = orderCancelCheckEvent;
+    }
+
+    /**
+     * @return the pyramidSize
+     */
+    public int getPyramidSize() {
+        return pyramidSize;
     }
 }

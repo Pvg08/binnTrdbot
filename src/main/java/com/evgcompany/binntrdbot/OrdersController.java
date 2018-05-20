@@ -101,7 +101,7 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
     }
     
     public long Buy(Long orderCID, BigDecimal baseAmount, BigDecimal price, boolean use_transactions) {
-        long result = 0;
+        long result;
         try {
             SEMAPHORE.acquire();
             OrderPairItem pair = pairOrders.get(orderCID);
@@ -160,7 +160,7 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
     }
     
     public long Sell(Long orderCID, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel, boolean use_transactions) {
-        long result = 0;
+        long result;
         try {
             SEMAPHORE.acquire();
             OrderPairItem pair = pairOrders.get(orderCID);
@@ -298,11 +298,11 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
         OrderPairItem pair = pairOrders.get(orderCID);
         if (pair != null) {
             if (isok) {
-                pair.setLastOrderPrice(sold_price);
                 pair.confirmTransaction();
             } else {
                 pair.rollbackTransaction();
             }
+            pair.setLastOrderPrice(pair.getPyramidSize() != 0 ? sold_price : null);
             updatePairTradeText(orderCID);
         }
     }

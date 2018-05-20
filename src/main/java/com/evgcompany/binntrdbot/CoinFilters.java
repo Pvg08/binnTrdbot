@@ -80,7 +80,7 @@ public class CoinFilters implements java.io.Serializable {
         if (filterQty) {
             BigDecimal pqty = qty;
             if (filterQtyStep.compareTo(BigDecimal.ZERO) > 0) {
-                qty = qty.divide(filterQtyStep).setScale(0, RoundingMode.HALF_UP).multiply(filterQtyStep);
+                qty = qty.divide(filterQtyStep, 0, RoundingMode.HALF_UP).multiply(filterQtyStep);
             }
             if (qty.compareTo(filterMinQty) < 0) {
                 qty = filterMinQty;

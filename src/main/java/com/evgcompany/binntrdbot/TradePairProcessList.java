@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class TradePairProcessList {
     
     private OrdersController ordersController = null;
-    private final List<TradePairProcess> pairs = new ArrayList<>(0);
+    private final List<AbstractTradePairProcess> pairs = new ArrayList<>(0);
     
     private String mainStrategy;
     private String barsInterval;
@@ -43,7 +43,7 @@ public class TradePairProcessList {
         this.ordersController = OrdersController.getInstance();
     }
     
-    public List<TradePairProcess> getPairs() {
+    public List<AbstractTradePairProcess> getPairs() {
         return pairs;
     }
 
@@ -60,7 +60,7 @@ public class TradePairProcessList {
         return searchCurrencyFirstPair(currencyPair) >= 0;
     }
 
-    private TradePairProcess initializePair(String symbol, boolean run) {
+    private AbstractTradePairProcess initializePair(String symbol, boolean run) {
         boolean has_short = symbol.contains("_");
         boolean has_wave = symbol.contains("~");
         boolean has_plus = symbol.contains("+");
@@ -68,28 +68,26 @@ public class TradePairProcessList {
         boolean has_minus = !has_plus && symbol.contains("-");
         symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "").replaceAll("\\~", "").replaceAll("\\_", "");
         int pair_index = searchCurrencyFirstPair(symbol);
-        TradePairProcess nproc;
+        AbstractTradePairProcess nproc;
         if (pair_index < 0) {
             if (has_wave || allPairsWavesUsage) {
                 nproc = new TradePairWaveProcess(ordersController.getClient(), symbol);
             } else {
                 nproc = new TradePairProcess(ordersController.getClient(), symbol);
+                ((TradePairProcess)nproc).setTryingToSellOnPeak(has_plus);
+                ((TradePairProcess)nproc).setSellOpenOrdersOnPeak(has_2plus);
             }
             nproc.setStartDelay(pairs.size() * 1000 + 500);
-            nproc.setTryingToSellOnPeak(has_plus);
-            nproc.setSellOpenOrdersOnPeak(has_2plus);
+            
         } else {
             nproc = pairs.get(pair_index);
         }
 
-        nproc.setTryingToBuyDip(has_minus);
         nproc.setNeedToRemove(false);
         nproc.setTradingBalancePercent(tradingBalancePercent);
         nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
-        nproc.setMainStrategy(mainStrategy);
         nproc.setBarInterval(barsInterval);
         nproc.setDelayTime(updateDelay);
-        nproc.setCheckOtherStrategies(checkOtherStrategies);
         nproc.setUseBuyStopLimited(buyStop);
         nproc.setUseSellStopLimited(sellStop);
         nproc.setStopBuyLimitTimeout(buyStopLimitedTimeout);
@@ -97,6 +95,14 @@ public class TradePairProcessList {
         nproc.setBarQueryCount(barAdditionalCount);
         nproc.setLongModeAuto(!has_short);
         nproc.setPyramidAutoMaxSize(pyramidAutoMaxSize);
+        
+        if (nproc instanceof TradePairProcess) {
+            ((TradePairProcess)nproc).setTryingToBuyDip(has_minus);
+            ((TradePairProcess)nproc).setMainStrategy(mainStrategy);
+            ((TradePairProcess)nproc).setCheckOtherStrategies(checkOtherStrategies);
+        } else if (nproc instanceof TradePairWaveProcess) {
+            // @todo
+        }
         
         if (run && pair_index < 0) {
             nproc.start();
@@ -128,32 +134,38 @@ public class TradePairProcessList {
         }
     }
     
-    public TradePairProcess addPair(TradePairProcess newProc) {
+    public AbstractTradePairProcess addPair(AbstractTradePairProcess newProc) {
         pairs.add(newProc);
         newProc.start();
         return newProc;
     }
-    public TradePairProcess addPair(String newPair) {
+    public AbstractTradePairProcess addPair(String newPair) {
         return initializePair(newPair, true);
     }
-    public TradePairProcess addPairFastRun(String newPair) {
+    public AbstractTradePairProcess addPairFastRun(String newPair) {
         if (!hasPair(newPair)) {
-            TradePairProcess nproc = initializePair(newPair, false);
-            nproc.setTryingToSellOnPeak(false);
-            nproc.setSellOpenOrdersOnPeak(false);
-            nproc.setTryingToBuyDip(false);
+            AbstractTradePairProcess nproc = initializePair(newPair, false);
             nproc.setNeedToRemove(false);
             nproc.setTradingBalancePercent(tradingBalancePercent);
             nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
-            nproc.setMainStrategy("Auto");
             nproc.setBarInterval("5m");
             nproc.setDelayTime(8);
-            nproc.setBuyOnStart(true);
             nproc.setStopBuyLimitTimeout(120);
             nproc.setStopSellLimitTimeout(300);
             nproc.setUseBuyStopLimited(true);
             nproc.setUseSellStopLimited(true);
             nproc.setPyramidAutoMaxSize(1);
+
+            if (nproc instanceof TradePairProcess) {
+                ((TradePairProcess)nproc).setTryingToSellOnPeak(false);
+                ((TradePairProcess)nproc).setSellOpenOrdersOnPeak(false);
+                ((TradePairProcess)nproc).setTryingToBuyDip(false);
+                ((TradePairProcess)nproc).setMainStrategy("Auto");
+                ((TradePairProcess)nproc).setBuyOnStart(true);
+            } else if (nproc instanceof TradePairWaveProcess) {
+                // @todo
+            }
+
             return addPair(nproc);
         }
         return null;
@@ -193,28 +205,28 @@ public class TradePairProcessList {
     
     public void pairAction(int index, String action) {
         if (pairs.size() > 0 && index >= 0) {
-            ControllableOrderProcess process = ordersController.getNthControllableOrderProcess(index);
-            if (process != null) {
-                TradePairProcess pairProcess = null;
-                if (process instanceof TradePairProcess) {
-                    pairProcess = (TradePairProcess) process;
+            ControllableOrderProcess controllableProcess = ordersController.getNthControllableOrderProcess(index);
+            if (controllableProcess != null) {
+                AbstractTradePairProcess pairProcess = null;
+                TradePairProcess tradePairProcess = null;
+                if (controllableProcess instanceof AbstractTradePairProcess) {
+                    pairProcess = (AbstractTradePairProcess) controllableProcess;
+                }
+                if (controllableProcess instanceof TradePairProcess) {
+                    tradePairProcess = (TradePairProcess) controllableProcess;
                 }
                 switch (action) {
                     case "REMOVE":
-                        process.doStop();
+                        controllableProcess.doStop();
                         break;
                     case "BUY":
-                        process.doBuy();
+                        controllableProcess.doBuy();
                         break;
                     case "SELL":
-                        process.doSell();
+                        controllableProcess.doSell();
                         break;
                     case "CANCEL":
-                        process.orderCancel();
-                        break;
-                    case "STATISTICS":
-                        if (pairProcess == null) break;
-                        pairProcess.doShowStatistics();
+                        controllableProcess.orderCancel();
                         break;
                     case "PLOT":
                         if (pairProcess == null) break;
@@ -231,21 +243,25 @@ public class TradePairProcessList {
                             }
                         }
                         break;
+                    case "STATISTICS":
+                        if (tradePairProcess == null) break;
+                        tradePairProcess.doShowStatistics();
+                        break;
                     case "NNBTRAIN":
-                        if (pairProcess == null) break;
-                        pairProcess.doNetworkAction("TRAIN", "BASE");
+                        if (tradePairProcess == null) break;
+                        tradePairProcess.doNetworkAction("TRAIN", "BASE");
                         break;
                     case "NNCTRAIN":
-                        if (pairProcess == null) break;
-                        pairProcess.doNetworkAction("TRAIN", "COIN");
+                        if (tradePairProcess == null) break;
+                        tradePairProcess.doNetworkAction("TRAIN", "COIN");
                         break;
                     case "NNBADD":
-                        if (pairProcess == null) break;
-                        pairProcess.doNetworkAction("ADDSET", "BASE");
+                        if (tradePairProcess == null) break;
+                        tradePairProcess.doNetworkAction("ADDSET", "BASE");
                         break;
                     case "NNCADD":
-                        if (pairProcess == null) break;
-                        pairProcess.doNetworkAction("ADDSET", "COIN");
+                        if (tradePairProcess == null) break;
+                        tradePairProcess.doNetworkAction("ADDSET", "COIN");
                         break;
                     default:
                         break;
