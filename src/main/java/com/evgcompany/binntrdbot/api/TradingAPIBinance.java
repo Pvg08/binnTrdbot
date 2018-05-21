@@ -9,6 +9,7 @@ import com.binance.api.client.BinanceApiCallback;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.BinanceApiWebSocketClient;
+import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.TimeInForce;
 import com.binance.api.client.domain.account.Account;
 import com.binance.api.client.domain.account.AssetBalance;
@@ -20,6 +21,7 @@ import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
 import com.binance.api.client.domain.event.CandlestickEvent;
+import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
 import com.binance.api.client.domain.event.UserDataUpdateEvent;
 import com.binance.api.client.domain.event.UserDataUpdateEvent.UserDataUpdateEventType;
 import com.binance.api.client.domain.general.ExchangeInfo;
@@ -181,9 +183,28 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         return (newOrderResponse != null && newOrderResponse.getOrderId()>0) ? newOrderResponse.getOrderId() : -1;
     }
 
+    private String realPriceOfOrder(String symbol, long order_id) {
+        double sumQty = 0;
+        double sumCost = 0;
+        List<Trade> myTrades = client.getMyTrades(symbol);
+        for (int i=0; i < myTrades.size(); i++) {
+            if (Long.parseLong(myTrades.get(i).getOrderId()) == order_id) {
+                double qty = Double.parseDouble(myTrades.get(i).getQty());
+                double price = Double.parseDouble(myTrades.get(i).getPrice());
+                sumQty += qty;
+                sumCost += price*qty;
+            }
+        }
+        return sumQty > 0 ? numberFormatForOrder(sumCost/sumQty) : "0";
+    }
+    
     @Override
-    public Order getOrderStatus(String pair, long order_id) {
-        return client.getOrderStatus(new OrderStatusRequest(pair, order_id));
+    public Order getOrderStatus(String symbol, long order_id) {
+        Order order = client.getOrderStatus(new OrderStatusRequest(symbol, order_id));
+        if (order != null && Double.parseDouble(order.getPrice()) <= 0) {
+            order.setPrice(realPriceOfOrder(symbol, order_id));
+        }
+        return order;
     }
 
     @Override
@@ -289,20 +310,29 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         BinanceApiCallback<UserDataUpdateEvent> event = new BinanceApiCallback<UserDataUpdateEvent>() {
             @Override
             public void onResponse(UserDataUpdateEvent response) {
+                OrderTradeUpdateEvent event = response.getOrderTradeUpdateEvent();
                 if (response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE) {
-                    System.out.println(response.getOrderTradeUpdateEvent());
+                    System.out.println(event);
                 }
                 if (
                         response.getEventType() == UserDataUpdateEventType.ORDER_TRADE_UPDATE &&
-                        response.getOrderTradeUpdateEvent().getEventType().equals("executionReport") && 
-                        response.getOrderTradeUpdateEvent().getOrderId() > 0 &&
-                        //Double.parseDouble(response.getOrderTradeUpdateEvent().getAccumulatedQuantity()) > 0 &&
-                        (
+                        event.getEventType().equals("executionReport") && 
+                        event.getOrderId() > 0 && (
                             symbol == null ||
-                            response.getOrderTradeUpdateEvent().getSymbol().toUpperCase().equals(symbol)
+                            event.getSymbol().toUpperCase().equals(symbol)
                         )
                 ) {
-                    evt.onUpdate(response.getOrderTradeUpdateEvent());
+                    if (
+                            event.getOrderId() > 0 &&
+                            Double.parseDouble(event.getPrice()) <= 0 &&
+                            (
+                                event.getOrderStatus() == OrderStatus.FILLED ||
+                                event.getOrderStatus() == OrderStatus.CANCELED
+                            )
+                    ) {
+                        event.setPrice(realPriceOfOrder(event.getSymbol(), event.getOrderId()));
+                    }
+                    evt.onUpdate(event);
                 }
             }
             

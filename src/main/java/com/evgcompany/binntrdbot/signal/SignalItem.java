@@ -39,6 +39,12 @@ public class SignalItem {
     private double rating;
     private long maxDaysAgo;
 
+    public boolean isTargetReachedAtPrice(BigDecimal price) {
+        return  price_target != null && 
+                price_target.compareTo(BigDecimal.ZERO) > 0 && 
+                price_target.compareTo(price) < 0;
+    }
+    
     public long getMillisFromSignalStart() {
         long millis = System.currentTimeMillis() - localMillis;
         if (millis < 0) millis = 0;

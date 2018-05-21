@@ -49,6 +49,9 @@ public abstract class TradingAPIAbstractInterface {
     protected static String numberFormatForOrder(BigDecimal num) {
         return NumberFormatter.df8.format(num).replace(".","").replace(",",".").replace(" ","");
     }
+    protected static String numberFormatForOrder(double num) {
+        return numberFormatForOrder(BigDecimal.valueOf(num));
+    }
     
     public long getServerTime() {
         return System.currentTimeMillis();

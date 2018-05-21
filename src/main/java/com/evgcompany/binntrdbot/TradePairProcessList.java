@@ -84,8 +84,6 @@ public class TradePairProcessList {
         }
 
         nproc.setNeedToRemove(false);
-        nproc.setTradingBalancePercent(tradingBalancePercent);
-        nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
         nproc.setBarInterval(barsInterval);
         nproc.setDelayTime(updateDelay);
         nproc.setUseBuyStopLimited(buyStop);
@@ -100,8 +98,12 @@ public class TradePairProcessList {
             ((TradePairProcess)nproc).setTryingToBuyDip(has_minus);
             ((TradePairProcess)nproc).setMainStrategy(mainStrategy);
             ((TradePairProcess)nproc).setCheckOtherStrategies(checkOtherStrategies);
+            nproc.setTradingBalancePercent(tradingBalancePercent);
+            nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
         } else if (nproc instanceof TradePairWaveProcess) {
             // @todo
+            //nproc.setTradingBalancePercent(tradingBalancePercent);
+            //nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
         }
         
         if (run && pair_index < 0) {
@@ -146,8 +148,6 @@ public class TradePairProcessList {
         if (!hasPair(newPair)) {
             AbstractTradePairProcess nproc = initializePair(newPair, false);
             nproc.setNeedToRemove(false);
-            nproc.setTradingBalancePercent(tradingBalancePercent);
-            nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
             nproc.setBarInterval("5m");
             nproc.setDelayTime(8);
             nproc.setStopBuyLimitTimeout(120);

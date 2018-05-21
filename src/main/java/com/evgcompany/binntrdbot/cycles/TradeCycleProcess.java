@@ -403,7 +403,7 @@ public class TradeCycleProcess extends PeriodicProcessThread implements Controll
         if (isBuying) {
             filter.setCurrentPrice(price);
             filter.setCurrentAmount(amount);
-            filter.prepareForBuy();
+            filter.prepareForBuy(!isMarket);
             BigDecimal tobuy_price = filter.getCurrentPrice();
             BigDecimal tobuy_amount = filter.getCurrentAmount();
             if (BalanceController.getInstance().canBuy(pairSymbol, tobuy_amount, tobuy_price)) {
@@ -428,7 +428,7 @@ public class TradeCycleProcess extends PeriodicProcessThread implements Controll
         } else {
             filter.setCurrentPrice(price);
             filter.setCurrentAmount(amount);
-            filter.prepareForSell();
+            filter.prepareForSell(!isMarket);
             BigDecimal tosell_price = filter.getCurrentPrice();
             BigDecimal tosell_amount = filter.getCurrentAmount();
             if (BalanceController.getInstance().canSell(pairSymbol, tosell_amount)) {

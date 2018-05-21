@@ -35,10 +35,13 @@ public class DepthCacheProcess {
     private static final String ASKS = "ASKS";
 
     private long lastUpdateId;
+    private long lastUpdateMillis = 0;
 
     private Map<String, NavigableMap<BigDecimal, BigDecimal>> depthCache;
 
     private Closeable socket = null;
+    
+    private int registered = 0;
 
     public DepthCacheProcess(String symbol) {
         this.symbol = symbol;
@@ -50,10 +53,18 @@ public class DepthCacheProcess {
         System.out.println("Depth check for " + symbol + " is started.");
     }
     public void stopProcess() {
+        if (registered > 0) return;
         depthCache.clear();
         lastUpdateId = 0;
         stopDepthEventStreaming();
         System.out.println("Depth check for " + symbol + " is stopped.");
+    }
+    
+    public void registerNew() {
+        registered++;
+    }
+    public void unregister() {
+        registered--;
     }
     
     /**
@@ -68,16 +79,18 @@ public class DepthCacheProcess {
         this.lastUpdateId = orderBook.getLastUpdateId();
 
         NavigableMap<BigDecimal, BigDecimal> asks = new TreeMap<>(Comparator.reverseOrder());
-        for (OrderBookEntry ask : orderBook.getAsks()) {
+        orderBook.getAsks().forEach((ask) -> {
             asks.put(new BigDecimal(ask.getPrice()), new BigDecimal(ask.getQty()));
-        }
+        });
         depthCache.put(ASKS, asks);
 
         NavigableMap<BigDecimal, BigDecimal> bids = new TreeMap<>(Comparator.reverseOrder());
-        for (OrderBookEntry bid : orderBook.getBids()) {
+        orderBook.getBids().forEach((bid) -> {
             bids.put(new BigDecimal(bid.getPrice()), new BigDecimal(bid.getQty()));
-        }
+        });
         depthCache.put(BIDS, bids);
+        
+        lastUpdateMillis = System.currentTimeMillis();
     }
 
     /**
@@ -90,6 +103,7 @@ public class DepthCacheProcess {
             if (response.getUpdateId() > lastUpdateId) {
                 //System.out.println(response);
                 lastUpdateId = response.getUpdateId();
+                lastUpdateMillis = System.currentTimeMillis();
                 updateOrderBook(getAsks(), response.getAsks());
                 updateOrderBook(getBids(), response.getBids());
                 //printDepthCache();
@@ -108,6 +122,10 @@ public class DepthCacheProcess {
         }
     }
 
+    public long getMillisFromLastUpdate() {
+        return System.currentTimeMillis() - lastUpdateMillis;
+    }
+    
     public boolean isStopped() {
         return socket == null;
     }
@@ -120,7 +138,7 @@ public class DepthCacheProcess {
      * from the order book.
      */
     private void updateOrderBook(NavigableMap<BigDecimal, BigDecimal> lastOrderBookEntries, List<OrderBookEntry> orderBookDeltas) {
-        for (OrderBookEntry orderBookDelta : orderBookDeltas) {
+        orderBookDeltas.forEach((orderBookDelta) -> {
             BigDecimal price = new BigDecimal(orderBookDelta.getPrice());
             BigDecimal qty = new BigDecimal(orderBookDelta.getQty());
             if (qty.compareTo(BigDecimal.ZERO) == 0) {
@@ -129,7 +147,7 @@ public class DepthCacheProcess {
             } else {
                 lastOrderBookEntries.put(price, qty);
             }
-        }
+        });
     }
 
     public NavigableMap<BigDecimal, BigDecimal> getAsks() {

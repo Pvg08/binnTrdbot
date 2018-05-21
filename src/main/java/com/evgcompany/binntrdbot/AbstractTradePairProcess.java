@@ -45,8 +45,8 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     
     private long lastBarTime = 0;
     
-    private BigDecimal tradingBalanceQuotePercent = BigDecimal.valueOf(50);
-    private BigDecimal tradingBalanceMainValue = BigDecimal.valueOf(0);
+    protected BigDecimal tradingBalanceQuotePercent = BigDecimal.valueOf(50);
+    protected BigDecimal tradingBalanceMainValue = BigDecimal.valueOf(0);
     
     protected TimeSeries series = null;
     
@@ -83,6 +83,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected BigDecimal orderAvgPrice = BigDecimal.ZERO;
     
     protected boolean inAPIOrder = false;
+    protected boolean forceMarketOrders = false;
     
     public AbstractTradePairProcess(TradingAPIAbstractInterface client, String pair) {
         super(pair);
@@ -111,14 +112,14 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         }
         filter.setCurrentPrice(curPrice);
         filter.setCurrentAmount(base_asset_amount);
-        filter.prepareForBuy();
+        filter.prepareForBuy(!forceMarketOrders);
         BigDecimal tobuy_price = filter.getCurrentPrice();
         BigDecimal tobuy_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tobuy_price.multiply(tobuy_amount);
         if (BalanceController.getInstance().canBuy(symbol, tobuy_amount, tobuy_price)) {
             app.log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
             lastOrderMillis = System.currentTimeMillis();
-            long result = ordersController.Buy(orderCID, tobuy_amount, tobuy_price);
+            long result = ordersController.Buy(orderCID, tobuy_amount, !forceMarketOrders ? tobuy_price : null);
             if (result < 0) {
                 app.log("Error!", true, true);
             }
@@ -144,7 +145,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         
         filter.setCurrentPrice(price);
         filter.setCurrentAmount(base_asset_amount);
-        filter.prepareForSell();
+        filter.prepareForSell(!forceMarketOrders);
         BigDecimal tosell_price = filter.getCurrentPrice();
         BigDecimal tosell_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tosell_amount.multiply(tosell_price);
@@ -165,7 +166,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             if (BalanceController.getInstance().canSell(symbol, tosell_amount)) {
                 app.log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
                 lastOrderMillis = System.currentTimeMillis();
-                long result = ordersController.Sell(orderCID, tosell_amount, tosell_price, null);
+                long result = ordersController.Sell(orderCID, tosell_amount, !forceMarketOrders ? tosell_price : null, null);
                 if (result < 0) {
                     app.log("Error!", true, true);
                 }
@@ -289,7 +290,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         if (orderBaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
             orderAvgPrice = price;
         }
-        if(isBuying && longModeAuto || !isBuying && !longModeAuto) {
+        if((isBuying && pyramidSize >= 0) || (!isBuying && pyramidSize <= 0)) {
             if (orderBaseAmount.compareTo(BigDecimal.ZERO) > 0) {
                 orderAvgPrice = orderAvgPrice.multiply(orderBaseAmount).add(price.multiply(executedQty)).divide(orderBaseAmount.add(executedQty), RoundingMode.HALF_UP);
             }

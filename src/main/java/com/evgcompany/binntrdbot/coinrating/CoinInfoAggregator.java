@@ -94,15 +94,20 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             if (depthProcesses.get(pair).isStopped()) {
                 depthProcesses.get(pair).startProcess();
             }
+            depthProcesses.get(pair).registerNew();
         } else {
             DepthCacheProcess newproc = new DepthCacheProcess(pair);
             newproc.startProcess();
+            newproc.registerNew();
             depthProcesses.put(pair, newproc);
         }
     }
     public void stopDepthCheckForPair(String pair) {
-        if (depthProcesses.containsKey(pair) && !depthProcesses.get(pair).isStopped()) {
-            depthProcesses.get(pair).stopProcess();
+        if (depthProcesses.containsKey(pair)) {
+            depthProcesses.get(pair).unregister();
+            if (!depthProcesses.get(pair).isStopped()) {
+                depthProcesses.get(pair).stopProcess();
+            }
         }
     }
     public DepthCacheProcess getDepthProcessForPair(String pair) {
@@ -271,9 +276,11 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
     public double convertSumm(String symbol1, double price) {
         return convertSumm(symbol1, price, baseCoin);
     }
-    
     public BigDecimal convertSumm(String symbol1, BigDecimal price, String symbol2) {
         return BigDecimal.valueOf(convertSumm(symbol1, price.doubleValue(), symbol2));
+    }
+    public BigDecimal convertSumm(String symbol1, BigDecimal price) {
+        return BigDecimal.valueOf(convertSumm(symbol1, price.doubleValue(), baseCoin));
     }
     
     private void updatePrices(boolean needSync) {

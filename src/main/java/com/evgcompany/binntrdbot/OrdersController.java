@@ -473,7 +473,6 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
                             order.getStatus() == OrderStatus.REJECTED;
                     boolean isFinished = order.getStatus() == OrderStatus.FILLED || isCanceled;
                     boolean isBuying = order.getSide() == OrderSide.BUY;
-
                     if (isFinished) {
                         pairItem.setOrderAPIID(0);
                         pairItem.setLastOrderPrice(null);
@@ -486,7 +485,6 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
                     mainApplication.getInstance().log("Checked: " + order.getType().name() + " " + order.getSide().name() + " " + order.getSymbol() + "; Qty=" + executedQty + "; Price=" + price, false, true);
                     updatePairTrade(orderCID, !isTestMode);
                 }
-
                 if (isTestMode) emulator.progressOrder(pairItem.getOrderAPIID());
                 result = order;
             }
