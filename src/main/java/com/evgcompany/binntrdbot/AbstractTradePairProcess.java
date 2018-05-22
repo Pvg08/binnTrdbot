@@ -10,12 +10,14 @@ import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
+import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -85,6 +87,8 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected boolean inAPIOrder = false;
     protected boolean forceMarketOrders = false;
     
+    protected final long maxProcessUpdateIntervalMillis = 10 * 60 * 1000; // 10m
+    
     public AbstractTradePairProcess(TradingAPIAbstractInterface client, String pair) {
         super(pair);
         app = mainApplication.getInstance();
@@ -96,13 +100,48 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         if (info.getClient() == null) info.setClient(client);
     }
     
-    protected void doEnter(BigDecimal curPrice) {
+    protected BigDecimal calculateInstantProfit(boolean is_enter, BigDecimal price) {
+        if (
+            pyramidSize == 0 || 
+            (is_enter && pyramidSize > 0) || 
+            (!is_enter && pyramidSize < 0) ||
+            orderAvgPrice == null ||
+            orderAvgPrice.compareTo(BigDecimal.ZERO) <= 0 ||
+            orderBaseAmount == null ||
+            orderBaseAmount.compareTo(BigDecimal.ZERO) <= 0
+        ) {
+            return null;
+        }
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            price = currentPrice;
+            DepthCacheProcess process = info.getDepthProcessForPair(symbol);
+            if (!process.isStopped() && process.getMillisFromLastUpdate() < maxProcessUpdateIntervalMillis) {
+                if (is_enter) {
+                    Map.Entry<BigDecimal, BigDecimal> bestAsk = process.getBestAsk();
+                    if (bestAsk != null) price = bestAsk.getKey();
+                } else {
+                    Map.Entry<BigDecimal, BigDecimal> bestBid = process.getBestBid();
+                    if (bestBid != null) price = bestBid.getKey();
+                }
+            }
+        }
+        BigDecimal profit;
+        if (is_enter) {
+            profit = orderAvgPrice.subtract(price).divide(price, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+        } else {
+            profit = price.subtract(orderAvgPrice).divide(orderAvgPrice, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+        }
+        profit = profit.subtract(client.getTradeComissionPercent());
+        return profit;
+    }
+    
+    protected boolean doEnter(BigDecimal curPrice, boolean skip_check) {
         if (pyramidSize == 0) {
             longModeAuto = true;
         }
         isTriedBuy = true;
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
-            return;
+            return false;
         }
         BigDecimal base_asset_amount;
         if (pyramidSize >= 0) {
@@ -116,24 +155,42 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         BigDecimal tobuy_price = filter.getCurrentPrice();
         BigDecimal tobuy_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tobuy_price.multiply(tobuy_amount);
-        if (BalanceController.getInstance().canBuy(symbol, tobuy_amount, tobuy_price)) {
-            app.log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
-            lastOrderMillis = System.currentTimeMillis();
-            long result = ordersController.Buy(orderCID, tobuy_amount, !forceMarketOrders ? tobuy_price : null);
-            if (result < 0) {
-                app.log("Error!", true, true);
+        
+        BigDecimal profit = calculateInstantProfit(true, tobuy_price);
+        long result = -1;
+        
+        if (
+                skip_check || 
+                !ordersController.isLowHold() || 
+                profit == null ||
+                profit.compareTo(ordersController.getTradeMinProfitPercent()) > 0 ||
+                (
+                    ordersController.getStopLossPercent() != null &&
+                    profit.compareTo(ordersController.getStopLossPercent().multiply(BigDecimal.valueOf(-1))) < 0
+                )
+        ) {
+            if (BalanceController.getInstance().canBuy(symbol, tobuy_amount, tobuy_price)) {
+                app.log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
+                lastOrderMillis = System.currentTimeMillis();
+                result = ordersController.Buy(orderCID, tobuy_amount, !forceMarketOrders ? tobuy_price : null);
+                if (result < 0) {
+                    app.log("Error!", true, true);
+                }
+            } else {
+                app.log("Can't buy " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")");
             }
         } else {
-            app.log("Can't buy " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")");
+            app.log(symbol + " - need to enter but profit ("+NumberFormatter.df4.format(profit)+"%) is too low. Waiting...", false, true);
         }
+        return result >= 0;
     }
 
-    protected void doExit(BigDecimal price, boolean skip_check) {
+    protected boolean doExit(BigDecimal price, boolean skip_check) {
         if (pyramidSize == 0) {
             longModeAuto = false;
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            return;
+            return false;
         }
         
         BigDecimal base_asset_amount;
@@ -150,23 +207,25 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         BigDecimal tosell_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tosell_amount.multiply(tosell_price);
         
+        BigDecimal profit = calculateInstantProfit(false, tosell_price);
+        long result = -1;
+        
         //BigDecimal incomeWithoutComission = tosell_price.multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(0.01).multiply(client.getTradeComissionPercent()))).subtract(lastBuyPrice);
         //BigDecimal incomeWithoutComissionPercent = BigDecimal.valueOf(100).multiply(incomeWithoutComission).divide(lastBuyPrice, RoundingMode.HALF_DOWN);
         if (
-                true
-                /*skip_check || 
+                skip_check || 
                 !ordersController.isLowHold() || 
-                signalItem != null ||
-                incomeWithoutComissionPercent.compareTo(ordersController.getTradeMinProfitPercent()) > 0 ||
+                profit == null ||
+                profit.compareTo(ordersController.getTradeMinProfitPercent()) > 0 ||
                 (
                     ordersController.getStopLossPercent() != null &&
-                    incomeWithoutComissionPercent.compareTo(ordersController.getStopLossPercent().multiply(BigDecimal.valueOf(-1))) < 0
-                )*/
+                    profit.compareTo(ordersController.getStopLossPercent().multiply(BigDecimal.valueOf(-1))) < 0
+                )
             ) {
             if (BalanceController.getInstance().canSell(symbol, tosell_amount)) {
                 app.log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
                 lastOrderMillis = System.currentTimeMillis();
-                long result = ordersController.Sell(orderCID, tosell_amount, !forceMarketOrders ? tosell_price : null, null);
+                result = ordersController.Sell(orderCID, tosell_amount, !forceMarketOrders ? tosell_price : null, null);
                 if (result < 0) {
                     app.log("Error!", true, true);
                 }
@@ -174,8 +233,9 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
                 app.log("Can't sell " + NumberFormatter.df8.format(tosell_amount) + " " + symbol + "", false, true);
             }
         } else {
-            //app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(incomeWithoutComissionPercent)+"%) is too low. Waiting...", false, true);
+            app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(profit)+"%) is too low. Waiting...", false, true);
         }
+        return result >= 0;
     }
 
     protected void checkStatus() {
@@ -394,7 +454,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             }
         }
         
-        System.out.println("PYR_SIZE " + pyramidSize + "  BASE " + orderBaseAmount + "  QUOTE " + orderQuoteAmount + "  AVG " + orderAvgPrice);
+        System.out.println(symbol + ":  PYR_SIZE " + pyramidSize + "  BASE " + orderBaseAmount + "  QUOTE " + orderQuoteAmount + "  AVG " + orderAvgPrice);
     }
     
     @Override
@@ -446,7 +506,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     @Override
     public void doBuy() {
         if (!inAPIOrder) {
-            doEnter(currentPrice);
+            doEnter(currentPrice, true);
         }
     }
 

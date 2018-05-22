@@ -20,14 +20,16 @@ import java.util.Map;
 public class TradePairWaveProcess extends AbstractTradePairProcess implements TradeSignalProcessInterface {
     
     private BigDecimal wavesSecondaryPercent = BigDecimal.valueOf(25);
-    private BigDecimal wavesIncKoef = BigDecimal.valueOf(59);
-    private BigDecimal desireableProfitPercent = BigDecimal.valueOf(5);
+    private BigDecimal wavesIncKoef = BigDecimal.valueOf(65);
 
-    private final BigDecimal minPriceChangePercent = BigDecimal.valueOf(0.2);
-    private final long maxProcessUpdateIntervalMillis = 10 * 60 * 1000; // 10m
+    private double initialProfitPercent = 8;
+    private double minProfitPercent = 0.75;
+    private double halfDivideProfitOrdersCount = 10;
+    private final double minPriceChangeInitialPercent = 0.15;
     
     private BigDecimal minPrice = null;
     private BigDecimal lastBaseValue = null;
+    private BigDecimal secondBaseValue = null;
     
     private SignalItem signalItem = null;
     
@@ -37,7 +39,7 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
         longModeAuto = true;
         forceMarketOrders = true;
         tradingBalanceQuotePercent = BigDecimal.valueOf(0);
-        tradingBalanceMainValue = BigDecimal.valueOf(0.0007);
+        tradingBalanceMainValue = BigDecimal.valueOf(0.0005);
         stopAfterFinish = true;
     }
 
@@ -46,9 +48,9 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
         super.checkStatus();
         if (inAPIOrder) return;
         if (minPrice == null || orderBaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            minPrice = currentPrice;
-            System.out.println("First wave order...");
-            doEnter(currentPrice);
+            if (doEnter(currentPrice, true)) {
+                minPrice = currentPrice;
+            }
             return;
         }
         BigDecimal checkPrice = currentPrice;
@@ -60,19 +62,32 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
         }
         
         if (minPrice.compareTo(checkPrice) > 0) {
+            BigDecimal koef = BigDecimal.ONE;
+            if (lastBaseValue != null && secondBaseValue != null) {
+                koef = lastBaseValue.divide(secondBaseValue, RoundingMode.HALF_UP);
+                koef = BigDecimal.valueOf(Math.sqrt(koef.doubleValue()));
+            }
             BigDecimal diffPercent = minPrice.subtract(checkPrice).divide(minPrice, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
-            if (diffPercent.compareTo(minPriceChangePercent) > 0) {
+            if (diffPercent.compareTo(koef.multiply(BigDecimal.valueOf(minPriceChangeInitialPercent))) > 0) {
+                BigDecimal tmpLastBase = lastBaseValue;
                 if (lastBaseValue == null) {
-                    System.out.println("Second wave order...");
                     lastBaseValue = orderBaseAmount.multiply(wavesSecondaryPercent).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
                 } else {
-                    System.out.println("Next wave order...");
-                    lastBaseValue = lastBaseValue.add(orderAvgPrice.subtract(checkPrice).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP).multiply(wavesIncKoef).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                    BigDecimal modKoef = wavesIncKoef;
+                    if (filter.isFilterQty() && filter.getFilterQtyStep() != null) {
+                        modKoef = modKoef.multiply(filter.getFilterQtyStep());
+                    }
+                    BigDecimal priceOffset = orderAvgPrice.subtract(checkPrice).divide(orderAvgPrice, RoundingMode.HALF_UP);
+                    lastBaseValue = lastBaseValue.add(priceOffset.multiply(modKoef));
                 }
                 lastBaseValue = filter.normalizeQuantity(lastBaseValue, false);
                 tradingBalanceMainValue = info.convertSumm(baseAssetSymbol, lastBaseValue);
-                minPrice = checkPrice;
-                doEnter(checkPrice);
+                if (doEnter(checkPrice, true)) {
+                    minPrice = checkPrice;
+                    if (secondBaseValue == null) secondBaseValue = lastBaseValue;
+                } else {
+                    lastBaseValue = tmpLastBase;
+                }
             }
             return;
         }
@@ -86,9 +101,19 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
         if (signalItem != null && checkPrice.compareTo(orderAvgPrice) > 0 && signalItem.isTargetReachedAtPrice(checkPrice)) {
             System.out.println("Exit from wave signal order...");
             doExit(checkPrice, true);
-        } else if (checkPrice.compareTo(orderAvgPrice.multiply(desireableProfitPercent.add(BigDecimal.valueOf(100))).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)) > 0) {
-            System.out.println("Exit from wave order...");
-            doExit(checkPrice, true);
+        } else {
+            double checkProfitPercent = initialProfitPercent;
+            if (Math.abs(pyramidSize) > 0) {
+                checkProfitPercent = checkProfitPercent/Math.pow(2.0, Math.abs(pyramidSize - 0.99999)/halfDivideProfitOrdersCount);
+                if (checkProfitPercent < minProfitPercent) {
+                    checkProfitPercent = minProfitPercent;
+                }
+            }
+            System.out.println(symbol + " Check profit percent = " + checkProfitPercent);
+            if (checkPrice.compareTo(orderAvgPrice.multiply(BigDecimal.valueOf(checkProfitPercent).add(BigDecimal.valueOf(100))).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)) > 0) {
+                System.out.println("Exit from wave order...");
+                doExit(checkPrice, true);
+            }
         }
     }
     
@@ -131,16 +156,44 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
     }
 
     /**
-     * @return the desireableProfitPercent
+     * @return the minProfitPercent
      */
-    public BigDecimal getDesireableProfitPercent() {
-        return desireableProfitPercent;
+    public double getMinProfitPercent() {
+        return minProfitPercent;
     }
 
     /**
-     * @param desireableProfitPercent the desireableProfitPercent to set
+     * @param minProfitPercent the minProfitPercent to set
      */
-    public void setDesireableProfitPercent(BigDecimal desireableProfitPercent) {
-        this.desireableProfitPercent = desireableProfitPercent;
+    public void setMinProfitPercent(double minProfitPercent) {
+        this.minProfitPercent = minProfitPercent;
+    }
+
+    /**
+     * @return the halfDivideProfitOrdersCount
+     */
+    public double getHalfDivideProfitOrdersCount() {
+        return halfDivideProfitOrdersCount;
+    }
+
+    /**
+     * @param halfDivideProfitOrdersCount the halfDivideProfitOrdersCount to set
+     */
+    public void setHalfDivideProfitOrdersCount(double halfDivideProfitOrdersCount) {
+        this.halfDivideProfitOrdersCount = halfDivideProfitOrdersCount;
+    }
+
+    /**
+     * @return the initialProfitPercent
+     */
+    public double getInitialProfitPercent() {
+        return initialProfitPercent;
+    }
+
+    /**
+     * @param initialProfitPercent the initialProfitPercent to set
+     */
+    public void setInitialProfitPercent(double initialProfitPercent) {
+        this.initialProfitPercent = initialProfitPercent;
     }
 }

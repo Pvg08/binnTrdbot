@@ -93,6 +93,9 @@ public class CoinFilters implements java.io.Serializable {
                     qty = BigDecimal.ZERO;
                 }
             }
+            if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+                qty = filterMinQty;
+            }
         }
         return qty;
     }

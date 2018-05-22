@@ -70,7 +70,7 @@ public class TradePairProcess extends AbstractTradePairProcess implements TradeS
             checkOtherStrategies
         );
         if (saction == StrategiesController.StrategiesAction.DO_ENTER && pyramidSize < pyramidAutoMaxSize) {
-            if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice);
+            if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice, false);
         } else if (saction == StrategiesController.StrategiesAction.DO_EXIT && pyramidSize > -pyramidAutoMaxSize) {
             doExit(lastStrategyCheckPrice, false);
         }
