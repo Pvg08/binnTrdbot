@@ -57,7 +57,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected int pyramidAutoMaxSize = 100;
     protected boolean stopAfterFinish = false;
     
-    private BigDecimal last_trade_profit = BigDecimal.ZERO;
+    private BigDecimal lastTradeProfit = BigDecimal.ZERO;
     
     protected CurrencyPlot plot = null;
     
@@ -175,6 +175,8 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
                 result = ordersController.Buy(orderCID, tobuy_amount, !forceMarketOrders ? tobuy_price : null);
                 if (result < 0) {
                     app.log("Error!", true, true);
+                } else {
+                    lastTradeProfit = profit;
                 }
             } else {
                 app.log("Can't buy " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")");
@@ -228,6 +230,8 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
                 result = ordersController.Sell(orderCID, tosell_amount, !forceMarketOrders ? tosell_price : null, null);
                 if (result < 0) {
                     app.log("Error!", true, true);
+                } else {
+                    lastTradeProfit = profit;
                 }
             } else {
                 app.log("Can't sell " + NumberFormatter.df8.format(tosell_amount) + " " + symbol + "", false, true);
@@ -559,6 +563,10 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         return quoteAssetSymbol;
     }
     
+    public void doShowStatistics() {
+        app.log("Symbol: " + symbol);
+    }
+    
     /**
      * @return the do_remove_flag
      */
@@ -672,7 +680,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
      * @return the last_trade_profit
      */
     public BigDecimal getLastTradeProfit() {
-        return last_trade_profit;
+        return lastTradeProfit;
     }
 
     /**

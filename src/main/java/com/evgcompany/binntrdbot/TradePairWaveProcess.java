@@ -9,6 +9,7 @@ import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.signal.TradeSignalProcessInterface;
+import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
@@ -17,19 +18,18 @@ import java.util.Map;
  *
  * @author EVG_Adminer
  */
-public class TradePairWaveProcess extends AbstractTradePairProcess implements TradeSignalProcessInterface {
+public class TradePairWaveProcess extends TradePairStrategyProcess implements TradeSignalProcessInterface {
     
     private BigDecimal wavesSecondaryPercent = BigDecimal.valueOf(25);
     private BigDecimal wavesIncKoef = BigDecimal.valueOf(65);
 
-    private double initialProfitPercent = 8;
-    private double minProfitPercent = 0.75;
+    private double initialProfitPercent = 5;
+    private double minProfitPercent = 0.5;
     private double halfDivideProfitOrdersCount = 10;
     private final double minPriceChangeInitialPercent = 0.15;
     
     private BigDecimal minPrice = null;
     private BigDecimal lastBaseValue = null;
-    private BigDecimal secondBaseValue = null;
     
     private SignalItem signalItem = null;
     
@@ -44,9 +44,17 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
     }
 
     @Override
+    protected void onBuySell(boolean isBuying, BigDecimal price, BigDecimal executedQty) {
+        super.onBuySell(isBuying, price, executedQty);
+        if (isBuying) {
+            strategiesController.addStrategyMarker(true, "Wave", price.doubleValue());
+        }
+    }
+    
+    @Override
     protected void checkStatus() {
-        super.checkStatus();
-        if (inAPIOrder) return;
+        info.setLatestPrice(symbol, currentPrice);
+        ordersController.updatePairTradeText(orderCID);
         if (minPrice == null || orderBaseAmount.compareTo(BigDecimal.ZERO) <= 0) {
             if (doEnter(currentPrice, true)) {
                 minPrice = currentPrice;
@@ -62,13 +70,9 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
         }
         
         if (minPrice.compareTo(checkPrice) > 0) {
-            BigDecimal koef = BigDecimal.ONE;
-            if (lastBaseValue != null && secondBaseValue != null) {
-                koef = lastBaseValue.divide(secondBaseValue, RoundingMode.HALF_UP);
-                koef = BigDecimal.valueOf(Math.sqrt(koef.doubleValue()));
-            }
             BigDecimal diffPercent = minPrice.subtract(checkPrice).divide(minPrice, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
-            if (diffPercent.compareTo(koef.multiply(BigDecimal.valueOf(minPriceChangeInitialPercent))) > 0) {
+            System.out.println(symbol + " diffPercent(min,check) = " + diffPercent);
+            if (diffPercent.compareTo(BigDecimal.valueOf(minPriceChangeInitialPercent)) > 0) {
                 BigDecimal tmpLastBase = lastBaseValue;
                 if (lastBaseValue == null) {
                     lastBaseValue = orderBaseAmount.multiply(wavesSecondaryPercent).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
@@ -84,7 +88,6 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
                 tradingBalanceMainValue = info.convertSumm(baseAssetSymbol, lastBaseValue);
                 if (doEnter(checkPrice, true)) {
                     minPrice = checkPrice;
-                    if (secondBaseValue == null) secondBaseValue = lastBaseValue;
                 } else {
                     lastBaseValue = tmpLastBase;
                 }
@@ -109,10 +112,22 @@ public class TradePairWaveProcess extends AbstractTradePairProcess implements Tr
                     checkProfitPercent = minProfitPercent;
                 }
             }
-            System.out.println(symbol + " Check profit percent = " + checkProfitPercent);
-            if (checkPrice.compareTo(orderAvgPrice.multiply(BigDecimal.valueOf(checkProfitPercent).add(BigDecimal.valueOf(100))).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)) > 0) {
-                System.out.println("Exit from wave order...");
-                doExit(checkPrice, true);
+            BigDecimal aimPrice = orderAvgPrice.multiply(BigDecimal.valueOf(checkProfitPercent).add(BigDecimal.valueOf(100))).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
+            System.out.println(symbol + " Aim price = " + aimPrice);
+            if (checkPrice.compareTo(aimPrice) > 0) {
+                StrategiesController.StrategiesAction saction = StrategiesController.StrategiesAction.DO_EXIT;
+                if (
+                        !strategiesController.getMainStrategy().equals("No Strategy") && 
+                        !strategiesController.getMainStrategy().equals("Neural Network") && 
+                        !strategiesController.getMainStrategy().equals("Auto")
+                ) {
+                    System.out.println(symbol + " Checking strategy for exit...");
+                    saction = strategiesController.checkStatus(true, false, null);
+                }
+                if (saction == StrategiesController.StrategiesAction.DO_EXIT) {
+                    System.out.println(symbol + " Exit from wave order...");
+                    doExit(checkPrice, true);
+                }
             }
         }
     }

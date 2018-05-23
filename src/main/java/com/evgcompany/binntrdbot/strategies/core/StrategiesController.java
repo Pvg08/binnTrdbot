@@ -114,11 +114,12 @@ public class StrategiesController {
         this.mainStrategy = mainStrategy;
     }
     
-    public void addStrategyMarker(boolean is_enter, String strategy_name) {
+    public void addStrategyMarker(boolean is_enter, String strategy_name, Double price) {
         if (ordersController != null) {
             StrategyMarker newm = new StrategyMarker();
             newm.label = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
             newm.timeStamp = ordersController.getClient().getAlignedCurrentTimeMillis();
+            newm.value = price != null ? price : 0;
             if (strategy_name.equals(mainStrategy)) {
                 newm.typeIndex = is_enter ? 0 : 1;
             } else {
@@ -517,17 +518,17 @@ public class StrategiesController {
         return subseries;
     }
     
-    public StrategiesAction checkStatus(boolean canExit, boolean checkOtherStrategies) {
+    public StrategiesAction checkStatus(boolean canExit, boolean checkOtherStrategies, Double price) {
         int endIndex = series.getEndIndex();
         
         boolean shouldEnter = strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord);
         boolean shouldExit = strategies.get(mainStrategy).shouldExit(endIndex, tradingRecord);
         
         if (shouldEnter) {
-            addStrategyMarker(true, mainStrategy);
+            addStrategyMarker(true, mainStrategy, price);
         }
         if (shouldExit) {
-            addStrategyMarker(false, mainStrategy);
+            addStrategyMarker(false, mainStrategy, price);
         }
         
         if (canExit) {
@@ -549,18 +550,18 @@ public class StrategiesController {
                 if (!entry.getKey().equals(mainStrategy)) {
                     if (canExit) {
                         if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
-                            addStrategyMarker(false, entry.getKey());
+                            addStrategyMarker(false, entry.getKey(), null);
                             app.log(groupName + " can exit here ("+entry.getKey()+")...", false, true);
                         } else if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
-                            addStrategyMarker(true, entry.getKey());
+                            addStrategyMarker(true, entry.getKey(), null);
                             app.log(groupName + " can enter here ("+entry.getKey()+")...", false, true);
                         }
                     } else {
                         if (entry.getValue().shouldEnter(endIndex, tradingRecord)) {
-                            addStrategyMarker(true, entry.getKey());
+                            addStrategyMarker(true, entry.getKey(), null);
                             app.log(groupName + " can enter here ("+entry.getKey()+")...", false, true);
                         } else if (entry.getValue().shouldExit(endIndex, tradingRecord)) {
-                            addStrategyMarker(false, entry.getKey());
+                            addStrategyMarker(false, entry.getKey(), null);
                             app.log(groupName + " can exit here ("+entry.getKey()+")...", false, true);
                         }
                     }

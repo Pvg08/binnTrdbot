@@ -9,116 +9,32 @@ import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
-import com.evgcompany.binntrdbot.analysis.NeuralNetworkStockPredictor;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
-import com.evgcompany.binntrdbot.misc.CurrencyPlot;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
-import com.evgcompany.binntrdbot.signal.SignalItem;
-import com.evgcompany.binntrdbot.signal.TradeSignalProcessInterface;
-import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
-import com.evgcompany.binntrdbot.strategies.core.StrategyItem;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.ta4j.core.Bar;
-import org.ta4j.core.Decimal;
 
 /**
  *
  * @author EVG_adm_T
  */
-public class TradePairProcess extends AbstractTradePairProcess implements TradeSignalProcessInterface {
-
-    private StrategiesController strategiesController = null;
-    private NeuralNetworkStockPredictor predictor = null;
+public class TradePairProcess extends TradePairSignalProcess {
     
-    private SignalItem signalItem = null;
-    
-    private boolean checkOtherStrategies = true;
-    private boolean isTryingToSellOnPeak = false;
-    private boolean isTryingToBuyOnDip = false;
-    private boolean buyOnStart = false;
-    private boolean sellOpenOrdersOnPeak = false;
+    protected boolean isTryingToSellOnPeak = false;
+    protected boolean isTryingToBuyOnDip = false;
+    protected boolean buyOnStart = false;
+    protected boolean sellOpenOrdersOnPeak = false;
     
     public TradePairProcess(TradingAPIAbstractInterface client, String pair) {
         super(client, pair);
-        strategiesController = new StrategiesController(symbol);
-    }
-
-    private boolean canBuyForCoinRating() {
-        return app.getCoinRatingController() == null || 
-                !app.getCoinRatingController().isAlive() || 
-                !app.getCoinRatingController().isNoAutoBuysOnDowntrend() || 
-                !app.getCoinRatingController().isInDownTrend();
-    }
-    
-    @Override
-    protected void onBuySell(boolean isBuying, BigDecimal price, BigDecimal executedQty) {
-        super.onBuySell(isBuying, price, executedQty);
-        if (isBuying) {
-            strategiesController.getTradingRecord().enter(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
-        } else {
-            strategiesController.getTradingRecord().exit(series.getBarCount()-1, Decimal.valueOf(price), Decimal.valueOf(executedQty));
-        }
-    }
-    
-    @Override
-    protected void checkStatus() {
-        StrategiesController.StrategiesAction saction = strategiesController.checkStatus((pyramidSize != 0 || !longModeAuto), 
-            checkOtherStrategies
-        );
-        if (saction == StrategiesController.StrategiesAction.DO_ENTER && pyramidSize < pyramidAutoMaxSize) {
-            if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice, false);
-        } else if (saction == StrategiesController.StrategiesAction.DO_EXIT && pyramidSize > -pyramidAutoMaxSize) {
-            doExit(lastStrategyCheckPrice, false);
-        }
-        super.checkStatus();
-    }
-    
-    @Override
-    protected void setNewSeries() {
-        series = strategiesController.resetSeries();
-    }
-    
-    @Override
-    protected void resetSeries() {
-        
-        if (strategiesController.getMainStrategy().equals("Neural Network")) {
-            predictor = new NeuralNetworkStockPredictor(symbol);
-            if (!predictor.isHaveNetworkInFile() && predictor.isHaveNetworkInBaseFile()) {
-                predictor.toBase();
-            }
-        }
-        
-        super.resetSeries();
-        
-        if (predictor != null && predictor.isHaveNetworkInFile()) {
-            predictor.initMinMax(series);
-        }
-    }
-    
-    @Override
-    protected void resetBars() {
-        super.resetBars();
-        if (signalItem != null) {
-            setMainStrategy("Signal");
-            strategiesController.startSignal(signalItem);
-        }
-        strategiesController.resetStrategies();
     }
     
     @Override
     protected void runStart() {
         super.runStart();
-
-        if (signalItem != null) {
-            setMainStrategy("Signal");
-            strategiesController.startSignal(signalItem);
-        }
-        strategiesController.resetStrategies();
-        
         if (isTryingToSellOnPeak) {
             initSellAllOnPeak();
         } else if (isTryingToBuyOnDip) {
@@ -130,25 +46,6 @@ public class TradePairProcess extends AbstractTradePairProcess implements TradeS
         }
 
         app.log(symbol + " initialized. Current price = " + NumberFormatter.df8.format(currentPrice));
-    }
-    
-    @Override
-    protected void runBody() {
-        super.runBody();
-        if(strategiesController.getMainStrategy().equals("Neural Network")) {
-            if (predictor != null && !predictor.isLearning() && predictor.isHaveNetworkInFile()) {
-                Bar nbar = predictor.predictNextBar(series);
-                app.log(symbol + " NEUR prediction = " + NumberFormatter.df8.format(nbar.getClosePrice()));
-            }
-        }
-    }
-    
-    @Override
-    protected void onBarUpdate(Bar nbar, boolean is_fin) {
-        super.onBarUpdate(nbar, is_fin);
-        if (is_fin && (predictor == null || !predictor.isLearning())) {
-            app.log(symbol + " current price = " + NumberFormatter.df8.format(currentPrice));
-        }
     }
     
     private void initBuyOnDip() {
@@ -234,85 +131,6 @@ public class TradePairProcess extends AbstractTradePairProcess implements TradeS
             }
         }
         app.log("Can't set SellAllPeak mode for " + symbol, true, true);
-    }
-    
-    public void doNetworkAction(String train, String base) {
-        if (strategiesController.getMainStrategy().equals("Neural Network")) {
-            predictor = new NeuralNetworkStockPredictor(base.equals("COIN") ? symbol : "");
-            switch (train) {
-                case "TRAIN":
-                    predictor.start();
-                    break;
-                case "ADDSET":
-                    predictor.setSaveTrainData(true);
-                    predictor.appendTrainingData(series);
-                    break;
-                case "STOP":
-                    if (predictor.getLearningRule() != null) {
-                        predictor.getLearningRule().stopLearning();
-                    }   break;
-                default:
-                    break;
-            }
-        }
-    }
-    
-    @Override
-    public void doShowPlot() {
-        StrategyItem item = strategiesController.getMainStrategyItem();
-        plot = new CurrencyPlot(symbol, series, strategiesController.getTradingRecord(), item != null ? item.getInitializer() : null);
-        for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
-            plot.addMarker(
-                strategiesController.getStrategyMarkers().get(i).label, 
-                strategiesController.getStrategyMarkers().get(i).timeStamp, 
-                strategiesController.getStrategyMarkers().get(i).typeIndex
-            );
-        }
-        
-        if (predictor != null && predictor.isHaveNetworkInFile()) {
-            List<Bar> pbars = predictor.predictPreviousBars(series);
-            pbars.forEach((pbar)->{
-                plot.addPoint(pbar.getEndTime().toInstant().toEpochMilli(), pbar.getClosePrice().doubleValue());
-            });
-        }
-        plot.showPlot();
-    }
-    
-    /**
-     * @param mainStrategy the mainStrategy to set
-     */
-    public void setMainStrategy(String mainStrategy) {
-        if (signalItem != null) {
-            mainStrategy = "Signal";
-        }
-        strategiesController.setMainStrategy(mainStrategy);
-        if (!mainStrategy.equals("Signal")) {
-            need_bar_reset = true;
-            if (predictor != null) {
-                if (predictor.getLearningRule() != null) {
-                    predictor.getLearningRule().stopLearning();
-                }
-                predictor = null;
-            }
-        }
-    }
-    
-    public void doShowStatistics() {
-        strategiesController.logStatistics(false);
-    }
-    
-    public void setCheckOtherStrategies(boolean checkOtherStrategies) {
-        this.checkOtherStrategies = checkOtherStrategies;
-    }
-
-    @Override
-    public SignalItem getSignalItem() {
-        return signalItem;
-    }
-    
-    @Override
-    public void setSignalItem(SignalItem item) {
-        signalItem = item;
     }
     
     /**

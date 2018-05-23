@@ -154,8 +154,8 @@ public class CurrencyPlot extends JFrame {
         };
         renderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
         renderer.setUseOutlinePaint(false);
-        renderer.setUpPaint(Color.GREEN);
-        renderer.setDownPaint(Color.RED);
+        renderer.setUpPaint(Color.decode("#00b900"));
+        renderer.setDownPaint(Color.decode("#b90000"));
         mainPlot = chart.getXYPlot();
         mainPlot.setRenderer(renderer);
 
@@ -166,10 +166,11 @@ public class CurrencyPlot extends JFrame {
         renderer2.setSeriesPaint(0, Color.BLUE);
         renderer2.setSeriesPaint(1, Color.MAGENTA);
         renderer2.setSeriesPaint(2, Color.ORANGE);
-        renderer2.setSeriesPaint(3, Color.CYAN);
-        renderer2.setSeriesPaint(4, Color.decode("#217300"));
-        renderer2.setSeriesPaint(5, Color.decode("#852cbb"));
-        renderer2.setSeriesPaint(6, Color.decode("#a09dff"));
+        renderer2.setSeriesPaint(3, Color.GREEN);
+        renderer2.setSeriesPaint(4, Color.RED);
+        renderer2.setSeriesPaint(5, Color.decode("#217300"));
+        renderer2.setSeriesPaint(6, Color.decode("#852cbb"));
+        renderer2.setSeriesPaint(7, Color.decode("#a09dff"));
         renderer2.setSeriesStroke(0, new BasicStroke(2));
         renderer2.setSeriesStroke(1, new BasicStroke(2));
         renderer2.setSeriesStroke(2, new BasicStroke(2));
@@ -177,6 +178,7 @@ public class CurrencyPlot extends JFrame {
         renderer2.setSeriesStroke(4, new BasicStroke(2));
         renderer2.setSeriesStroke(5, new BasicStroke(2));
         renderer2.setSeriesStroke(6, new BasicStroke(2));
+        renderer2.setSeriesStroke(7, new BasicStroke(2));
         mainPlot.setRenderer(1, renderer2);
 
         points = new org.jfree.data.time.TimeSeries("Points");
@@ -184,7 +186,7 @@ public class CurrencyPlot extends JFrame {
         mainPlot.setDataset(2, pointsDataset);
         mainPlot.mapDatasetToRangeAxis(2, 0);
         XYLineAndShapeRenderer renderer3 = new XYLineAndShapeRenderer(false, true);
-        renderer3.setSeriesPaint(0, Color.DARK_GRAY);
+        renderer3.setSeriesPaint(0, Color.CYAN);
         mainPlot.setRenderer(2, renderer3);
         
         // Misc
@@ -223,8 +225,8 @@ public class CurrencyPlot extends JFrame {
         }
     }
     
-    public void addMarker(String label, double value, int typeIndex) {
-        ValueMarker marker = new ValueMarker(value);
+    public void addMarker(String label, double timevalue, int typeIndex) {
+        ValueMarker marker = new ValueMarker(timevalue);
         marker.setLabel(label);
         if (typeIndex < 2) {
             marker.setStroke(new BasicStroke(2));
@@ -233,7 +235,7 @@ public class CurrencyPlot extends JFrame {
             marker.setStroke(new BasicStroke(1));
             marker.setPaint(typeIndex==2 ? new Color(255, 189, 145) : new Color(255, 140, 255));
         }
-        marker.setAlpha(0.15f);
+        marker.setAlpha(0.5f);
         mainPlot.addDomainMarker(marker);
     }
     
