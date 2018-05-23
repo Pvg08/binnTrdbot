@@ -13,8 +13,10 @@ import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
+import com.evgcompany.binntrdbot.strategies.core.OrderActionMarker;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +89,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected boolean inAPIOrder = false;
     protected boolean forceMarketOrders = false;
     
-    protected final long maxProcessUpdateIntervalMillis = 10 * 60 * 1000; // 10m
+    protected final List<OrderActionMarker> markers = new ArrayList<>();
     
     public AbstractTradePairProcess(TradingAPIAbstractInterface client, String pair) {
         super(pair);
@@ -115,7 +117,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             price = currentPrice;
             DepthCacheProcess process = info.getDepthProcessForPair(symbol);
-            if (!process.isStopped() && process.getMillisFromLastUpdate() < maxProcessUpdateIntervalMillis) {
+            if (!process.isStopped() && !process.isObsolete()) {
                 if (is_enter) {
                     Map.Entry<BigDecimal, BigDecimal> bestAsk = process.getBestAsk();
                     if (bestAsk != null) price = bestAsk.getKey();
@@ -385,7 +387,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     }
     
     protected void onBuySell(boolean isBuying, BigDecimal price, BigDecimal executedQty) {
-        // nothing
+        markers.add(new OrderActionMarker(isBuying, price != null ? price.doubleValue() : 0));
     }
     
     protected void onOrderEvent(
@@ -528,6 +530,9 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     
     public void doShowPlot() {
         plot = new CurrencyPlot(symbol, series, null, null);
+        markers.forEach((marker) -> {
+            plot.addMarker(marker);
+        });
         plot.showPlot();
     }
     

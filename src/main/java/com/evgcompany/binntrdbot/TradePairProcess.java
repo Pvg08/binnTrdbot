@@ -68,10 +68,23 @@ public class TradePairProcess extends TradePairSignalProcess {
 
             CoinBalanceItem qbalance = BalanceController.getInstance().getCoinBalanceInfo(baseAssetSymbol);
             BigDecimal free_cnt = qbalance.getFreeValue();
-            BigDecimal order_cnt = BigDecimal.ZERO;
             BigDecimal acc_cnt = BigDecimal.ZERO;
             int ordersCount = 0;
             
+            List<Long> ordersToCancel = new ArrayList<>();
+
+            if (sellOpenOrdersOnPeak) {
+                List<Order> openOrders = client.getOpenOrders(symbol);
+                for (int i=0; i < openOrders.size(); i++) {
+                    if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL) {
+                        ordersToCancel.add(openOrders.get(i).getOrderId());
+                    }
+                }
+            }
+            
+            if (!ordersToCancel.isEmpty()) {
+                free_cnt = qbalance.getValue();
+            }
             for (Trade trade : trades) {
                 if (trade.isBuyer() && acc_cnt.compareTo(free_cnt) < 0) {
                     BigDecimal ctprice = new BigDecimal(trade.getPrice());
@@ -89,20 +102,8 @@ public class TradePairProcess extends TradePairSignalProcess {
                 avgTradeBuyPrice = BigDecimal.valueOf(info.getLastPrices().get(symbol));
                 ordersCount = 1;
             }
-            
-            List<Long> ordersToCancel = new ArrayList<>();
 
-            if (sellOpenOrdersOnPeak) {
-                List<Order> openOrders = client.getOpenOrders(symbol);
-                for (int i=0; i < openOrders.size(); i++) {
-                    if (openOrders.get(i).getStatus() == OrderStatus.NEW && openOrders.get(i).getSide() == OrderSide.SELL) {
-                        ordersToCancel.add(openOrders.get(i).getOrderId());
-                        order_cnt = order_cnt.add(new BigDecimal(openOrders.get(i).getOrigQty()));
-                    }
-                }
-            }
-
-            if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || (order_cnt.compareTo(BigDecimal.ZERO) > 0 && !ordersToCancel.isEmpty())) {
+            if (free_cnt.compareTo(BigDecimal.ZERO) > 0 || !ordersToCancel.isEmpty()) {
                 if (!ordersToCancel.isEmpty()) {
                     app.log("Canceling orders: " + ordersToCancel, true, true);
                     ordersController.cancelOrdersList(orderCID, ordersToCancel);
@@ -122,6 +123,7 @@ public class TradePairProcess extends TradePairSignalProcess {
                         stopAfterFinish = true;
                         longModeAuto = true;
                         pyramidSize = ordersCount;
+                        ordersController.setPairOrderPrice(orderCID, orderAvgPrice);
                         ordersController.updatePairTradeText(orderCID);
                         return;
                     } else {

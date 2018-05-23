@@ -10,7 +10,6 @@ import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
-import java.util.Arrays;
 
 /**
  *
@@ -88,7 +87,11 @@ public class OrderPairItem {
             
             if (marker.isEmpty()) {
                 if (inTransaction) {
-                    txt = txt + " [PENDING "+(lastTransactionSell ? "SELL" : "BUY")+" "+(Math.abs(pyramidSize) + 1)+"]";
+                    txt = txt + " [PENDING "+(lastTransactionSell ? "SELL" : "BUY");
+                    if (pyramidSize < 0 && lastTransactionSell || pyramidSize > 0 && !lastTransactionSell) {
+                        txt = txt + " " + (Math.abs(pyramidSize) + 1);
+                    }
+                    txt = txt + "]";
                 } else if (pyramidSize < 0) {
                     txt = txt + " [ORDER SHORT "+(-pyramidSize)+"]";
                 } else if (pyramidSize > 0) {

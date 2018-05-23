@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.misc.CurrencyPlot;
+import com.evgcompany.binntrdbot.strategies.core.OrderActionType;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import com.evgcompany.binntrdbot.strategies.core.StrategyItem;
 import java.math.BigDecimal;
@@ -21,8 +22,6 @@ public class TradePairStrategyProcess extends AbstractTradePairProcess {
     protected StrategiesController strategiesController = null;
     
     protected boolean checkOtherStrategies = true;
-    
-    private String lastOrderMarker = "";
     
     public TradePairStrategyProcess(TradingAPIAbstractInterface client, String pair) {
         super(client, pair);
@@ -48,13 +47,13 @@ public class TradePairStrategyProcess extends AbstractTradePairProcess {
     
     @Override
     protected void checkStatus() {
-        StrategiesController.StrategiesAction saction = strategiesController.checkStatus((pyramidSize != 0 || !longModeAuto), 
+        OrderActionType saction = strategiesController.checkStatus((pyramidSize != 0 || !longModeAuto), 
             checkOtherStrategies,
             currentPrice.doubleValue()
         );
-        if (saction == StrategiesController.StrategiesAction.DO_ENTER && pyramidSize < pyramidAutoMaxSize) {
+        if (saction == OrderActionType.DO_STRATEGY_ENTER && pyramidSize < pyramidAutoMaxSize) {
             if (canBuyForCoinRating()) doEnter(lastStrategyCheckPrice, false);
-        } else if (saction == StrategiesController.StrategiesAction.DO_EXIT && pyramidSize > -pyramidAutoMaxSize) {
+        } else if (saction == OrderActionType.DO_STRATEGY_EXIT && pyramidSize > -pyramidAutoMaxSize) {
             doExit(lastStrategyCheckPrice, false);
         }
         super.checkStatus();
@@ -87,16 +86,12 @@ public class TradePairStrategyProcess extends AbstractTradePairProcess {
     public void doShowPlot() {
         StrategyItem item = strategiesController.getMainStrategyItem();
         plot = new CurrencyPlot(symbol, series, strategiesController.getTradingRecord(), item != null ? item.getInitializer() : null);
-        for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
-            plot.addMarker(
-                strategiesController.getStrategyMarkers().get(i).label, 
-                strategiesController.getStrategyMarkers().get(i).timeStamp, 
-                strategiesController.getStrategyMarkers().get(i).typeIndex
-            );
-            if (strategiesController.getStrategyMarkers().get(i).value > 0) {
-                plot.addPoint(strategiesController.getStrategyMarkers().get(i).timeStamp, strategiesController.getStrategyMarkers().get(i).value);
-            }
-        }
+        strategiesController.getStrategyMarkers().forEach((marker) -> {
+            plot.addMarker(marker);
+        });
+        markers.forEach((marker) -> {
+            plot.addMarker(marker);
+        });
         plot.showPlot();
     }
     

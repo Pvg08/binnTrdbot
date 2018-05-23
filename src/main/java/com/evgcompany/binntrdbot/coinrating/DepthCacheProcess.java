@@ -43,6 +43,8 @@ public class DepthCacheProcess {
     
     private int registered = 0;
 
+    protected final long maxProcessUpdateIntervalMillis = 10 * 60 * 1000; // 10m
+    
     public DepthCacheProcess(String symbol) {
         this.symbol = symbol;
     }
@@ -124,6 +126,9 @@ public class DepthCacheProcess {
 
     public long getMillisFromLastUpdate() {
         return System.currentTimeMillis() - lastUpdateMillis;
+    }
+    public boolean isObsolete() {
+        return getMillisFromLastUpdate() > maxProcessUpdateIntervalMillis;
     }
     
     public boolean isStopped() {

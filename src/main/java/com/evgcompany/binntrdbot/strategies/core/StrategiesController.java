@@ -33,13 +33,6 @@ import org.ta4j.core.trading.rules.*;
  */
 public class StrategiesController {
 
-    public enum StrategiesMode {
-       NORMAL, BUY_DIP, SELL_UP
-    }
-    public enum StrategiesAction {
-       DO_NOTHING, DO_ENTER, DO_EXIT, DO_ENTER_SECONDARY, DO_LEAVE_SECONDARY
-    }
-    
     private mainApplication app = null;
     private OrdersController ordersController = null;
     private TimeSeries series = null;
@@ -52,7 +45,7 @@ public class StrategiesController {
     private String mainStrategy = "Auto";
     private int strategyItemIndex = -1;
     private String groupName;
-    private final List<StrategyMarker> markers = new ArrayList<>();
+    private final List<OrderActionMarker> markers = new ArrayList<>();
     private TradingRecord tradingRecord = null;
     
     public StrategiesController(String groupName) {
@@ -76,7 +69,7 @@ public class StrategiesController {
         return series;
     }
     
-    public List<StrategyMarker> getStrategyMarkers() {
+    public List<OrderActionMarker> getStrategyMarkers() {
         return markers;
     }
     
@@ -115,25 +108,30 @@ public class StrategiesController {
     }
     
     public void addStrategyMarker(boolean is_enter, String strategy_name, Double price) {
-        if (ordersController != null) {
-            StrategyMarker newm = new StrategyMarker();
-            newm.label = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
-            newm.timeStamp = ordersController.getClient().getAlignedCurrentTimeMillis();
-            newm.value = price != null ? price : 0;
-            if (strategy_name.equals(mainStrategy)) {
-                newm.typeIndex = is_enter ? 0 : 1;
-            } else {
-                newm.typeIndex = is_enter ? 2 : 3;
-            }
-            markers.add(newm);
-        }
+        addStrategyMarker(is_enter, ordersController.getClient().getAlignedCurrentTimeMillis(), strategy_name, price);
     }
     
-    private void addStrategyPastMarker(boolean is_enter, long timestamp, String strategy_name) {
-        StrategyMarker newm = new StrategyMarker();
-        newm.label = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
+    private void addStrategyMarker(boolean is_enter, long timestamp, String strategy_name, Double price) {
+        String newlabel = (is_enter ? "Enter" : "Exit") + " (" + strategy_name + ")";
+        if (!markers.isEmpty() && series != null && !series.isEmpty()) {
+            OrderActionMarker lastM = markers.get(markers.size()-1);
+            if ((timestamp - lastM.timeStamp) < (0.95 * series.getFirstBar().getTimePeriod().toMillis()) && (lastM.label.endsWith(newlabel) || lastM.label.startsWith(newlabel))) {
+                return;
+            } else if ((timestamp - lastM.timeStamp) < (0.01 * series.getFirstBar().getTimePeriod().toMillis())) {
+                lastM.label = lastM.label + ", " + newlabel;
+                timestamp = timestamp + 1;
+                newlabel = "";
+            }
+        }
+        OrderActionMarker newm = new OrderActionMarker();
+        newm.label = newlabel;
         newm.timeStamp = timestamp;
-        newm.typeIndex = is_enter ? 0 : 1;
+        newm.value = price != null ? price : 0;
+        if (strategy_name.equals(mainStrategy)) {
+            newm.action = is_enter ? OrderActionType.DO_STRATEGY_ENTER : OrderActionType.DO_STRATEGY_EXIT;
+        } else {
+            newm.action = is_enter ? OrderActionType.DO_STRATEGY_ENTER_SECONDARY : OrderActionType.DO_STRATEGY_EXIT_SECONDARY;
+        }
         markers.add(newm);
     }
     
@@ -155,11 +153,11 @@ public class StrategiesController {
                 org.ta4j.core.Trade rtrade = trlist.get(k);
                 if (rtrade.getEntry() != null) {
                     index = rtrade.getEntry().getIndex();
-                    addStrategyPastMarker(true, series.getBar(index).getBeginTime().toInstant().toEpochMilli(), mainStrategy);
+                    addStrategyMarker(true, series.getBar(index).getBeginTime().toInstant().toEpochMilli(), mainStrategy, rtrade.getEntry().getPrice().doubleValue());
                 }
                 if (rtrade.getExit() != null) {
                     index = rtrade.getExit().getIndex();
-                    addStrategyPastMarker(false, series.getBar(index).getEndTime().toInstant().toEpochMilli(), mainStrategy);
+                    addStrategyMarker(false, series.getBar(index).getEndTime().toInstant().toEpochMilli(), mainStrategy, rtrade.getEntry().getPrice().doubleValue());
                 }
             }
         }
@@ -210,10 +208,10 @@ public class StrategiesController {
         strategies.put(entry.getStrategyName(), nstrategy);
         strategyItemIndex = 0;
 
-        StrategyMarker newm = new StrategyMarker();
+        OrderActionMarker newm = new OrderActionMarker();
         newm.label = "Signal";
         newm.timeStamp = item.getLocalMillis();
-        newm.typeIndex = 0;
+        newm.action = OrderActionType.DO_SIGNAL_START;
         markers.add(newm);
     }
     
@@ -518,7 +516,7 @@ public class StrategiesController {
         return subseries;
     }
     
-    public StrategiesAction checkStatus(boolean canExit, boolean checkOtherStrategies, Double price) {
+    public OrderActionType checkStatus(boolean canExit, boolean checkOtherStrategies, Double price) {
         int endIndex = series.getEndIndex();
         
         boolean shouldEnter = strategies.get(mainStrategy).shouldEnter(endIndex, tradingRecord);
@@ -533,13 +531,13 @@ public class StrategiesController {
         
         if (canExit) {
             if (shouldExit) {
-                return StrategiesAction.DO_EXIT;
+                return OrderActionType.DO_STRATEGY_EXIT;
             } else if (shouldEnter) {
                 app.log(groupName + " can enter here but not need it...", false, true);
             }
         } else {
             if (shouldEnter) {
-                return StrategiesAction.DO_ENTER;
+                return OrderActionType.DO_STRATEGY_ENTER;
             } else if (shouldExit) {
                 app.log(groupName + " can exit here but not need it...", false, true);
             }
@@ -569,7 +567,7 @@ public class StrategiesController {
             }
         }
 
-        return StrategiesAction.DO_NOTHING;
+        return OrderActionType.DO_NOTHING;
     }
 
     public StrategyItem getMainStrategyItem() {

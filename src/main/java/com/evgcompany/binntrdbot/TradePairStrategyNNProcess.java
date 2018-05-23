@@ -72,7 +72,8 @@ public class TradePairStrategyNNProcess extends TradePairSignalProcess {
                 case "STOP":
                     if (predictor.getLearningRule() != null) {
                         predictor.getLearningRule().stopLearning();
-                    }   break;
+                    }
+                    break;
                 default:
                     break;
             }
@@ -83,14 +84,12 @@ public class TradePairStrategyNNProcess extends TradePairSignalProcess {
     public void doShowPlot() {
         StrategyItem item = strategiesController.getMainStrategyItem();
         plot = new CurrencyPlot(symbol, series, strategiesController.getTradingRecord(), item != null ? item.getInitializer() : null);
-        for(int i=0; i<strategiesController.getStrategyMarkers().size(); i++) {
-            plot.addMarker(
-                strategiesController.getStrategyMarkers().get(i).label, 
-                strategiesController.getStrategyMarkers().get(i).timeStamp, 
-                strategiesController.getStrategyMarkers().get(i).typeIndex
-            );
-        }
-        
+        strategiesController.getStrategyMarkers().forEach((marker) -> {
+            plot.addMarker(marker);
+        });
+        markers.forEach((marker) -> {
+            plot.addMarker(marker);
+        });
         if (predictor != null && predictor.isHaveNetworkInFile()) {
             List<Bar> pbars = predictor.predictPreviousBars(series);
             pbars.forEach((pbar)->{

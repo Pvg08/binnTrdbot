@@ -9,6 +9,7 @@ import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.signal.TradeSignalProcessInterface;
+import com.evgcompany.binntrdbot.strategies.core.OrderActionType;
 import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -41,14 +42,8 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
         tradingBalanceQuotePercent = BigDecimal.valueOf(0);
         tradingBalanceMainValue = BigDecimal.valueOf(0.0005);
         stopAfterFinish = true;
-    }
-
-    @Override
-    protected void onBuySell(boolean isBuying, BigDecimal price, BigDecimal executedQty) {
-        super.onBuySell(isBuying, price, executedQty);
-        if (isBuying) {
-            strategiesController.addStrategyMarker(true, "Wave", price.doubleValue());
-        }
+        super.setMainStrategy("EMA");
+        strategiesController.getMainStrategyItem().getConfig().setParam("EMA-TimeFrame", BigDecimal.valueOf(12));
     }
     
     @Override
@@ -64,7 +59,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
         BigDecimal checkPrice = currentPrice;
         
         DepthCacheProcess process = info.getDepthProcessForPair(symbol);
-        if (!process.isStopped() && process.getMillisFromLastUpdate() < maxProcessUpdateIntervalMillis) {
+        if (!process.isStopped() && !process.isObsolete()) {
             Map.Entry<BigDecimal, BigDecimal> bestAsk = process.getBestAsk();
             if (bestAsk != null) checkPrice = bestAsk.getKey();
         }
@@ -96,7 +91,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
         }
         
         checkPrice = currentPrice;
-        if (!process.isStopped() && process.getMillisFromLastUpdate() < maxProcessUpdateIntervalMillis) {
+        if (!process.isStopped() && !process.isObsolete()) {
             Map.Entry<BigDecimal, BigDecimal> bestBid = process.getBestBid();
             if (bestBid != null) checkPrice = bestBid.getKey();
         }
@@ -115,7 +110,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
             BigDecimal aimPrice = orderAvgPrice.multiply(BigDecimal.valueOf(checkProfitPercent).add(BigDecimal.valueOf(100))).divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP);
             System.out.println(symbol + " Aim price = " + aimPrice);
             if (checkPrice.compareTo(aimPrice) > 0) {
-                StrategiesController.StrategiesAction saction = StrategiesController.StrategiesAction.DO_EXIT;
+                OrderActionType saction = OrderActionType.DO_STRATEGY_EXIT;
                 if (
                         !strategiesController.getMainStrategy().equals("No Strategy") && 
                         !strategiesController.getMainStrategy().equals("Neural Network") && 
@@ -124,12 +119,17 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
                     System.out.println(symbol + " Checking strategy for exit...");
                     saction = strategiesController.checkStatus(true, false, null);
                 }
-                if (saction == StrategiesController.StrategiesAction.DO_EXIT) {
+                if (saction == OrderActionType.DO_STRATEGY_EXIT) {
                     System.out.println(symbol + " Exit from wave order...");
                     doExit(checkPrice, true);
                 }
             }
         }
+    }
+    
+    @Override
+    public void setMainStrategy(String mainStrategy) {
+        // nothing
     }
     
     @Override

@@ -192,14 +192,16 @@ public class CoinCycleController extends PeriodicProcessThread {
     public double getEdgeWeight(String symbol1, String symbol2) {
         if (useDepsetUpdates) {
             DepthCacheProcess proc = info.getDepthProcessForPair(symbol1 + symbol2);
-            if (proc != null) { // selling
-                Map.Entry<BigDecimal, BigDecimal> ask = proc.getBestAsk();
-                if (ask != null) return ask.getKey().doubleValue() * (1-depsetBidAskAddPercent*0.01);
-            } else {
-                proc = info.getDepthProcessForPair(symbol2 + symbol1);
-                if (proc != null) { // buying
-                    Map.Entry<BigDecimal, BigDecimal> bid = proc.getBestBid();
-                    if (bid != null) return 1/bid.getKey().doubleValue() * (1+depsetBidAskAddPercent*0.01);
+            if (!proc.isStopped() && !proc.isObsolete()) {
+                if (proc != null) { // selling
+                    Map.Entry<BigDecimal, BigDecimal> ask = proc.getBestAsk();
+                    if (ask != null) return ask.getKey().doubleValue() * (1-depsetBidAskAddPercent*0.01);
+                } else {
+                    proc = info.getDepthProcessForPair(symbol2 + symbol1);
+                    if (proc != null) { // buying
+                        Map.Entry<BigDecimal, BigDecimal> bid = proc.getBestBid();
+                        if (bid != null) return 1/bid.getKey().doubleValue() * (1+depsetBidAskAddPercent*0.01);
+                    }
                 }
             }
         }

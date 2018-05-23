@@ -6,8 +6,6 @@
 package com.evgcompany.binntrdbot.strategies.core;
 
 import com.evgcompany.binntrdbot.analysis.ProfitWithoutComissionCriterion;
-import com.evgcompany.binntrdbot.analysis.StrategyConfig;
-import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
 import com.evgcompany.binntrdbot.analysis.TrailingStopLossRule;
 import com.evgcompany.binntrdbot.mainApplication;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;

@@ -5,6 +5,7 @@
  */
 package com.evgcompany.binntrdbot.misc;
 
+import com.evgcompany.binntrdbot.strategies.core.OrderActionMarker;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Paint;
@@ -29,7 +30,7 @@ import org.jfree.data.xy.OHLCDataset;
 import org.jfree.data.xy.XYDataset;
 import org.ta4j.core.Bar;
 import org.ta4j.core.TimeSeries;
-import com.evgcompany.binntrdbot.analysis.StrategyDatasetInitializer;
+import com.evgcompany.binntrdbot.strategies.core.StrategyDatasetInitializer;
 import org.ta4j.core.TradingRecord;
 
 /**
@@ -225,22 +226,59 @@ public class CurrencyPlot extends JFrame {
         }
     }
     
-    public void addMarker(String label, double timevalue, int typeIndex) {
-        ValueMarker marker = new ValueMarker(timevalue);
-        marker.setLabel(label);
-        if (typeIndex < 2) {
-            marker.setStroke(new BasicStroke(2));
-            marker.setPaint(typeIndex==0 ? Color.ORANGE : Color.MAGENTA);
-        } else {
-            marker.setStroke(new BasicStroke(1));
-            marker.setPaint(typeIndex==2 ? new Color(255, 189, 145) : new Color(255, 140, 255));
+    public void addMarker(OrderActionMarker actionMarker) {
+        ValueMarker marker = new ValueMarker(actionMarker.timeStamp);
+        marker.setLabel(actionMarker.label);
+        
+        if (null != actionMarker.action) switch (actionMarker.action) {
+            case DO_STRATEGY_ENTER:
+                marker.setStroke(new BasicStroke(1));
+                marker.setPaint(new Color(255, 189, 145));
+                marker.setAlpha(0.5f);
+                if (actionMarker.value > 0) addPoint(actionMarker.timeStamp, actionMarker.value);
+                break;
+            case DO_STRATEGY_EXIT:
+                marker.setStroke(new BasicStroke(1));
+                marker.setPaint(new Color(255, 140, 255));
+                marker.setAlpha(0.5f);
+                if (actionMarker.value > 0) addPoint(actionMarker.timeStamp, actionMarker.value);
+                break;
+            case DO_STRATEGY_ENTER_SECONDARY:
+                marker.setStroke(new BasicStroke(1));
+                marker.setPaint(new Color(255, 189, 145));
+                marker.setAlpha(0.2f);
+                break;
+            case DO_STRATEGY_EXIT_SECONDARY:
+                marker.setStroke(new BasicStroke(1));
+                marker.setPaint(new Color(255, 140, 255));
+                marker.setAlpha(0.2f);
+                break;
+            case DO_SIGNAL_START:
+                marker.setStroke(new BasicStroke(1));
+                marker.setPaint(new Color(0, 255, 255));
+                marker.setAlpha(0.9f);
+                break;
+            case DO_BUY:
+                marker.setStroke(new BasicStroke(2));
+                marker.setPaint(Color.ORANGE);
+                marker.setAlpha(1.0f);
+                if (actionMarker.value > 0) addPoint(actionMarker.timeStamp, actionMarker.value);
+                break;
+            case DO_SELL:
+                marker.setStroke(new BasicStroke(2));
+                marker.setPaint(Color.MAGENTA);
+                marker.setAlpha(1.0f);
+                if (actionMarker.value > 0) addPoint(actionMarker.timeStamp, actionMarker.value);
+                break;
+            default:
+                break;
         }
-        marker.setAlpha(0.5f);
+
         mainPlot.addDomainMarker(marker);
     }
     
     public void addPoint(double x, double y) {
-        points.add(new Second(Date.from(Instant.ofEpochMilli((long) x))), y);
+        points.addOrUpdate(new Second(Date.from(Instant.ofEpochMilli((long) x))), y);
     }
     
     public void showPlot() {

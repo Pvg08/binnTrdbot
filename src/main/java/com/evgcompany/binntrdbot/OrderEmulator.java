@@ -10,6 +10,7 @@ import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.OrderType;
 import com.binance.api.client.domain.account.Order;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
+import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -81,12 +82,30 @@ public class OrderEmulator {
         boolean isBuying = order.getSide() == OrderSide.BUY;
         BigDecimal orderPrice = new BigDecimal(order.getPrice());
         BigDecimal currentPrice = BigDecimal.valueOf(CoinInfoAggregator.getInstance().getLastPrices().get(order.getSymbol()));
+        boolean actualPrice = false;
+        
+        DepthCacheProcess dpProcess = CoinInfoAggregator.getInstance().getDepthProcessForPair(order.getSymbol());
+        if (dpProcess != null && !dpProcess.isStopped() && !dpProcess.isObsolete()) {
+            if (isBuying) {
+                Map.Entry<BigDecimal, BigDecimal> bestAsk = dpProcess.getBestAsk();
+                if (bestAsk != null) {
+                    currentPrice = bestAsk.getKey();
+                    actualPrice = true;
+                }
+            } else {
+                Map.Entry<BigDecimal, BigDecimal> bestBid = dpProcess.getBestBid();
+                if (bestBid != null) {
+                    currentPrice = bestBid.getKey();
+                    actualPrice = true;
+                }
+            }
+        }
         
         if (order.getType() == OrderType.MARKET) {
             order.setPrice(numberFormatForOrder(currentPrice));
             addOrderExecutedQty(order, 100.0000001);
         } else {
-            currentPrice = currentPrice.multiply(BigDecimal.valueOf((isBuying ? 1.00001 : 0.99999)));
+            if (!actualPrice) currentPrice = currentPrice.multiply(BigDecimal.valueOf((isBuying ? 1.00001 : 0.99999)));
             if (isBuying) {
                 if (currentPrice.compareTo(orderPrice) <= 0) {
                     addOrderExecutedQty(order, Math.random() * 200);
