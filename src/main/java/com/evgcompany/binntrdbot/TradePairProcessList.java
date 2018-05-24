@@ -7,6 +7,7 @@ package com.evgcompany.binntrdbot;
 
 import java.awt.Desktop;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -34,10 +35,18 @@ public class TradePairProcessList {
     private boolean checkOtherStrategies = false;
     private boolean buyStop = false;
     private boolean sellStop = false;
-    private boolean allPairsWavesUsage = false;
     private int buyStopLimitedTimeout;
     private int sellStopLimitedTimeout;
     private int pyramidAutoMaxSize;
+    
+    private boolean allPairsWavesUsage = false;
+    private double wavesTradingBalancePercent;
+    private double wavesTradingBalanceMainValue;
+    private double wavesSecondaryPercent;
+    private double wavesIncKoef;
+    private double wavesInitialProfitPercent;
+    private double wavesMinProfitPercent;
+    private double wavesHalfDivideProfitOrdersCount;
     
     public TradePairProcessList() {
         this.ordersController = OrdersController.getInstance();
@@ -104,9 +113,13 @@ public class TradePairProcessList {
             ((TradePairProcess)nproc).setTryingToBuyDip(has_minus);
         }
         if (nproc instanceof TradePairWaveProcess) {
-            // @todo
-            //nproc.setTradingBalancePercent(tradingBalancePercent);
-            //nproc.setTradingBalanceMainValue(tradingBalanceMainValue);
+            ((TradePairWaveProcess)nproc).setTradingBalancePercent(wavesTradingBalancePercent);
+            ((TradePairWaveProcess)nproc).setTradingBalanceMainValue(wavesTradingBalanceMainValue);
+            ((TradePairWaveProcess)nproc).setWavesIncKoef(BigDecimal.valueOf(wavesIncKoef));
+            ((TradePairWaveProcess)nproc).setWavesSecondaryPercent(BigDecimal.valueOf(wavesSecondaryPercent));
+            ((TradePairWaveProcess)nproc).setMinProfitPercent(wavesMinProfitPercent);
+            ((TradePairWaveProcess)nproc).setInitialProfitPercent(wavesInitialProfitPercent);
+            ((TradePairWaveProcess)nproc).setHalfDivideProfitOrdersCount(wavesHalfDivideProfitOrdersCount);
         }
         
         if (run && pair_index < 0) {
@@ -169,7 +182,7 @@ public class TradePairProcessList {
                 ((TradePairProcess)nproc).setBuyOnStart(true);
             }
             if (nproc instanceof TradePairWaveProcess) {
-                // @todo
+                ((TradePairWaveProcess)nproc).setMinProfitPercent(0.1);
             }
 
             return addPair(nproc);
@@ -456,5 +469,103 @@ public class TradePairProcessList {
      */
     public void setTradingBalanceMainValue(double tradingBalanceMainValue) {
         this.tradingBalanceMainValue = tradingBalanceMainValue;
+    }
+
+    /**
+     * @return the wavesTradingBalancePercent
+     */
+    public double getWavesTradingBalancePercent() {
+        return wavesTradingBalancePercent;
+    }
+
+    /**
+     * @param wavesTradingBalancePercent the wavesTradingBalancePercent to set
+     */
+    public void setWavesTradingBalancePercent(double wavesTradingBalancePercent) {
+        this.wavesTradingBalancePercent = wavesTradingBalancePercent;
+    }
+
+    /**
+     * @return the wavesTradingBalanceMainValue
+     */
+    public double getWavesTradingBalanceMainValue() {
+        return wavesTradingBalanceMainValue;
+    }
+
+    /**
+     * @param wavesTradingBalanceMainValue the wavesTradingBalanceMainValue to set
+     */
+    public void setWavesTradingBalanceMainValue(double wavesTradingBalanceMainValue) {
+        this.wavesTradingBalanceMainValue = wavesTradingBalanceMainValue;
+    }
+
+    /**
+     * @return the wavesSecondaryPercent
+     */
+    public double getWavesSecondaryPercent() {
+        return wavesSecondaryPercent;
+    }
+
+    /**
+     * @param wavesSecondaryPercent the wavesSecondaryPercent to set
+     */
+    public void setWavesSecondaryPercent(double wavesSecondaryPercent) {
+        this.wavesSecondaryPercent = wavesSecondaryPercent;
+    }
+
+    /**
+     * @return the wavesIncKoef
+     */
+    public double getWavesIncKoef() {
+        return wavesIncKoef;
+    }
+
+    /**
+     * @param wavesIncKoef the wavesIncKoef to set
+     */
+    public void setWavesIncKoef(double wavesIncKoef) {
+        this.wavesIncKoef = wavesIncKoef;
+    }
+
+    /**
+     * @return the wavesInitialProfitPercent
+     */
+    public double getWavesInitialProfitPercent() {
+        return wavesInitialProfitPercent;
+    }
+
+    /**
+     * @param wavesInitialProfitPercent the wavesInitialProfitPercent to set
+     */
+    public void setWavesInitialProfitPercent(double wavesInitialProfitPercent) {
+        this.wavesInitialProfitPercent = wavesInitialProfitPercent;
+    }
+
+    /**
+     * @return the wavesMinProfitPercent
+     */
+    public double getWavesMinProfitPercent() {
+        return wavesMinProfitPercent;
+    }
+
+    /**
+     * @param wavesMinProfitPercent the wavesMinProfitPercent to set
+     */
+    public void setWavesMinProfitPercent(double wavesMinProfitPercent) {
+        this.wavesMinProfitPercent = wavesMinProfitPercent;
+    }
+
+    /**
+     * @return the wavesHalfDivideProfitOrdersCount
+     */
+    public double getWavesHalfDivideProfitOrdersCount() {
+        return wavesHalfDivideProfitOrdersCount;
+    }
+
+    /**
+     * @param wavesHalfDivideProfitOrdersCount the wavesHalfDivideProfitOrdersCount to set
+     */
+    public void setWavesHalfDivideProfitOrdersCount(double wavesHalfDivideProfitOrdersCount) {
+        this.wavesHalfDivideProfitOrdersCount = wavesHalfDivideProfitOrdersCount;
     }
 }

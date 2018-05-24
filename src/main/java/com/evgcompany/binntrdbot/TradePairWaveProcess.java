@@ -10,7 +10,6 @@ import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.signal.TradeSignalProcessInterface;
 import com.evgcompany.binntrdbot.strategies.core.OrderActionType;
-import com.evgcompany.binntrdbot.strategies.core.StrategiesController;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
@@ -27,6 +26,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
     private double initialProfitPercent = 5;
     private double minProfitPercent = 0.5;
     private double halfDivideProfitOrdersCount = 10;
+
     private final double minPriceChangeInitialPercent = 0.15;
     
     private BigDecimal minPrice = null;
@@ -39,10 +39,13 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
         pyramidAutoMaxSize = Integer.MAX_VALUE;
         longModeAuto = true;
         forceMarketOrders = true;
-        tradingBalanceQuotePercent = BigDecimal.valueOf(0);
-        tradingBalanceMainValue = BigDecimal.valueOf(0.0005);
         stopAfterFinish = true;
+    }
+    
+    @Override
+    protected void runStart() {
         super.setMainStrategy("EMA");
+        super.runStart();
         strategiesController.getMainStrategyItem().getConfig().setParam("EMA-TimeFrame", BigDecimal.valueOf(12));
     }
     

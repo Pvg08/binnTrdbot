@@ -31,6 +31,7 @@ import org.jfree.data.xy.XYDataset;
 import org.ta4j.core.Bar;
 import org.ta4j.core.TimeSeries;
 import com.evgcompany.binntrdbot.strategies.core.StrategyDatasetInitializer;
+import org.jfree.chart.util.ShapeUtils;
 import org.ta4j.core.TradingRecord;
 
 /**
@@ -188,6 +189,8 @@ public class CurrencyPlot extends JFrame {
         mainPlot.mapDatasetToRangeAxis(2, 0);
         XYLineAndShapeRenderer renderer3 = new XYLineAndShapeRenderer(false, true);
         renderer3.setSeriesPaint(0, Color.CYAN);
+        renderer3.setSeriesStroke(0, new BasicStroke(1));
+        renderer3.setSeriesShape(0, ShapeUtils.createDiagonalCross(3, 1));
         mainPlot.setRenderer(2, renderer3);
         
         // Misc

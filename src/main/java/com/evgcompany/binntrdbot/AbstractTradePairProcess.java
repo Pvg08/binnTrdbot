@@ -596,7 +596,10 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     /**
      * @param tradingBalancePercent the tradingBalancePercent to set
      */
-    public void setTradingBalancePercent(int tradingBalancePercent) {
+    public void setTradingBalancePercent(double tradingBalancePercent) {
+        this.tradingBalanceQuotePercent = BigDecimal.valueOf(tradingBalancePercent);
+    }
+    public void setTradingBalancePercent(long tradingBalancePercent) {
         this.tradingBalanceQuotePercent = BigDecimal.valueOf(tradingBalancePercent);
     }
 

@@ -150,6 +150,13 @@ public class mainApplication extends javax.swing.JFrame {
         config.addComponent(spinnerCycleMaxEnterCount, "cycle_maxcount");
         config.addComponent(checkBoxCycleDepthCheck, "cycle_depset");
         config.addComponent(checkBoxWavesUse, "waves_use");
+        config.addComponent(spinnerBuyWavesFirstPercent, "waves_buy_first_percent");
+        config.addComponent(spinnerBuyWavesFirstMainValue, "waves_buy_first_main");
+        config.addComponent(spinnerBuyWavesSecondPercent, "waves_buy_second_percent");
+        config.addComponent(spinnerBuyWavesIncKoef, "waves_buy_inc_koef");
+        config.addComponent(spinnerWavesMinProfitPercent, "waves_min_profit_percent");
+        config.addComponent(spinnerWavesInitialProfitPercent, "waves_initial_profit_percent");
+        config.addComponent(spinnerWavesHalfProfitOrdersCnt, "waves_half_profit_orders");
         config.addComponent(checkBoxTestAdd, "test_useadd");
         config.addComponent(textFieldTestCoinAdd, "test_addcoin");
         config.addComponent(spinnerTestAdd, "test_addcoinval");
@@ -208,8 +215,16 @@ public class mainApplication extends javax.swing.JFrame {
         pairProcessController.setSellStopLimitedTimeout(((Number) spinnerSellStopLimited.getValue()).intValue());
         pairProcessController.setUpdateDelay(((Number) spinnerUpdateDelay.getValue()).longValue());
         pairProcessController.setCheckOtherStrategies(checkBoxCheckOtherStrategies.isSelected());
-        pairProcessController.setAllPairsWavesUsage(checkBoxWavesUse.isSelected());
         pairProcessController.setPyramidAutoMaxSize(checkBoxPyramiding.isSelected() ? ((Number) spinnerPyramidingMaxC.getValue()).intValue() : 1);
+        pairProcessController.setAllPairsWavesUsage(checkBoxWavesUse.isSelected());
+        
+        pairProcessController.setWavesMinProfitPercent(((Number) spinnerWavesMinProfitPercent.getValue()).doubleValue());
+        pairProcessController.setWavesInitialProfitPercent(((Number) spinnerWavesInitialProfitPercent.getValue()).doubleValue());
+        pairProcessController.setWavesHalfDivideProfitOrdersCount(((Number) spinnerWavesHalfProfitOrdersCnt.getValue()).doubleValue());
+        pairProcessController.setWavesTradingBalancePercent(((Number) spinnerBuyWavesFirstPercent.getValue()).doubleValue());
+        pairProcessController.setWavesTradingBalanceMainValue(((Number) spinnerBuyWavesFirstMainValue.getValue()).doubleValue());
+        pairProcessController.setWavesSecondaryPercent(((Number) spinnerBuyWavesSecondPercent.getValue()).doubleValue());
+        pairProcessController.setWavesIncKoef(((Number) spinnerBuyWavesIncKoef.getValue()).doubleValue());
     }
     
     /**
@@ -331,6 +346,21 @@ public class mainApplication extends javax.swing.JFrame {
         checkBoxUseSignals = new javax.swing.JCheckBox();
         jPanel7 = new javax.swing.JPanel();
         checkBoxWavesUse = new javax.swing.JCheckBox();
+        spinnerBuyWavesFirstPercent = new javax.swing.JSpinner();
+        jLabel48 = new javax.swing.JLabel();
+        spinnerBuyWavesFirstMainValue = new javax.swing.JSpinner();
+        jLabel49 = new javax.swing.JLabel();
+        jLabel50 = new javax.swing.JLabel();
+        spinnerBuyWavesSecondPercent = new javax.swing.JSpinner();
+        jLabel51 = new javax.swing.JLabel();
+        spinnerBuyWavesIncKoef = new javax.swing.JSpinner();
+        jLabel52 = new javax.swing.JLabel();
+        jLabel53 = new javax.swing.JLabel();
+        spinnerWavesInitialProfitPercent = new javax.swing.JSpinner();
+        spinnerWavesHalfProfitOrdersCnt = new javax.swing.JSpinner();
+        jLabel54 = new javax.swing.JLabel();
+        spinnerWavesMinProfitPercent = new javax.swing.JSpinner();
+        jLabel55 = new javax.swing.JLabel();
         jPanel6 = new javax.swing.JPanel();
         checkBoxUseCycles = new javax.swing.JCheckBox();
         textFieldRestrictedCoins = new javax.swing.JTextField();
@@ -1193,21 +1223,128 @@ public class mainApplication extends javax.swing.JFrame {
 
         checkBoxWavesUse.setText("Use waves for all pair trades");
 
+        spinnerBuyWavesFirstPercent.setModel(new javax.swing.SpinnerNumberModel(Float.valueOf(0.0f), Float.valueOf(0.0f), Float.valueOf(100.0f), Float.valueOf(0.1f)));
+        spinnerBuyWavesFirstPercent.setValue(10);
+
+        jLabel48.setText("First order quote %:");
+
+        spinnerBuyWavesFirstMainValue.setModel(new javax.swing.SpinnerNumberModel(Float.valueOf(0.0f), Float.valueOf(0.0f), Float.valueOf(1000000.0f), Float.valueOf(0.0001f)));
+        spinnerBuyWavesFirstMainValue.setEditor(new javax.swing.JSpinner.NumberEditor(spinnerBuyWavesFirstMainValue, "0.0000"));
+        spinnerBuyWavesFirstMainValue.setValue(0);
+
+        jLabel49.setText("First order main value:");
+
+        jLabel50.setText("+");
+
+        spinnerBuyWavesSecondPercent.setModel(new javax.swing.SpinnerNumberModel(Float.valueOf(25.0f), Float.valueOf(1.0E-4f), Float.valueOf(100.0f), Float.valueOf(0.001f)));
+        spinnerBuyWavesSecondPercent.setValue(25);
+
+        jLabel51.setText("Second wave %:");
+
+        spinnerBuyWavesIncKoef.setModel(new javax.swing.SpinnerNumberModel(Float.valueOf(59.0f), Float.valueOf(1.0E-4f), Float.valueOf(10000.0f), Float.valueOf(0.001f)));
+        spinnerBuyWavesIncKoef.setValue(59);
+
+        jLabel52.setText("Inc koef:");
+
+        jLabel53.setText("Initial profit %:");
+
+        spinnerWavesInitialProfitPercent.setModel(new javax.swing.SpinnerNumberModel(Float.valueOf(8.0f), Float.valueOf(1.0E-4f), Float.valueOf(100.0f), Float.valueOf(0.001f)));
+        spinnerWavesInitialProfitPercent.setValue(8);
+
+        spinnerWavesHalfProfitOrdersCnt.setModel(new javax.swing.SpinnerNumberModel(11, 1, 1000, 1));
+        spinnerWavesHalfProfitOrdersCnt.setValue(11);
+
+        jLabel54.setText("Half profit orders count:");
+
+        spinnerWavesMinProfitPercent.setModel(new javax.swing.SpinnerNumberModel(Float.valueOf(0.75f), Float.valueOf(0.0f), Float.valueOf(100.0f), Float.valueOf(0.001f)));
+        spinnerWavesMinProfitPercent.setValue(0.75);
+
+        jLabel55.setText("Min profit %:");
+
         javax.swing.GroupLayout jPanel7Layout = new javax.swing.GroupLayout(jPanel7);
         jPanel7.setLayout(jPanel7Layout);
         jPanel7Layout.setHorizontalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel7Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(checkBoxWavesUse)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(jLabel52)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerBuyWavesIncKoef, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(jLabel51)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerBuyWavesSecondPercent, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addGap(32, 32, 32)
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(jLabel54)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerWavesHalfProfitOrdersCnt, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(jLabel53)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerWavesInitialProfitPercent, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(jLabel55)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(spinnerWavesMinProfitPercent, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(spinnerBuyWavesFirstPercent, javax.swing.GroupLayout.PREFERRED_SIZE, 77, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(18, 18, 18)
+                                .addComponent(jLabel50))
+                            .addComponent(jLabel48))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel49)
+                            .addGroup(jPanel7Layout.createSequentialGroup()
+                                .addComponent(spinnerBuyWavesFirstMainValue, javax.swing.GroupLayout.PREFERRED_SIZE, 77, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(72, 72, 72)
+                                .addComponent(checkBoxWavesUse)))))
+                .addContainerGap(278, Short.MAX_VALUE))
         );
         jPanel7Layout.setVerticalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel7Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(checkBoxWavesUse)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel48)
+                    .addComponent(jLabel49))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(spinnerBuyWavesFirstPercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(spinnerBuyWavesFirstMainValue, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel50)
+                    .addComponent(checkBoxWavesUse))
+                .addGap(25, 25, 25)
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerWavesMinProfitPercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel55))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerWavesInitialProfitPercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel53))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerWavesHalfProfitOrdersCnt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel54))
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerBuyWavesSecondPercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel51))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(spinnerBuyWavesIncKoef, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel52))
+                        .addGap(53, 131, Short.MAX_VALUE))))
         );
 
         jTabbedPane2.addTab("Waves", jPanel7);
@@ -1852,8 +1989,10 @@ public class mainApplication extends javax.swing.JFrame {
             spinnerTestAdd.setEnabled(false);
             textFieldTestCoinAdd.setEnabled(false);
 
-        } catch (Exception e) {
-            log("Error: " + e.getMessage(), true, true);
+        } catch (Exception exx) {
+            exx.printStackTrace(System.out);
+            log("");
+            log("EXCEPTION - " + exx.getClass() + ": " + exx.getLocalizedMessage(), true, true);
             buttonRun.setEnabled(true);
         }
     }//GEN-LAST:event_buttonRunActionPerformed
@@ -2317,7 +2456,15 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel45;
     private javax.swing.JLabel jLabel46;
     private javax.swing.JLabel jLabel47;
+    private javax.swing.JLabel jLabel48;
+    private javax.swing.JLabel jLabel49;
     private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel50;
+    private javax.swing.JLabel jLabel51;
+    private javax.swing.JLabel jLabel52;
+    private javax.swing.JLabel jLabel53;
+    private javax.swing.JLabel jLabel54;
+    private javax.swing.JLabel jLabel55;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
@@ -2355,6 +2502,10 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JSpinner spinnerBuyMainValue;
     private javax.swing.JSpinner spinnerBuyPercent;
     private javax.swing.JSpinner spinnerBuyStopLimited;
+    private javax.swing.JSpinner spinnerBuyWavesFirstMainValue;
+    private javax.swing.JSpinner spinnerBuyWavesFirstPercent;
+    private javax.swing.JSpinner spinnerBuyWavesIncKoef;
+    private javax.swing.JSpinner spinnerBuyWavesSecondPercent;
     private javax.swing.JSpinner spinnerCycleAbortTime;
     private javax.swing.JSpinner spinnerCycleDelay;
     private javax.swing.JSpinner spinnerCycleFirstAbortTime;
@@ -2384,6 +2535,9 @@ public class mainApplication extends javax.swing.JFrame {
     private javax.swing.JSpinner spinnerStopLoss;
     private javax.swing.JSpinner spinnerTestAdd;
     private javax.swing.JSpinner spinnerUpdateDelay;
+    private javax.swing.JSpinner spinnerWavesHalfProfitOrdersCnt;
+    private javax.swing.JSpinner spinnerWavesInitialProfitPercent;
+    private javax.swing.JSpinner spinnerWavesMinProfitPercent;
     private javax.swing.JTextField textFieldAPIHash;
     private javax.swing.JTextField textFieldAPIID;
     private javax.swing.JTextField textFieldApiKey;
