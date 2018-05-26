@@ -41,6 +41,7 @@ public class StrategiesController {
     
     private List<String> strategy_auto = new ArrayList<>();
     private boolean autoWalkForward = false;
+    private boolean canAutoPickParams = true;
 
     private String mainStrategy = "Auto";
     private int strategyItemIndex = -1;
@@ -153,11 +154,11 @@ public class StrategiesController {
                 org.ta4j.core.Trade rtrade = trlist.get(k);
                 if (rtrade.getEntry() != null) {
                     index = rtrade.getEntry().getIndex();
-                    addStrategyMarker(true, series.getBar(index).getBeginTime().toInstant().toEpochMilli(), mainStrategy, rtrade.getEntry().getPrice().doubleValue());
+                    addStrategyMarker(true, series.getBar(index).getBeginTime().toInstant().toEpochMilli(), mainStrategy, null);
                 }
                 if (rtrade.getExit() != null) {
                     index = rtrade.getExit().getIndex();
-                    addStrategyMarker(false, series.getBar(index).getEndTime().toInstant().toEpochMilli(), mainStrategy, rtrade.getEntry().getPrice().doubleValue());
+                    addStrategyMarker(false, series.getBar(index).getEndTime().toInstant().toEpochMilli(), mainStrategy, null);
                 }
             }
         }
@@ -215,17 +216,11 @@ public class StrategiesController {
         markers.add(newm);
     }
     
-    public void resetStrategies() {
-        if (mainStrategy.equals("Signal")) {
-            return;
-        }
-        boolean need_main_optimize = false;
-        markers.clear();
-        strategies.clear();
-        getStrategiesInitializerMap();
+    public void updateStrategies() {
         strategy_items.forEach((entry) -> {
             Strategy nstrategy;
             if (
+                    canAutoPickParams &&
                     mainStrategy.equals(entry.getStrategyName()) && 
                     ordersController != null && 
                     ordersController.isAutoPickStrategyParams()
@@ -236,6 +231,17 @@ public class StrategiesController {
             }
             strategies.put(entry.getStrategyName(), nstrategy);
         });
+    }
+    
+    public void resetStrategies() {
+        if (mainStrategy.equals("Signal")) {
+            return;
+        }
+        boolean need_main_optimize = false;
+        markers.clear();
+        strategies.clear();
+        getStrategiesInitializerMap();
+        updateStrategies();
         if (ordersController != null) {
             strategy_auto = ordersController.getAutoStrategies();
             autoWalkForward = ordersController.isAutoWalkForward();
@@ -627,5 +633,19 @@ public class StrategiesController {
      */
     public void setTradingRecord(TradingRecord tradingRecord) {
         this.tradingRecord = tradingRecord;
+    }
+
+    /**
+     * @return the canAutoPickParams
+     */
+    public boolean isCanAutoPickParams() {
+        return canAutoPickParams;
+    }
+
+    /**
+     * @param canAutoPickParams the canAutoPickParams to set
+     */
+    public void setCanAutoPickParams(boolean canAutoPickParams) {
+        this.canAutoPickParams = canAutoPickParams;
     }
 }

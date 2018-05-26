@@ -59,13 +59,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
             }
             return;
         }
-        BigDecimal checkPrice = currentPrice;
-        
-        DepthCacheProcess process = info.getDepthProcessForPair(symbol);
-        if (!process.isStopped() && !process.isObsolete()) {
-            Map.Entry<BigDecimal, BigDecimal> bestAsk = process.getBestAsk();
-            if (bestAsk != null) checkPrice = bestAsk.getKey();
-        }
+        BigDecimal checkPrice = depthProcess.getBestAskOrDefault(currentPrice);
         
         if (minPrice.compareTo(checkPrice) > 0) {
             BigDecimal diffPercent = minPrice.subtract(checkPrice).divide(minPrice, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
@@ -93,11 +87,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
             return;
         }
         
-        checkPrice = currentPrice;
-        if (!process.isStopped() && !process.isObsolete()) {
-            Map.Entry<BigDecimal, BigDecimal> bestBid = process.getBestBid();
-            if (bestBid != null) checkPrice = bestBid.getKey();
-        }
+        checkPrice = depthProcess.getBestBidOrDefault(currentPrice);
         
         if (signalItem != null && checkPrice.compareTo(orderAvgPrice) > 0 && signalItem.isTargetReachedAtPrice(checkPrice)) {
             System.out.println("Exit from wave signal order...");

@@ -72,15 +72,22 @@ public class TradePairProcessList {
     private AbstractTradePairProcess initializePair(String symbol, boolean run) {
         boolean has_short = symbol.contains("_");
         boolean has_wave = symbol.contains("~");
+        boolean has_quick = symbol.contains("`");
         boolean has_plus = symbol.contains("+");
         boolean has_2plus = symbol.contains("++");
         boolean has_minus = !has_plus && symbol.contains("-");
-        symbol = symbol.replaceAll("\\-", "").replaceAll("\\+", "").replaceAll("\\~", "").replaceAll("\\_", "");
+        symbol = symbol.replaceAll("\\-", "").
+                replaceAll("\\+", "").
+                replaceAll("\\~", "").
+                replaceAll("\\_", "").
+                replaceAll("\\`", "");
         int pair_index = searchCurrencyFirstPair(symbol);
         AbstractTradePairProcess nproc;
         if (pair_index < 0) {
             if (has_wave || allPairsWavesUsage) {
                 nproc = new TradePairWaveProcess(ordersController.getClient(), symbol);
+            } else if (has_quick) {
+                nproc = new TradePairQuickWavesProcess(ordersController.getClient(), symbol);
             } else {
                 nproc = new TradePairProcess(ordersController.getClient(), symbol);
                 ((TradePairProcess)nproc).setTryingToSellOnPeak(has_plus);

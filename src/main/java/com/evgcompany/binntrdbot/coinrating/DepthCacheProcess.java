@@ -131,6 +131,26 @@ public class DepthCacheProcess {
         return getMillisFromLastUpdate() > maxProcessUpdateIntervalMillis;
     }
     
+    public BigDecimal getBestPriceOrDefault(boolean is_bid, BigDecimal defaultPrice) {
+        BigDecimal result = defaultPrice;
+        if (!isStopped() && !isObsolete()) {
+            if (is_bid) {
+                Map.Entry<BigDecimal, BigDecimal> bestBid = getBestBid();
+                if (bestBid != null) result = bestBid.getKey();
+            } else {
+                Map.Entry<BigDecimal, BigDecimal> bestAsk = getBestAsk();
+                if (bestAsk != null) result = bestAsk.getKey();
+            }
+        }
+        return result;
+    }
+    public BigDecimal getBestBidOrDefault(BigDecimal defaultPrice) {
+        return getBestPriceOrDefault(true, defaultPrice);
+    }
+    public BigDecimal getBestAskOrDefault(BigDecimal defaultPrice) {
+        return getBestPriceOrDefault(false, defaultPrice);
+    }
+    
     public boolean isStopped() {
         return socket == null;
     }

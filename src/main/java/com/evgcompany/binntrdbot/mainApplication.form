@@ -1649,7 +1649,6 @@
                                   <Component id="spinnerWavesHalfProfitOrdersCnt" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="jLabel54" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace max="32767" attributes="0"/>
                           </Group>
                           <Group type="102" attributes="0">
                               <Group type="103" groupAlignment="3" attributes="0">
@@ -1661,9 +1660,9 @@
                                   <Component id="spinnerBuyWavesIncKoef" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="jLabel52" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace min="53" pref="131" max="32767" attributes="0"/>
                           </Group>
                       </Group>
+                      <EmptySpace max="32767" attributes="0"/>
                   </Group>
               </Group>
             </DimensionLayout>
@@ -2317,7 +2316,7 @@
                     <Property name="columns" type="int" value="20"/>
                     <Property name="lineWrap" type="boolean" value="true"/>
                     <Property name="rows" type="int" value="5"/>
-                    <Property name="text" type="java.lang.String" value="Modifiers:&#xa;Buy for best price: -&#xa;Sell all free base coins for this pair: +&#xa;Sell all free and all limit orders for this pair: ++&#xa;Force waves mode: ~&#xa;Initial short mode: _"/>
+                    <Property name="text" type="java.lang.String" value="Modifiers:&#xa;Buy for best price, then quit: -&#xa;Sell all free base coins for this pair, then quit: +&#xa;Sell all free and all limit orders for this pair, then quit: ++&#xa;Force waves mode: ~&#xa;Quick waves limit mode: `&#xa;Initial short mode: _"/>
                     <Property name="wrapStyleWord" type="boolean" value="true"/>
                   </Properties>
                 </Component>

@@ -1334,8 +1334,7 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(spinnerWavesHalfProfitOrdersCnt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jLabel54))
-                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .addComponent(jLabel54)))
                     .addGroup(jPanel7Layout.createSequentialGroup()
                         .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(spinnerBuyWavesSecondPercent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -1343,8 +1342,8 @@ public class mainApplication extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(spinnerBuyWavesIncKoef, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jLabel52))
-                        .addGap(53, 131, Short.MAX_VALUE))))
+                            .addComponent(jLabel52))))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         jTabbedPane2.addTab("Waves", jPanel7);
@@ -1633,7 +1632,7 @@ public class mainApplication extends javax.swing.JFrame {
         jTextArea1.setColumns(20);
         jTextArea1.setLineWrap(true);
         jTextArea1.setRows(5);
-        jTextArea1.setText("Modifiers:\nBuy for best price: -\nSell all free base coins for this pair: +\nSell all free and all limit orders for this pair: ++\nForce waves mode: ~\nInitial short mode: _");
+        jTextArea1.setText("Modifiers:\nBuy for best price, then quit: -\nSell all free base coins for this pair, then quit: +\nSell all free and all limit orders for this pair, then quit: ++\nForce waves mode: ~\nQuick waves limit mode: `\nInitial short mode: _");
         jTextArea1.setWrapStyleWord(true);
         jScrollPane6.setViewportView(jTextArea1);
 

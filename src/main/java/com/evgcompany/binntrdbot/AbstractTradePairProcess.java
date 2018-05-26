@@ -19,7 +19,6 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -40,6 +39,8 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected OrdersController ordersController = null;
     protected CoinInfoAggregator info = null;
 
+    protected DepthCacheProcess depthProcess = null;
+    
     protected CoinFilters filter = null;
     protected final String symbol;
     protected String baseAssetSymbol;
@@ -69,12 +70,12 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     
     private boolean do_remove_flag = false;
     
-    private boolean useBuyStopLimited = false;
-    private int stopBuyLimitTimeout = 120;
-    private boolean useSellStopLimited = false;
-    private boolean isTriedBuy = false;
-    private int fullOrdersCount = 0;
-    private int stopSellLimitTimeout = 1200;
+    protected boolean useBuyStopLimited = false;
+    protected int stopBuyLimitTimeout = 120;
+    protected boolean useSellStopLimited = false;
+    protected boolean isTriedBuy = false;
+    protected int fullOrdersCount = 0;
+    protected int stopSellLimitTimeout = 1200;
     
     protected long lastOrderMillis = 0;
     protected long startMillis = 0;
@@ -115,17 +116,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             return null;
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            price = currentPrice;
-            DepthCacheProcess process = info.getDepthProcessForPair(symbol);
-            if (!process.isStopped() && !process.isObsolete()) {
-                if (is_enter) {
-                    Map.Entry<BigDecimal, BigDecimal> bestAsk = process.getBestAsk();
-                    if (bestAsk != null) price = bestAsk.getKey();
-                } else {
-                    Map.Entry<BigDecimal, BigDecimal> bestBid = process.getBestBid();
-                    if (bestBid != null) price = bestBid.getKey();
-                }
-            }
+            price = depthProcess.getBestPriceOrDefault(!is_enter, currentPrice);
         }
         BigDecimal profit;
         if (is_enter) {
@@ -473,6 +464,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         
         BalanceController.getInstance().StartAndWaitForInit();
         info.startDepthCheckForPair(symbol);
+        depthProcess = info.getDepthProcessForPair(symbol);
         
         try {
             filter = info.getPairFilters().get(symbol);
@@ -505,6 +497,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected void runFinish() {
         info.stopDepthCheckForPair(symbol);
         ordersController.unregisterPairTrade(orderCID);
+        depthProcess = null;
         app.log("");
         app.log("thread for " + symbol + " is stopped...");
     }

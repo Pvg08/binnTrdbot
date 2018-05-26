@@ -85,19 +85,11 @@ public class OrderEmulator {
         boolean actualPrice = false;
         
         DepthCacheProcess dpProcess = CoinInfoAggregator.getInstance().getDepthProcessForPair(order.getSymbol());
-        if (dpProcess != null && !dpProcess.isStopped() && !dpProcess.isObsolete()) {
-            if (isBuying) {
-                Map.Entry<BigDecimal, BigDecimal> bestAsk = dpProcess.getBestAsk();
-                if (bestAsk != null) {
-                    currentPrice = bestAsk.getKey();
-                    actualPrice = true;
-                }
-            } else {
-                Map.Entry<BigDecimal, BigDecimal> bestBid = dpProcess.getBestBid();
-                if (bestBid != null) {
-                    currentPrice = bestBid.getKey();
-                    actualPrice = true;
-                }
+        if (dpProcess != null) {
+            BigDecimal aPrice = dpProcess.getBestPriceOrDefault(!isBuying, null);
+            if (aPrice != null) {
+                currentPrice = aPrice;
+                actualPrice = true;
             }
         }
         
