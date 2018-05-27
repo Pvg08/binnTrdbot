@@ -10,7 +10,6 @@ import com.evgcompany.binntrdbot.coinrating.*;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,33 +17,57 @@ import java.util.Map;
  *
  * @author EVG_adm_T
  */
-public class SignalOrderController extends PeriodicProcessThread {
+public class SignalOrderController extends RunProcessNoThread implements BaseAutoOrderControllerInterface{
 
     private final CoinRatingController coinRatingController;
     private SignalController signalcontroller = null;
     private final TradePairProcessList pairProcessList;
+    private AutoPairOrders autoOrders = null;
 
     private boolean autoSignalOrder = false;
     private boolean autoSignalFastOrder = false;
     private float minSignalRatingForOrder = 4;
-    
-    private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
-    private int maxEnter = 10;
-    private int secondsOrderEnterWait = 28800;
+    private float minProfitPercentForOrder = 4;
     
     public SignalOrderController(CoinRatingController coinRatingController, TradePairProcessList pairProcessList) {
         this.coinRatingController = coinRatingController;
         signalcontroller = new SignalController();
         signalcontroller.setCoinRatingController(coinRatingController);
         this.pairProcessList = pairProcessList;
+        autoOrders = coinRatingController.getAutoOrders();
     }
 
-    private boolean signalOrderEnter(SignalItem item) {
+    @Override
+    public void onAfterAutoOrdersExitCheck() {
+        List<String> listRemove = new ArrayList<>();
+        if (autoOrders.getEntered().size() > 0) {
+            if (listRemove.isEmpty() && autoOrders.isMoreThanMaxEntered()) {
+                String worst_free_pair = getWorstFreeEnteredSignal();
+                if (worst_free_pair != null && !worst_free_pair.isEmpty()) {
+                    mainApplication.getInstance().log("Exit from worst order: " + worst_free_pair, true, true);
+                    pairProcessList.removePair(worst_free_pair);
+                    listRemove.add(worst_free_pair);
+                    autoOrders.getEntered().get(worst_free_pair).pair = null;
+                }
+            }
+            listRemove.forEach((entry) -> {
+                autoOrders.getEntered().remove(entry);
+            });
+        } else if (!autoOrders.isMaxEntered()) {
+            SignalItem best_signal = signalcontroller.getBestSignalToReEnter(minSignalRatingForOrder);
+            if (best_signal != null && best_signal.getMedianProfitPercent() > minProfitPercentForOrder) {
+                if (!autoOrders.orderEnter(best_signal.getPair(), autoSignalFastOrder, true, best_signal, this::checkSignalExit)) {
+                    best_signal.setAutopick(false);
+                }
+            }
+        }
+    }
+    
+    /*private boolean signalOrderEnter(SignalItem item) {
         String pair = item.getPair();
         if (
             autoSignalOrder && 
-            !coinRatingController.getEntered().containsKey(pair) && 
-            !entered.containsKey(pair) && 
+            !autoOrders.pairIsEntered(pair) && 
             !coinRatingController.getCoinPairRatingMap().isEmpty() &&
             item.getMedianProfitPercent() > 4
         ) {
@@ -69,9 +92,30 @@ public class SignalOrderController extends PeriodicProcessThread {
             }
         }
         return false;
+    }*/
+    
+    private boolean checkSignalExit(CoinRatingPairLogItem rentered) {
+        if (rentered != null && rentered.pair != null && rentered.pair.isInitialized() && rentered.pair instanceof TradeSignalProcessInterface) {
+            boolean is_free = !rentered.pair.isInOrder() && 
+                                !rentered.pair.isInAPIOrder() &&
+                                rentered.pair.getFullOrdersCount() == 0;
+            return (
+                is_free &&
+                rentered.pair.getLastPrice() != null &&
+                rentered.pair.getLastPrice().compareTo(BigDecimal.ZERO) > 0 &&
+                ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null &&
+                ((TradeSignalProcessInterface)rentered.pair).getSignalItem().getPriceTarget().compareTo(rentered.pair.getLastPrice()) < 0
+            ) || (
+                is_free &&
+                signalcontroller.getPairSignalRating(rentered.pair.getSymbol()) < minSignalRatingForOrder
+            ) || (
+                rentered.pair.getFullOrdersCount() > 0
+            );
+        }
+        return false;
     }
-
-    private void checkSignalOrders() {
+    
+    /*private void checkSignalOrders() {
         if (entered.size() > 0) {
             List<String> listRemove = new ArrayList<>();
             for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
@@ -114,39 +158,39 @@ public class SignalOrderController extends PeriodicProcessThread {
                     }
                 }
             }
-            if (listRemove.isEmpty() && entered.size() > maxEnter) {
+            if (listRemove.isEmpty() && autoOrders.isMaxEntered()) {
                 String worst_free_pair = getWorstFreeEnteredSignal();
                 if (worst_free_pair != null && !worst_free_pair.isEmpty()) {
                     mainApplication.getInstance().log("Exit from worst order: " + worst_free_pair, true, true);
                     pairProcessList.removePair(worst_free_pair);
                     listRemove.add(worst_free_pair);
-                    entered.get(worst_free_pair).pair = null;
+                    autoOrders.getEntered().get(worst_free_pair).pair = null;
                 }
             }
             listRemove.forEach((entry) -> {
-                entered.remove(entry);
+                autoOrders.getEntered().remove(entry);
             });
-        } else if (entered.size() < maxEnter) {
+        } else if (!autoOrders.isMaxEntered()) {
             SignalItem best_signal = signalcontroller.getBestSignalToReEnter(minSignalRatingForOrder);
-            if (best_signal != null) {
-                if (!signalOrderEnter(best_signal)) {
+            if (best_signal != null && best_signal.getMedianProfitPercent() > 4) {
+                if (!autoOrders.orderEnter(best_signal.getPair(), autoSignalFastOrder, true, best_signal, this::checkSignalExit)) {
                     best_signal.setAutopick(false);
                 }
             }
         }
-    }
+    }*/
 
     private String getWorstFreeEnteredSignal() {
         String result = null;
         double minCrit = 0;
-        for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
+        for (Map.Entry<String, CoinRatingPairLogItem> entry : autoOrders.getEntered().entrySet()) {
             CoinRatingPairLogItem rentered = entry.getValue();
             if (
-                    rentered != null && 
-                    rentered.pair != null && 
-                    rentered.pair instanceof TradeSignalProcessInterface && 
-                    rentered.pair.isInitialized() && 
-                    ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null
+                rentered != null && 
+                rentered.pair != null && 
+                rentered.pair.isInitialized() && 
+                rentered.pair instanceof TradeSignalProcessInterface && 
+                ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null
             ) {
                 boolean is_free = !rentered.pair.isInOrder()
                         && !rentered.pair.isInAPIOrder()
@@ -166,18 +210,20 @@ public class SignalOrderController extends PeriodicProcessThread {
     @Override
     protected void runStart() {
         mainApplication.getInstance().log("SignalOrderController starting...");
+        autoOrders.registerController(this);
         signalcontroller.setSignalEvent((item, rating) -> {
             if (coinRatingController.setPairSignalRating(item.getPair(), (float) rating)) {
                 if (
-                        signalcontroller.isInitialSignalsLoaded() &&
-                        rating >= minSignalRatingForOrder && 
-                        item.getCurrentRating() > minSignalRatingForOrder/2 && 
-                        !item.isDone() && 
-                        !item.isTimeout() && 
-                        item.getMillisFromSignalStart() >= 0 &&
-                        item.getMillisFromSignalStart() < 2 * 60 * 60 * 1000
+                    signalcontroller.isInitialSignalsLoaded() &&
+                    rating >= minSignalRatingForOrder && 
+                    item.getCurrentRating() > minSignalRatingForOrder/2 && 
+                    !item.isDone() && 
+                    !item.isTimeout() && 
+                    item.getMillisFromSignalStart() >= 0 &&
+                    item.getMillisFromSignalStart() < 2 * 60 * 60 * 1000 &&
+                    item.getMedianProfitPercent() > minProfitPercentForOrder
                 ) {
-                    signalOrderEnter(item);
+                    autoOrders.orderEnter(item.getPair(), autoSignalFastOrder, true, item, this::checkSignalExit);
                 }
             }
         });
@@ -185,12 +231,8 @@ public class SignalOrderController extends PeriodicProcessThread {
     }
 
     @Override
-    protected void runBody() {
-        checkSignalOrders();
-    }
-
-    @Override
     protected void runFinish() {
+        autoOrders.unregisterController(this);
         signalcontroller.stopSignalsProcessIfRunning();
         mainApplication.getInstance().log("SignalOrderController finished.");
     }
@@ -248,32 +290,7 @@ public class SignalOrderController extends PeriodicProcessThread {
         this.minSignalRatingForOrder = minSignalRatingForOrder;
     }
     
-    /**
-     * @return the secondsOrderEnterWait
-     */
-    public int getSecondsOrderEnterWait() {
-        return secondsOrderEnterWait;
-    }
-
-    /**
-     * @param secondsOrderEnterWait the secondsOrderEnterWait to set
-     */
-    public void setSecondsOrderEnterWait(int secondsOrderEnterWait) {
-        this.secondsOrderEnterWait = secondsOrderEnterWait;
-    }
-    
     public void setClient(TradingAPIAbstractInterface _client) {
         signalcontroller.setClient(_client);
-    }
-    
-    /**
-     * @param maxEnter the maxEnter to set
-     */
-    public void setMaxEnter(int maxEnter) {
-        this.maxEnter = maxEnter;
-    }
-
-    public Map<String, CoinRatingPairLogItem> getEntered() {
-        return entered;
     }
 }

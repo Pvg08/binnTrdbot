@@ -48,7 +48,7 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  *
  * @author EVG_Adminer
  */
-public class CoinRatingController extends PeriodicProcessThread {
+public class CoinRatingController extends PeriodicProcessThread implements BaseAutoOrderControllerInterface {
 
     private final TradePairProcessList paircontroller;
     private TradingAPIAbstractInterface client = null;
@@ -90,9 +90,7 @@ public class CoinRatingController extends PeriodicProcessThread {
 
     private final DefaultListModel<String> coinRatingModel = new DefaultListModel<>();
 
-    private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
-    private int maxEnter = 3;
-    private int secondsOrderEnterWait = 600;
+    private AutoPairOrders autoOrders = null;
     private float minRatingForOrder = 5;
     private final int globalTrendMaxRank = 40;
     
@@ -109,8 +107,8 @@ public class CoinRatingController extends PeriodicProcessThread {
         strategiesController.setMainStrategy("No strategy");
         coinInfo = CoinInfoAggregator.getInstance();
         coinInfo.setClient(client);
+        autoOrders = new AutoPairOrders(this, paircontroller);
         signalOrderController = new SignalOrderController(this, paircontroller);
-        signalOrderController.setDelayTime(2);
         coinCycleController = new CoinCycleController(client, this);
         coinCycleController.setDelayTime(90);
     }
@@ -744,7 +742,7 @@ public class CoinRatingController extends PeriodicProcessThread {
         return 0;
     }
     
-    private void baseOrderEnter(String pair) {
+    /*private void baseOrderEnter(String pair) {
         if (
             autoOrder && 
             entered.size() < maxEnter && 
@@ -770,9 +768,9 @@ public class CoinRatingController extends PeriodicProcessThread {
                 }
             }
         }
-    }
+    }*/
 
-    private void checkOrderExit() {
+    /*private void checkOrderExit() {
         if (entered.size() > 0) {
             List<String> listRemove = new ArrayList<>();
             for (Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
@@ -807,18 +805,24 @@ public class CoinRatingController extends PeriodicProcessThread {
                 entered.remove(entry);
             });
         }
-    }
+    }*/
 
+    @Override
+    public void onAfterAutoOrdersExitCheck() {
+        // nothing to check
+    }
+    
     private void checkFastEnter() {
-        checkOrderExit();
-        if (autoOrder && entered.size() < maxEnter && !coinPairRatingMap.isEmpty()) {
+        //checkOrderExit();
+        autoOrders.checkOrderExit();
+        if (autoOrder && !autoOrders.isMaxEntered() && !coinPairRatingMap.isEmpty()) {
             String pairMax = "";
             float maxR = 0;
             for (Entry<String, CoinRatingPairLogItem> entry : coinPairRatingMap.entrySet()) {
                 CoinRatingPairLogItem curr = entry.getValue();
                 if (
                         curr != null && 
-                        !entered.containsKey(curr.symbol) &&
+                        !autoOrders.pairIsEntered(curr.symbol) &&
                         !curr.fastbuy_skip && 
                         curr.rating >= minRatingForOrder &&
                         curr.last_rating_update_millis > 0 &&
@@ -836,7 +840,8 @@ public class CoinRatingController extends PeriodicProcessThread {
                     }
                 }
             }
-            baseOrderEnter(pairMax);
+            autoOrders.orderEnter(pairMax, autoFastOrder, false, null, null);
+            //baseOrderEnter(pairMax);
         }
     }
     
@@ -994,6 +999,7 @@ public class CoinRatingController extends PeriodicProcessThread {
             mainApplication.getInstance().log("Start to collect info for coins and pairs rating...");
         }
         
+        autoOrders.registerController(this);
         mainApplication.getInstance().log("CoinRatingController started...");
     }
     
@@ -1018,8 +1024,8 @@ public class CoinRatingController extends PeriodicProcessThread {
 
         if (analyzer && autoOrder && have_all_coins_pairs_info) {
             checkFastEnter();
-        } else if (!analyzer && entered.size() > 0) {
-            checkOrderExit();
+        } else if (!analyzer) {
+            autoOrders.checkOrderExit();
         }
 
         if (System.currentTimeMillis() > (updateTrendMillis + updateTrendTime*1000)) {
@@ -1029,6 +1035,7 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     @Override
     protected void runFinish() {
+        autoOrders.unregisterController(this);
         saveToFile(serialize_filename);
         if (signalOrderController != null && signalOrderController.isAlive()) signalOrderController.doStop();
         if (coinCycleController != null && coinCycleController.isAlive()) coinCycleController.doStop();
@@ -1151,27 +1158,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     }
 
     /**
-     * @param maxEnter the maxEnter to set
-     */
-    public void setMaxEnter(int maxEnter) {
-        this.maxEnter = maxEnter;
-    }
-
-    /**
-     * @return the secondsOrderEnterWait
-     */
-    public int getSecondsOrderEnterWait() {
-        return secondsOrderEnterWait;
-    }
-
-    /**
-     * @param secondsOrderEnterWait the secondsOrderEnterWait to set
-     */
-    public void setSecondsOrderEnterWait(int secondsOrderEnterWait) {
-        this.secondsOrderEnterWait = secondsOrderEnterWait;
-    }
-
-    /**
      * @return the minRatingForOrder
      */
     public float getMinRatingForOrder() {
@@ -1187,10 +1173,6 @@ public class CoinRatingController extends PeriodicProcessThread {
     
     public Map<String, CoinRatingPairLogItem> getCoinPairRatingMap() {
         return coinPairRatingMap;
-    }
-    
-    public Map<String, CoinRatingPairLogItem> getEntered() {
-        return entered;
     }
     
     public SignalOrderController getSignalOrderController() {
@@ -1364,5 +1346,12 @@ public class CoinRatingController extends PeriodicProcessThread {
      */
     public double getInitialBTCDominance() {
         return initialBTCDominance;
+    }
+
+    /**
+     * @return the autoOrders
+     */
+    public AutoPairOrders getAutoOrders() {
+        return autoOrders;
     }
 }

@@ -26,6 +26,7 @@ public class TradePairProcessList {
     private OrdersController ordersController = null;
     private final List<AbstractTradePairProcess> pairs = new ArrayList<>(0);
     
+    // main pair process
     private String mainStrategy;
     private String barsInterval;
     private int barAdditionalCount;
@@ -39,6 +40,7 @@ public class TradePairProcessList {
     private int sellStopLimitedTimeout;
     private int pyramidAutoMaxSize;
     
+    // wave pair process
     private boolean allPairsWavesUsage = false;
     private double wavesTradingBalancePercent;
     private double wavesTradingBalanceMainValue;

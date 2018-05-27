@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jgrapht.GraphPath;
-import org.jgrapht.alg.shortestpath.KShortestPaths;
+import org.jgrapht.alg.shortestpath.KShortestSimplePaths;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 /**
@@ -91,8 +91,8 @@ public class CoinCycleController extends PeriodicProcessThread {
 
     public List<String> getRevertPathDescription(String coinLast, String coinBase) {
         if (coinLast.equals(coinBase)) return null;
-        KShortestPaths pathsF = new KShortestPaths(info.getPricesGraph(), 100, 4);
-        List<GraphPath<String, DefaultWeightedEdge>> paths = pathsF.getPaths(coinLast, coinBase);
+        KShortestSimplePaths pathsF = new KShortestSimplePaths(info.getPricesGraph(), 4);
+        List<GraphPath<String, DefaultWeightedEdge>> paths = pathsF.getPaths(coinLast, coinBase, 100);
         if (paths.isEmpty()) return null;
         return getCycleDescription(paths.get(0).getVertexList());
     }
