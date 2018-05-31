@@ -517,6 +517,8 @@ def main():
     proxy_type = str(config['main']['proxy_type'])
     proxy_host = str(config['main']['proxy_host'])
     proxy_port = str(config['main']['proxy_port'])
+    proxy_login = str(config['main']['proxy_login'])
+    proxy_password = str(config['main']['proxy_password'])
     if proxy_port:
         proxy_port = int(proxy_port)
 
@@ -538,7 +540,11 @@ def main():
             proxy_type = socks.HTTP
         else:
             proxy_type = socks.SOCKS5
-        proxy = (proxy_type, proxy_host, proxy_port)
+
+        if proxy_login or proxy_password:
+            proxy = (proxy_type, proxy_host, proxy_port, True, proxy_login, proxy_password)
+        else:
+            proxy = (proxy_type, proxy_host, proxy_port)
     else:
         proxy = None
 

@@ -56,7 +56,7 @@ public class AutoPairOrders {
         return entered.size() > maxEnter;
     }
     
-    public boolean orderEnter(String pair, boolean isFast, boolean isIgnoreMaxCount, SignalItem item, AutoOrderExitCheck exit_checker) {
+    public boolean orderEnter(String pair, boolean isFast, boolean isIgnoreMaxCount, SignalItem signalItem, AutoOrderExitCheck exit_checker) {
         if (
             (isIgnoreMaxCount || entered.size() < maxEnter) && 
             !entered.containsKey(pair) && 
@@ -66,11 +66,14 @@ public class AutoPairOrders {
                 CoinRatingPairLogItem toenter = coinRatingController.getCoinPairRatingMap().get(pair);
                 if (toenter != null) {
                     if (isFast) {
-                        mainApplication.getInstance().log("Trying to auto fast-enter with pair: " + pair, true, true);
+                        mainApplication.getInstance().log("Trying to auto fast-enter"+(signalItem!=null ? " signal" : "")+" with pair: " + pair, true, true);
                         toenter.pair = pairProcessList.addPairFastRun(pair);
                     } else {
-                        mainApplication.getInstance().log("Trying to auto enter with pair: " + pair, true, true);
+                        mainApplication.getInstance().log("Trying to auto enter"+(signalItem!=null ? " signal" : "")+" with pair: " + pair, true, true);
                         toenter.pair = pairProcessList.addPair(pair);
+                    }
+                    if (toenter.pair instanceof TradeSignalProcessInterface) {
+                        ((TradeSignalProcessInterface)toenter.pair).setSignalItem(signalItem);
                     }
                     toenter.exit_check = exit_checker;
                     entered.put(pair, toenter);
@@ -104,9 +107,12 @@ public class AutoPairOrders {
                                 rentered.exit_check.isNeedExit(rentered)
                             )
                     ) {
-                        mainApplication.getInstance().log("Exit from order: " + rentered.pair.getSymbol(), true, true);
-                        rentered.pair.doStop();
-                        if (rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0 || !rentered.pair.isTriedBuy()) {
+                        boolean is_signal = rentered.pair instanceof TradeSignalProcessInterface && ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null;
+                        mainApplication.getInstance().log("Exit from"+(is_signal ? " signal" : "")+" order: " + rentered.pair.getSymbol(), true, true);
+                        if (rentered.pair.isAlive()) rentered.pair.doStop();
+                        if ((rentered.pair.getLastTradeProfit() != null && rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0) || 
+                            !rentered.pair.isTriedBuy()
+                        ) {
                             //rentered.fastbuy_skip = true;
                             rentered.rating_inc -= 1;
                         } else {
@@ -114,7 +120,7 @@ public class AutoPairOrders {
                         }
                         rentered.calculateRating();
                         listRemove.add(rentered.pair.getSymbol());
-                        if (((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null && rentered.pair.getFullOrdersCount() > 0) {
+                        if (is_signal && rentered.pair.getFullOrdersCount() > 0) {
                             ((TradeSignalProcessInterface)rentered.pair).getSignalItem().setAutopick(false);
                         }
                         rentered.pair = null;

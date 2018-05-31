@@ -104,7 +104,7 @@ public class CoinRatingController extends PeriodicProcessThread implements BaseA
     public CoinRatingController(mainApplication application, TradePairProcessList paircontroller) {
         this.paircontroller = paircontroller;
         strategiesController = new StrategiesController();
-        strategiesController.setMainStrategy("No strategy");
+        strategiesController.setMainStrategy("No Strategy");
         coinInfo = CoinInfoAggregator.getInstance();
         coinInfo.setClient(client);
         autoOrders = new AutoPairOrders(this, paircontroller);
@@ -1024,7 +1024,8 @@ public class CoinRatingController extends PeriodicProcessThread implements BaseA
 
         if (analyzer && autoOrder && have_all_coins_pairs_info) {
             checkFastEnter();
-        } else if (!analyzer) {
+        }
+        if (have_all_coins_pairs_info || !analyzer) {
             autoOrders.checkOrderExit();
         }
 

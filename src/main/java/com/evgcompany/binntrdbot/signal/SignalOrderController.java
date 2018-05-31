@@ -109,6 +109,8 @@ public class SignalOrderController extends RunProcessNoThread implements BaseAut
                 is_free &&
                 signalcontroller.getPairSignalRating(rentered.pair.getSymbol()) < minSignalRatingForOrder
             ) || (
+                !rentered.pair.isInOrder() && 
+                !rentered.pair.isInAPIOrder() &&
                 rentered.pair.getFullOrdersCount() > 0
             );
         }

@@ -6,13 +6,11 @@
 package com.evgcompany.binntrdbot;
 
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
-import com.evgcompany.binntrdbot.coinrating.DepthCacheProcess;
 import com.evgcompany.binntrdbot.signal.SignalItem;
 import com.evgcompany.binntrdbot.signal.TradeSignalProcessInterface;
 import com.evgcompany.binntrdbot.strategies.core.OrderActionType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Map;
 
 /**
  *
@@ -44,7 +42,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
     
     @Override
     protected void runStart() {
-        super.setMainStrategy("EMA");
+        super.setMainStrategy(signalItem == null ? "EMA" : "Signal");
         super.runStart();
         strategiesController.getMainStrategyItem().getConfig().setParam("EMA-TimeFrame", BigDecimal.valueOf(12));
     }
