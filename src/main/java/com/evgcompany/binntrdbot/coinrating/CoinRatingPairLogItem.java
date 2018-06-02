@@ -6,7 +6,6 @@
 package com.evgcompany.binntrdbot.coinrating;
 
 import com.evgcompany.binntrdbot.AbstractTradePairProcess;
-import com.evgcompany.binntrdbot.events.AutoOrderExitCheck;
 
 /**
  *
@@ -18,7 +17,6 @@ public class CoinRatingPairLogItem implements java.io.Serializable {
     public String symbolBase;
     public AbstractTradePairProcess pair = null;
     public CoinRatingLogItem base_rating = new CoinRatingLogItem();
-    public AutoOrderExitCheck exit_check = null;
 
     public Float percent_hour = 0f;
     public Float percent_day = 0f;

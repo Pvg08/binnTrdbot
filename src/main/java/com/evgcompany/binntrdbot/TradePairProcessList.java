@@ -86,7 +86,7 @@ public class TradePairProcessList {
         int pair_index = searchCurrencyFirstPair(symbol);
         AbstractTradePairProcess nproc;
         if (pair_index < 0) {
-            if (has_wave || allPairsWavesUsage) {
+            if (has_wave || (allPairsWavesUsage && !has_short && !has_quick && !has_plus && !has_2plus && !has_minus)) {
                 nproc = new TradePairWaveProcess(ordersController.getClient(), symbol);
             } else if (has_quick) {
                 nproc = new TradePairQuickWavesProcess(ordersController.getClient(), symbol);

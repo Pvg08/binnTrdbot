@@ -8,9 +8,6 @@ package com.evgcompany.binntrdbot.signal;
 import com.evgcompany.binntrdbot.*;
 import com.evgcompany.binntrdbot.coinrating.*;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,20 +36,12 @@ public class SignalOrderController extends RunProcessNoThread implements BaseAut
 
     @Override
     public void onAfterAutoOrdersExitCheck() {
-        List<String> listRemove = new ArrayList<>();
-        if (autoOrders.getEntered().size() > 0) {
-            if (listRemove.isEmpty() && autoOrders.isMoreThanMaxEntered()) {
-                String worst_free_pair = getWorstFreeEnteredSignal();
-                if (worst_free_pair != null && !worst_free_pair.isEmpty()) {
-                    mainApplication.getInstance().log("Exit from worst order: " + worst_free_pair, true, true);
-                    pairProcessList.removePair(worst_free_pair);
-                    listRemove.add(worst_free_pair);
-                    autoOrders.getEntered().get(worst_free_pair).pair = null;
-                }
+        if (autoOrders.getEntered().size() > 0 && autoOrders.isMoreThanMaxEntered()) {
+            String worst_free_pair = getWorstFreeEnteredSignal();
+            if (worst_free_pair != null && !worst_free_pair.isEmpty()) {
+                mainApplication.getInstance().log("Exit from worst order: " + worst_free_pair, true, true);
+                autoOrders.getEntered().get(worst_free_pair).pair.doStop();
             }
-            listRemove.forEach((entry) -> {
-                autoOrders.getEntered().remove(entry);
-            });
         } else if (!autoOrders.isMaxEntered()) {
             SignalItem best_signal = signalcontroller.getBestSignalToReEnter(minSignalRatingForOrder);
             if (best_signal != null && best_signal.getMedianProfitPercent() > minProfitPercentForOrder) {
@@ -99,13 +88,13 @@ public class SignalOrderController extends RunProcessNoThread implements BaseAut
             boolean is_free = !rentered.pair.isInOrder() && 
                                 !rentered.pair.isInAPIOrder() &&
                                 rentered.pair.getFullOrdersCount() == 0;
-            return (
+            return /*(
                 is_free &&
                 rentered.pair.getLastPrice() != null &&
                 rentered.pair.getLastPrice().compareTo(BigDecimal.ZERO) > 0 &&
                 ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null &&
                 ((TradeSignalProcessInterface)rentered.pair).getSignalItem().getPriceTarget().compareTo(rentered.pair.getLastPrice()) < 0
-            ) || (
+            ) ||*/ (
                 is_free &&
                 signalcontroller.getPairSignalRating(rentered.pair.getSymbol()) < minSignalRatingForOrder
             ) || (
@@ -190,19 +179,20 @@ public class SignalOrderController extends RunProcessNoThread implements BaseAut
             if (
                 rentered != null && 
                 rentered.pair != null && 
+                rentered.pair.isAlive() && 
                 rentered.pair.isInitialized() && 
                 rentered.pair instanceof TradeSignalProcessInterface && 
-                ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null
+                ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null &&
+                !rentered.pair.isIsInBuySell() &&
+                (System.currentTimeMillis() - rentered.pair.getLastActivityMillis()) > autoOrders.getMinEnterExitCheckSecondsInterval() * 1000 &&
+                !rentered.pair.isInOrder() &&
+                !rentered.pair.isInAPIOrder() &&
+                rentered.pair.getFullOrdersCount() == 0
             ) {
-                boolean is_free = !rentered.pair.isInOrder()
-                        && !rentered.pair.isInAPIOrder()
-                        && rentered.pair.getFullOrdersCount() == 0;
-                if (is_free) {
-                    double currCrit = ((TradeSignalProcessInterface)rentered.pair).getSignalItem().getCurrentRating()*((TradeSignalProcessInterface)rentered.pair).getSignalItem().getPriceProfitPercent(rentered.pair.getLastPrice());
-                    if (result == null || minCrit > currCrit) {
-                        result = entry.getKey();
-                        minCrit = currCrit;
-                    }
+                double currCrit = ((TradeSignalProcessInterface)rentered.pair).getSignalItem().getCurrentRating()*((TradeSignalProcessInterface)rentered.pair).getSignalItem().getPriceProfitPercent(rentered.pair.getLastPrice());
+                if (result == null || minCrit > currCrit) {
+                    result = entry.getKey();
+                    minCrit = currCrit;
                 }
             }
         }

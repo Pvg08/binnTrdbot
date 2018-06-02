@@ -26,9 +26,12 @@ public class AutoPairOrders {
     private final TradePairProcessList pairProcessList;
     
     private final Map<String, CoinRatingPairLogItem> entered = new HashMap<>();
+    private final Map<String, AutoOrderExitCheck> exitChecks = new HashMap<>();
     private final List<BaseAutoOrderControllerInterface> controllers = new ArrayList<>();
     private int maxEnter = 10;
     private int secondsOrderEnterWait = 28800;
+    
+    private final int minEnterExitCheckSecondsInterval = 30;
 
     public AutoPairOrders(CoinRatingController coinRatingController, TradePairProcessList pairProcessList) {
         this.coinRatingController = coinRatingController;
@@ -75,7 +78,7 @@ public class AutoPairOrders {
                     if (toenter.pair instanceof TradeSignalProcessInterface) {
                         ((TradeSignalProcessInterface)toenter.pair).setSignalItem(signalItem);
                     }
-                    toenter.exit_check = exit_checker;
+                    exitChecks.put(toenter.symbol, exit_checker);
                     entered.put(pair, toenter);
                     return true;
                 }
@@ -89,7 +92,12 @@ public class AutoPairOrders {
             List<String> listRemove = new ArrayList<>();
             for (Map.Entry<String, CoinRatingPairLogItem> entry : entered.entrySet()) {
                 CoinRatingPairLogItem rentered = entry.getValue();
-                if (rentered != null && rentered.pair != null && rentered.pair.isInitialized()) {
+                if (rentered != null && 
+                    rentered.pair != null && 
+                    rentered.pair.isInitialized() &&
+                    !rentered.pair.isIsInBuySell() &&
+                    (System.currentTimeMillis() - rentered.pair.getLastActivityMillis()) > minEnterExitCheckSecondsInterval * 1000
+                ) {
                     boolean is_free = !rentered.pair.isInOrder() && 
                                 !rentered.pair.isInAPIOrder() &&
                                 rentered.pair.getFullOrdersCount() == 0;
@@ -103,12 +111,29 @@ public class AutoPairOrders {
                             ) || (
                                 !rentered.pair.isAlive()
                             ) || (
-                                rentered.exit_check != null &&
-                                rentered.exit_check.isNeedExit(rentered)
+                                exitChecks.containsKey(rentered.symbol) &&
+                                exitChecks.get(rentered.symbol) != null &&
+                                exitChecks.get(rentered.symbol).isNeedExit(rentered)
                             )
                     ) {
                         boolean is_signal = rentered.pair instanceof TradeSignalProcessInterface && ((TradeSignalProcessInterface)rentered.pair).getSignalItem() != null;
                         mainApplication.getInstance().log("Exit from"+(is_signal ? " signal" : "")+" order: " + rentered.pair.getSymbol(), true, true);
+                        
+                        
+                        System.out.println("Exit from"+(is_signal ? " signal" : "")+" order: " + rentered.pair.getSymbol());
+                        System.out.println("Reason:");
+                        System.out.println("is_free = " + (is_free ? 1 : 0));
+                        System.out.println("isAlive = " + (rentered.pair.isAlive() ? 1 : 0));
+                        System.out.println("ECheck = " + (exitChecks.containsKey(rentered.symbol) &&
+                                exitChecks.get(rentered.symbol) != null &&
+                                exitChecks.get(rentered.symbol).isNeedExit(rentered) ? 1 : 0));
+                        
+                        System.out.println("FullOrdersCount = " + rentered.pair.getFullOrdersCount());
+                        System.out.println("isTriedBuy = " + (rentered.pair.isTriedBuy() ? 1 : 0));
+                        System.out.println("isInOrder = " + (rentered.pair.isInOrder() ? 1 : 0));
+                        System.out.println("millisTO = " + ((System.currentTimeMillis() - rentered.pair.getStartMillis()) > secondsOrderEnterWait * 1000 ? 1 : 0));
+                        
+                        
                         if (rentered.pair.isAlive()) rentered.pair.doStop();
                         if ((rentered.pair.getLastTradeProfit() != null && rentered.pair.getLastTradeProfit().compareTo(BigDecimal.ZERO) < 0) || 
                             !rentered.pair.isTriedBuy()
@@ -184,5 +209,12 @@ public class AutoPairOrders {
      */
     public void setSecondsOrderEnterWait(int secondsOrderEnterWait) {
         this.secondsOrderEnterWait = secondsOrderEnterWait;
+    }
+
+    /**
+     * @return the minEnterExitCheckSecondsInterval
+     */
+    public int getMinEnterExitCheckSecondsInterval() {
+        return minEnterExitCheckSecondsInterval;
     }
 }

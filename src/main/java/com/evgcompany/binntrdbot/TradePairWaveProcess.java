@@ -42,9 +42,17 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
     
     @Override
     protected void runStart() {
-        super.setMainStrategy(signalItem == null ? "EMA" : "Signal");
+        if (signalItem != null) {
+            doWait(1000);
+            super.setMainStrategy("No Strategy");
+        } else {
+            super.setMainStrategy("EMA");
+        }
         super.runStart();
-        strategiesController.getMainStrategyItem().getConfig().setParam("EMA-TimeFrame", BigDecimal.valueOf(12));
+        if (signalItem != null) {
+            strategiesController.startSignal(signalItem);
+        }
+        strategiesController.getMainStrategyItem().getConfig().setParam("EMA-TimeFrame", BigDecimal.valueOf(11));
     }
     
     @Override
@@ -105,6 +113,7 @@ public class TradePairWaveProcess extends TradePairStrategyProcess implements Tr
                 if (
                         !strategiesController.getMainStrategy().equals("No Strategy") && 
                         !strategiesController.getMainStrategy().equals("Neural Network") && 
+                        !strategiesController.getMainStrategy().equals("Signal") && 
                         !strategiesController.getMainStrategy().equals("Auto")
                 ) {
                     System.out.println(symbol + " Checking strategy for exit...");

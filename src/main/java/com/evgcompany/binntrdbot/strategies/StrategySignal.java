@@ -37,6 +37,7 @@ public class StrategySignal extends StrategyItem {
         config.Add("PriceStop", new StrategyConfigItem("0", "100000000", "0.000000001", "0")).setActive(false);
         config.Add("FastOrder", new StrategyConfigItem("0", "1", "1", "0")).setActive(false);
         config.Add("OrderOnce", new StrategyConfigItem("0", "1", "1", "0")).setActive(false);
+        config.Add("EMA-TimeFrame", new StrategyConfigItem("2", "40", "1", "12")).setActive(false);
     }
 
     private Decimal getLossPercent(Decimal priceC, Decimal priceS) {
@@ -54,6 +55,8 @@ public class StrategySignal extends StrategyItem {
         if (series == null) {
             throw new IllegalArgumentException("Series cannot be null");
         }
+        
+        int ema_tf = config.GetIntValue("EMA-TimeFrame");
         
         boolean is_fast = config.GetIntValue("FastOrder") > 0;
         boolean is_once = config.GetIntValue("OrderOnce") > 0;
@@ -75,7 +78,7 @@ public class StrategySignal extends StrategyItem {
         
         initializer = (tseries, trecord, dataset) -> {
             ClosePriceIndicator closePrice = new ClosePriceIndicator(tseries);
-            EMAIndicator ema = new EMAIndicator(closePrice, 12);
+            EMAIndicator ema = new EMAIndicator(closePrice, ema_tf);
             TrailingStopLossIndicator stoploss = new TrailingStopLossIndicator(closePrice, loss_percent, priceS, trecord);
             ConstantIndicator p1 = new ConstantIndicator(price1);
             ConstantIndicator p2 = new ConstantIndicator(price2);
@@ -86,11 +89,11 @@ public class StrategySignal extends StrategyItem {
             dataset.addSeries(buildChartTimeSeries(tseries, pT, "Price target"));
             //dataset.addSeries(buildChartTimeSeries(tseries, pS, "Price stoploss"));
             dataset.addSeries(buildChartTimeSeries(tseries, stoploss, "Trailing stoploss"));
-            dataset.addSeries(buildChartTimeSeries(tseries, ema, "EMA 12"));
+            dataset.addSeries(buildChartTimeSeries(tseries, ema, "EMA " + ema_tf));
         };
         
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        EMAIndicator ema = new EMAIndicator(closePrice, 12);
+        EMAIndicator ema = new EMAIndicator(closePrice, ema_tf);
         
         Rule entryRule;
         

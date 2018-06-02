@@ -7,7 +7,7 @@ import socks
 import random
 import configparser
 
-from telethon import utils, events, TelegramClient, ConnectionMode
+from telethon import utils, events, TelegramClient
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.types import InputChannel, PeerChat
 from telethon.tl.functions.contacts import ResolveUsernameRequest
@@ -552,7 +552,6 @@ def main():
         session_name,
         api_id=api_id,
         api_hash=api_hash,
-        connection_mode=ConnectionMode.TCP_ABRIDGED,
         proxy=proxy,
         update_workers=1,
         spawn_read_thread=True

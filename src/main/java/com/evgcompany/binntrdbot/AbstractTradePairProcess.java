@@ -77,7 +77,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     protected int fullOrdersCount = 0;
     protected int stopSellLimitTimeout = 1200;
     
-    protected long lastOrderMillis = 0;
+    private long lastActivityMillis = 0;
     protected long startMillis = 0;
     protected BigDecimal currentPrice = BigDecimal.ZERO;
     protected BigDecimal lastStrategyCheckPrice = BigDecimal.ZERO;
@@ -89,6 +89,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     
     protected boolean inAPIOrder = false;
     protected boolean forceMarketOrders = false;
+    private boolean isInBuySell = false;
     
     protected final List<OrderActionMarker> markers = new ArrayList<>();
     
@@ -99,6 +100,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         this.client = client;
         this.ordersController = OrdersController.getInstance();
         startMillis = System.currentTimeMillis();
+        lastActivityMillis = System.currentTimeMillis();
         info = CoinInfoAggregator.getInstance();
         if (info.getClient() == null) info.setClient(client);
     }
@@ -129,11 +131,13 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     }
     
     protected boolean doEnter(BigDecimal curPrice, boolean skip_check) {
+        isInBuySell = true;
         if (pyramidSize == 0) {
             longModeAuto = true;
         }
         isTriedBuy = true;
         if (curPrice == null || curPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            isInBuySell = false;
             return false;
         }
         BigDecimal base_asset_amount;
@@ -164,7 +168,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         ) {
             if (BalanceController.getInstance().canBuy(symbol, tobuy_amount, tobuy_price)) {
                 app.log("BYING " + NumberFormatter.df8.format(tobuy_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tobuy_price) + ")", true, true);
-                lastOrderMillis = System.currentTimeMillis();
+                lastActivityMillis = System.currentTimeMillis();
                 result = ordersController.Buy(orderCID, tobuy_amount, !forceMarketOrders ? tobuy_price : null);
                 if (result < 0) {
                     app.log("Error!", true, true);
@@ -177,14 +181,17 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         } else {
             app.log(symbol + " - need to enter but profit ("+NumberFormatter.df4.format(profit)+"%) is too low. Waiting...", false, true);
         }
+        isInBuySell = false;
         return result >= 0;
     }
 
     protected boolean doExit(BigDecimal price, boolean skip_check) {
+        isInBuySell = true;
         if (pyramidSize == 0) {
             longModeAuto = false;
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            isInBuySell = false;
             return false;
         }
         
@@ -219,7 +226,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             ) {
             if (BalanceController.getInstance().canSell(symbol, tosell_amount)) {
                 app.log("SELLING " + NumberFormatter.df8.format(tosell_amount) + " " + baseAssetSymbol + "  for  " + NumberFormatter.df8.format(quote_asset_amount) + " " + quoteAssetSymbol + " (price=" + NumberFormatter.df8.format(tosell_price) + ")", true, true);
-                lastOrderMillis = System.currentTimeMillis();
+                lastActivityMillis = System.currentTimeMillis();
                 result = ordersController.Sell(orderCID, tosell_amount, !forceMarketOrders ? tosell_price : null, null);
                 if (result < 0) {
                     app.log("Error!", true, true);
@@ -232,6 +239,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         } else {
             app.log(symbol + " - need to exit but profit ("+NumberFormatter.df4.format(profit)+"%) is too low. Waiting...", false, true);
         }
+        isInBuySell = false;
         return result >= 0;
     }
 
@@ -327,15 +335,15 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             return false;
         }
         if(order.getSide() == OrderSide.BUY) {
-            if (useBuyStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopBuyLimitTimeout) {
+            if (useBuyStopLimited && (System.currentTimeMillis()-lastActivityMillis) > 1000*stopBuyLimitTimeout) {
                 app.log("We wait too long. Need to stop this "+symbol+"'s BUY order...");
-                lastOrderMillis = System.currentTimeMillis();
+                lastActivityMillis = System.currentTimeMillis();
                 return true;
             }
         } else {
-            if (useSellStopLimited && (System.currentTimeMillis()-lastOrderMillis) > 1000*stopSellLimitTimeout) {
+            if (useSellStopLimited && (System.currentTimeMillis()-lastActivityMillis) > 1000*stopSellLimitTimeout) {
                 app.log("We wait too long. Need to stop this "+symbol+"'s SELL order...");
-                lastOrderMillis = System.currentTimeMillis();
+                lastActivityMillis = System.currentTimeMillis();
                 return true;
             }
         }
@@ -399,7 +407,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             } else {
                 app.log("Selling "+symbol+"...", true, true);
             }
-            lastOrderMillis = System.currentTimeMillis();
+            lastActivityMillis = System.currentTimeMillis();
         }
         if (!isFinished) {
             return;
@@ -440,7 +448,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             }
             addOrderQuantities(executedQty, price, isBuying);
 
-            lastOrderMillis = System.currentTimeMillis();
+            lastActivityMillis = System.currentTimeMillis();
 
             ordersController.finishOrder(orderCID, true, orderAvgPrice);
             app.log("Order for "+(isBuying?"buy":"sell")+" "+symbol+" is finished! Price = "+NumberFormatter.df8.format(price) + profitStr, true, true);
@@ -457,10 +465,14 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
     @Override
     protected void runStart() {
 
+        lastActivityMillis = System.currentTimeMillis();
+        
         doWait(ThreadLocalRandom.current().nextLong(100, 500));
 
         app.log("thread for " + symbol + " is running...");
         app.log("");
+        
+        lastActivityMillis = System.currentTimeMillis();
         
         BalanceController.getInstance().StartAndWaitForInit();
         info.startDepthCheckForPair(symbol);
@@ -477,18 +489,21 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
             return;
         }
 
+        lastActivityMillis = System.currentTimeMillis();
+        
         orderCID = ordersController.registerPairTrade(symbol, this, this::onOrderEvent, this::onOrderCheckEvent);
 
         doWait(startDelayTime);
         
         resetSeries();
         startMillis = System.currentTimeMillis();
+        lastActivityMillis = System.currentTimeMillis();
     }
     
     @Override
     protected void runBody() {
         nextBars();
-        if (!inAPIOrder) {
+        if (!inAPIOrder && !need_stop) {
             checkStatus();
         }
     }
@@ -760,5 +775,19 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
      */
     public void setTradingBalanceMainValue(double tradingBalanceMainValue) {
         this.tradingBalanceMainValue = BigDecimal.valueOf(tradingBalanceMainValue);
+    }
+
+    /**
+     * @return the lastActivityMillis
+     */
+    public long getLastActivityMillis() {
+        return lastActivityMillis;
+    }
+
+    /**
+     * @return the isInBuySell
+     */
+    public boolean isIsInBuySell() {
+        return isInBuySell;
     }
 }
