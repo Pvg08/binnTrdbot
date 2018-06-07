@@ -85,6 +85,7 @@ public class TradePairProcess extends TradePairSignalProcess {
             if (!ordersToCancel.isEmpty()) {
                 free_cnt = qbalance.getValue();
             }
+            BigDecimal allOrdersQty = BigDecimal.ZERO;
             Trade lastTrade = null;
             for (Trade trade : trades) {
                 if (
@@ -105,8 +106,11 @@ public class TradePairProcess extends TradePairSignalProcess {
                     ordersCount++;
                     acc_cnt = acc_cnt.add(ctvol);
                 }
+                allOrdersQty = allOrdersQty.add(new BigDecimal(trade.getQty()));
                 lastTrade = trade;
             }
+            
+            app.log(symbol + ": All time quantity = " + NumberFormatter.df8.format(allOrdersQty), true, true);
             
             if (ordersCount == 0) {
                 avgTradeBuyPrice = BigDecimal.valueOf(info.getLastPrices().get(symbol));
