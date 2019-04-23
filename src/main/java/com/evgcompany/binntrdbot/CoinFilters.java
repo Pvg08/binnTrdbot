@@ -106,7 +106,7 @@ public class CoinFilters implements java.io.Serializable {
             }
             if (price.compareTo(filterMinPrice) < 0) {
                 price = filterMinPrice;
-            } else if (price.compareTo(filterMaxPrice) > 0) {
+            } else if (filterMaxPrice.compareTo(BigDecimal.ZERO) > 0 && price.compareTo(filterMaxPrice) > 0) {
                 price = filterMaxPrice;
             }
         }

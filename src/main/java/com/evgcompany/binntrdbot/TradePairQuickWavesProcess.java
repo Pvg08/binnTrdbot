@@ -22,8 +22,8 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  */
 public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
     
-    private double minProfitPercent = 0.2;
-    private double baseProfitPercent = 0.5;
+    private double minProfitPercent = 0.4;
+    private double baseProfitPercent = 0.95;
     private int emaDistance = 14;
     
     private BigDecimal enterPrice = null;

@@ -17,6 +17,7 @@ import com.evgcompany.binntrdbot.events.BarEvent;
 import com.evgcompany.binntrdbot.events.OrderEvent;
 import com.evgcompany.binntrdbot.events.SocketClosedEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
+import com.fasterxml.jackson.core.JsonParseException;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -215,8 +216,8 @@ public abstract class TradingAPIAbstractInterface {
     abstract public List<AssetBalance> getAllBalances();
     abstract public AssetBalance getAssetBalance(String pair);
     
-    abstract public long order(boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price);
-    abstract public Order getOrderStatus(String pair, long order_id);
+    abstract public Long order(boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price);
+    abstract public Order getOrderStatus(String pair, long order_id) throws JsonParseException;
     abstract public void cancelOrder(String pair, long order_id);
     
     abstract public Trade getLastTrade(String pair);

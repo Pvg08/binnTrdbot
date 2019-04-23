@@ -35,6 +35,7 @@ import com.evgcompany.binntrdbot.events.BalanceEvent;
 import com.evgcompany.binntrdbot.events.BarEvent;
 import com.evgcompany.binntrdbot.events.OrderEvent;
 import com.evgcompany.binntrdbot.events.SocketClosedEvent;
+import com.fasterxml.jackson.core.JsonParseException;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -61,7 +62,7 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
     public TradingAPIBinance(String secret, String key) {
         super(secret, key);
         tradeComissionPercent = new BigDecimal("0.1");
-        tradeComissionCurrencyPercent = new BigDecimal("0.05");
+        tradeComissionCurrencyPercent = new BigDecimal("0.075");
         tradeComissionCurrency = "BNB";
     }
 
@@ -165,8 +166,8 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
     }
     
     @Override
-    public long order(boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price) {
-        NewOrderResponse newOrderResponse = null;
+    public Long order(boolean is_buy, boolean is_market, String pair, BigDecimal amount, BigDecimal price) {
+        NewOrderResponse newOrderResponse;
         if (is_buy) {
             if (is_market) {
                 newOrderResponse = client.newOrder(marketBuy(pair, numberFormatForOrder(amount)));
@@ -180,7 +181,7 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
                 newOrderResponse = client.newOrder(limitSell(pair, TimeInForce.GTC, numberFormatForOrder(amount), numberFormatForOrder(price)));
             }
         }
-        return (newOrderResponse != null && newOrderResponse.getOrderId()>0) ? newOrderResponse.getOrderId() : -1;
+        return (newOrderResponse != null) ? newOrderResponse.getOrderId() : null;
     }
 
     private String realPriceOfOrder(String symbol, long order_id) {
@@ -199,7 +200,7 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
     }
     
     @Override
-    public Order getOrderStatus(String symbol, long order_id) {
+    public Order getOrderStatus(String symbol, long order_id) throws JsonParseException {
         Order order = client.getOrderStatus(new OrderStatusRequest(symbol, order_id));
         if (order != null && Double.parseDouble(order.getPrice()) <= 0) {
             order.setPrice(realPriceOfOrder(symbol, order_id));

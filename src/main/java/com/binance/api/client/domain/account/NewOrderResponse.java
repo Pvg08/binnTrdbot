@@ -8,7 +8,9 @@ import com.binance.api.client.domain.TimeInForce;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +43,8 @@ public class NewOrderResponse {
 
   private String executedQty;
 
+  private String cummulativeQuoteQty;
+
   private OrderStatus status;
 
   private TimeInForce timeInForce;
@@ -49,6 +53,7 @@ public class NewOrderResponse {
 
   private OrderSide side;
 
+  // @JsonSetter(nulls = Nulls.AS_EMPTY)
   private List<Trade> fills;
 
   /**
@@ -112,6 +117,14 @@ public class NewOrderResponse {
     this.executedQty = executedQty;
   }
 
+  public String getCummulativeQuoteQty() {
+    return cummulativeQuoteQty;
+  }
+
+  public void setCummulativeQuoteQty(String cummulativeQuoteQty) {
+    this.cummulativeQuoteQty = cummulativeQuoteQty;
+  }
+
   public OrderStatus getStatus() {
     return status;
   }
@@ -166,7 +179,10 @@ public class NewOrderResponse {
         .append("timeInForce", timeInForce)
         .append("type", type)
         .append("side", side)
-        .append("fills", fills.stream().map(Object::toString).collect(Collectors.joining(", ")))
+        .append("fills", Optional.ofNullable(fills).orElse(Collections.emptyList())
+            .stream()
+            .map(Object::toString)
+            .collect(Collectors.joining(", ")))
         .toString();
   }
 }

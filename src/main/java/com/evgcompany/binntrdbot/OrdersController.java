@@ -15,6 +15,7 @@ import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
 import com.evgcompany.binntrdbot.events.PairOrderEvent;
 import com.evgcompany.binntrdbot.misc.NumberFormatter;
+import com.fasterxml.jackson.core.JsonParseException;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.swing.DefaultListModel;
@@ -101,7 +102,7 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
     }
     
     public long Buy(Long orderCID, BigDecimal baseAmount, BigDecimal price, boolean use_transactions) {
-        long result;
+        Long result;
         try {
             SEMAPHORE.acquire();
             OrderPairItem pair = pairOrders.get(orderCID);
@@ -135,8 +136,8 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
                 result = emulator.emulateOrder(true, isMarket, pair.getSymbolPair(), baseAmount, price);
             }
             pair.resetCheckHashOrder();
-            pair.setOrderAPIID(result);
-            if (result > 0) {
+            pair.setOrderAPIID(result != null ? result : -1);
+            if (result != null && result > 0) {
                 if (use_transactions)
                     pair.startBuyTransaction(baseAmount, baseAmount.multiply(price), price);
                 app.log("Order id = " + result, false, true);
@@ -152,7 +153,7 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
             SEMAPHORE.release();
             return -1;
         }
-        return result;
+        return (result != null ? result : -1);
     }
 
     public long Sell(Long orderCID, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel) {
@@ -160,7 +161,7 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
     }
     
     public long Sell(Long orderCID, BigDecimal baseAmount, BigDecimal price, List<Long> OrderToCancel, boolean use_transactions) {
-        long result;
+        Long result;
         try {
             SEMAPHORE.acquire();
             OrderPairItem pair = pairOrders.get(orderCID);
@@ -208,14 +209,15 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
                 result = emulator.emulateOrder(false, isMarket, pair.getSymbolPair(), baseAmount, price);
             }
             pair.resetCheckHashOrder();
-            pair.setOrderAPIID(result);
-            if (result > 0) {
+            pair.setOrderAPIID(result != null ? result : -1);
+            if (result != null && result > 0) {
                 if (use_transactions)
                     pair.startSellTransaction(baseAmount, baseAmount.multiply(price), price);
                 app.log("Order id = " + result, false, true);
                 Thread.sleep(550);
                 checkOrder(orderCID, pair);
             } else {
+                result = null;
                 app.log("Order error!", true, true);
             }
             SEMAPHORE.release();
@@ -225,13 +227,18 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
             SEMAPHORE.release();
             return -1;
         }
-        return result;
+        return (result != null ? result : -1);
     }
 
     private void transferLimit(Long orderCID, long orderAPIID) {
         OrderPairItem pair = pairOrders.get(orderCID);
         if (pair == null) return;
-        Order order = client.getOrderStatus(pair.getSymbolPair(), orderAPIID);
+        Order order = null;
+        try {
+            order = client.getOrderStatus(pair.getSymbolPair(), orderAPIID);
+        } catch (JsonParseException ex) {
+            Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, ex);
+        }
         if (order == null || order.getStatus() == OrderStatus.CANCELED || order.getStatus() == OrderStatus.FILLED) return;
         BigDecimal orderValue = new BigDecimal(order.getOrigQty()).subtract(new BigDecimal(order.getExecutedQty()));
         if (orderValue.compareTo(pair.getBaseItem().getLimitValue()) < 0) orderValue = pair.getBaseItem().getLimitValue();
@@ -278,7 +285,11 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
     public Order getAPIOrder(Long orderCID) {
         if (pairOrders.containsKey(orderCID) && pairOrders.get(orderCID).getOrderAPIID() > 0) {
             if (!isTestMode) {
-                return client.getOrderStatus(pairOrders.get(orderCID).getSymbolPair(), pairOrders.get(orderCID).getOrderAPIID());
+                try {
+                    return client.getOrderStatus(pairOrders.get(orderCID).getSymbolPair(), pairOrders.get(orderCID).getOrderAPIID());
+                } catch (JsonParseException ex) {
+                    Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, ex);
+                }
             } else {
                 return emulator.getEmulatedOrder(pairOrders.get(orderCID).getOrderAPIID());
             }
@@ -488,8 +499,8 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
                 if (isTestMode) emulator.progressOrder(pairItem.getOrderAPIID());
                 result = order;
             }
-        } catch (InterruptedException ex) {
-            Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException | JsonParseException exx) {
+            Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, exx);
         }
         SEMAPHORE_CHECK.release();
         
