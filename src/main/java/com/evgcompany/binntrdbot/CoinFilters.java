@@ -117,6 +117,9 @@ public class CoinFilters implements java.io.Serializable {
             if (quantity.multiply(price).compareTo(filterMinNotional) < 0) {
                 quantity = filterMinNotional.divide(price, filterMinNotional.scale(), RoundingMode.HALF_UP);
                 quantity = normalizeQuantity(quantity, false);
+                if (quantity.multiply(price).compareTo(filterMinNotional) < 0) {
+                    quantity = quantity.add(filterQtyStep);
+                }
             }
         }
         return quantity;

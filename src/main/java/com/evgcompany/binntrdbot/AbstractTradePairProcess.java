@@ -148,7 +148,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         }
         filter.setCurrentPrice(curPrice);
         filter.setCurrentAmount(base_asset_amount);
-        filter.prepareForBuy(!forceMarketOrders);
+        filter.prepareForBuy();
         BigDecimal tobuy_price = filter.getCurrentPrice();
         BigDecimal tobuy_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tobuy_price.multiply(tobuy_amount);
@@ -204,7 +204,7 @@ abstract public class AbstractTradePairProcess extends PeriodicProcessSocketUpda
         
         filter.setCurrentPrice(price);
         filter.setCurrentAmount(base_asset_amount);
-        filter.prepareForSell(!forceMarketOrders);
+        filter.prepareForSell();
         BigDecimal tosell_price = filter.getCurrentPrice();
         BigDecimal tosell_amount = filter.getCurrentAmount();
         BigDecimal quote_asset_amount = tosell_amount.multiply(tosell_price);

@@ -264,7 +264,7 @@ public class TradePairProcessList {
                         if (pairProcess == null) break;
                         if (Desktop.isDesktopSupported()) {
                             try {
-                                String url = "https://www.binance.com/tradeDetail.html?symbol="+pairProcess.getBaseSymbol()+"_"+pairProcess.getQuoteSymbol();
+                                String url = "https://www.binance.com/en/trade/pro/"+pairProcess.getBaseSymbol()+"_"+pairProcess.getQuoteSymbol();
                                 Desktop.getDesktop().browse(new URI(url));
                             } catch (URISyntaxException | IOException ex) {
                                 Logger.getLogger(mainApplication.class.getName()).log(Level.SEVERE, null, ex);

@@ -22,8 +22,9 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  */
 public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
     
-    private double minProfitPercent = 0.4;
-    private double baseProfitPercent = 0.95;
+    private double minProfitPercent = 0.2;
+    private double baseProfitPercent = 0.5;
+    private long maxWaitTimeMSeconds = 3600000;
     private int emaDistance = 14;
     
     private BigDecimal enterPrice = null;
@@ -31,6 +32,7 @@ public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
     
     private int restartTickCounter = 0;
     private int restartTickMaxCounter = 5;
+    private long lastOrderTime = 0;
     
     public TradePairQuickWavesProcess(TradingAPIAbstractInterface client, String pair) {
         super(client, pair);
@@ -119,6 +121,7 @@ public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
             }
             
             doEnter(enterPrice, true);
+            lastOrderTime = System.currentTimeMillis();
             return;
         }
         
@@ -162,7 +165,30 @@ public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
             }
             
             doExit(exitPrice, true);
+            lastOrderTime = System.currentTimeMillis();
             return;
+        }
+    }
+
+    @Override
+    protected void runBody() {
+        if (!inAPIOrder && !need_stop) {
+            checkStatus();
+        }
+        if ((enterPrice != null || exitPrice != null || pyramidSize > 0) && lastOrderTime > 0 && (System.currentTimeMillis() - lastOrderTime) > maxWaitTimeMSeconds) {
+            System.out.println("TIMEOUT FOR QUICK WAVE!");
+            lastOrderTime = System.currentTimeMillis();
+            orderCancel();
+            if (exitPrice != null && pyramidSize > 0) {
+                doWait(1000);
+                forceMarketOrders = true;
+                doExit(exitPrice, true);
+                forceMarketOrders = false;
+                doWait(10000);
+            }
+            restartTickCounter = 0;
+            enterPrice = null;
+            exitPrice = null;
         }
     }
     

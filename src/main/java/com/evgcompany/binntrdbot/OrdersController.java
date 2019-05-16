@@ -10,6 +10,7 @@ import com.binance.api.client.domain.OrderSide;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.OrderStatus;
 import com.binance.api.client.domain.event.OrderTradeUpdateEvent;
+import com.binance.api.client.exception.BinanceApiException;
 import com.evgcompany.binntrdbot.api.TradingAPIAbstractInterface;
 import com.evgcompany.binntrdbot.coinrating.CoinInfoAggregator;
 import com.evgcompany.binntrdbot.events.PairOrderCheckEvent;
@@ -499,7 +500,7 @@ public class OrdersController extends PeriodicProcessSocketUpdateThread {
                 if (isTestMode) emulator.progressOrder(pairItem.getOrderAPIID());
                 result = order;
             }
-        } catch (InterruptedException | JsonParseException exx) {
+        } catch (InterruptedException | BinanceApiException | JsonParseException exx) {
             Logger.getLogger(OrdersController.class.getName()).log(Level.SEVERE, null, exx);
         }
         SEMAPHORE_CHECK.release();
