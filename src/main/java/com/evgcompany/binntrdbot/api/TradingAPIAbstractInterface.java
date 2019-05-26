@@ -222,6 +222,7 @@ public abstract class TradingAPIAbstractInterface {
     
     abstract public Trade getLastTrade(String pair);
     abstract public List<Trade> getAllTrades(String pair);
+    abstract public List<Trade> getOrderHistory(String symbol, int limit);
     abstract public List<Order> getOpenOrders(String pair);
     
     abstract public BigDecimal getLastTradePrice(String symbolPair, boolean isBuyer);

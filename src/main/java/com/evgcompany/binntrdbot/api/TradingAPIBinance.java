@@ -17,6 +17,7 @@ import static com.binance.api.client.domain.account.NewOrder.*;
 import com.binance.api.client.domain.account.NewOrderResponse;
 import com.binance.api.client.domain.account.Order;
 import com.binance.api.client.domain.account.Trade;
+import com.binance.api.client.domain.account.request.AllOrdersRequest;
 import com.binance.api.client.domain.account.request.CancelOrderRequest;
 import com.binance.api.client.domain.account.request.OrderRequest;
 import com.binance.api.client.domain.account.request.OrderStatusRequest;
@@ -257,6 +258,11 @@ public class TradingAPIBinance extends TradingAPIAbstractInterface {
         return client.getMyTrades(pair);
     }
 
+    @Override
+    public List<Trade> getOrderHistory(String symbol, int limit) {
+        return client.getMyTrades(symbol, limit);
+    }
+    
     @Override
     public BigDecimal getCurrentPrice(String symbolPair) {
         TickerStatistics tc = client.get24HrPriceStatistics(symbolPair);

@@ -6,6 +6,8 @@
 package com.evgcompany.binntrdbot.coinrating;
 
 import com.binance.api.client.domain.account.AssetBalance;
+import com.binance.api.client.domain.account.Order;
+import com.binance.api.client.domain.account.Trade;
 import com.binance.api.client.domain.general.SymbolInfo;
 import com.binance.api.client.domain.general.SymbolStatus;
 import com.binance.api.client.domain.market.TickerPrice;
@@ -383,6 +385,34 @@ public class CoinInfoAggregator extends PeriodicProcessThread {
             Logger.getLogger(CoinInfoAggregator.class.getName()).log(Level.SEVERE, null, ex);
         }
         SEMAPHORE_UPDATE.release();
+    }
+    
+    public BigDecimal getAssetMyTradeVolume(String asset, long millis_from) {
+        
+        System.out.println(asset + ":");
+        String[] assets = asset.split(",");
+        
+        BigDecimal all_result = BigDecimal.ZERO;
+        
+        for(int k=0; k<assets.length; k++) {
+            System.out.println(assets[k] + ":");
+            BigDecimal result = BigDecimal.ZERO;
+            List<Trade> orders = client.getOrderHistory(assets[k], 1000);
+            for(int i = 0; i< orders.size(); i++) {
+                if (orders.get(i).getTime() > millis_from) {
+                    BigDecimal qty = new BigDecimal(orders.get(i).getQty());
+                    BigDecimal price = new BigDecimal(orders.get(i).getPrice());
+                    result = result.add(qty.multiply(price));
+                    System.out.println(orders.get(i));
+                }
+            }
+
+            System.out.println("result = " + result);
+            all_result = all_result.add(result);
+        }
+        System.out.println("result for all = " + all_result);
+        
+        return all_result;
     }
     
     /**
