@@ -14,6 +14,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -129,6 +130,31 @@ public class DepthCacheProcess {
     }
     public boolean isObsolete() {
         return getMillisFromLastUpdate() > maxProcessUpdateIntervalMillis;
+    }
+    
+    public Double getBidAskRatio(BigDecimal percentage, BigDecimal basePrice) {
+        BigDecimal summaryAskVol = BigDecimal.ZERO;
+        BigDecimal summaryBidVol = BigDecimal.ZERO;
+        for (Map.Entry<BigDecimal, BigDecimal> entry : getAsks().entrySet()) {
+            if (entry.getKey().subtract(basePrice).abs().divide(basePrice, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).compareTo(percentage) < 0) {
+                summaryAskVol = summaryAskVol.add(entry.getValue());
+                //System.out.println(toDepthCacheEntryString(entry));
+            }
+        }
+        //System.out.println("---");
+        for (Map.Entry<BigDecimal, BigDecimal> entry : getBids().entrySet()) {
+            if (entry.getKey().subtract(basePrice).abs().divide(basePrice, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).compareTo(percentage) < 0) {
+                summaryBidVol = summaryAskVol.add(entry.getValue());
+                //System.out.println(toDepthCacheEntryString(entry));
+            }
+        }
+        if (summaryAskVol.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        if (summaryBidVol.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return summaryBidVol.divide(summaryAskVol, RoundingMode.HALF_UP).doubleValue();
     }
     
     public BigDecimal getBestPriceOrDefault(boolean is_bid, BigDecimal defaultPrice) {

@@ -22,16 +22,18 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
  */
 public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
     
-    private double minProfitPercent = 0.2;
-    private double baseProfitPercent = 0.5;
-    private long maxWaitTimeMSeconds = 3600000;
+    private double minProfitPercent = 0.25;
+    private double baseProfitPercent = 0.85;
+    private long maxWaitTimeBuySeconds = 2400;
+    private long maxWaitTimeSellSeconds = 0;
     private int emaDistance = 14;
+    private int emaDistanceLong = 28;
     
     private BigDecimal enterPrice = null;
     private BigDecimal exitPrice = null;
     
     private int restartTickCounter = 0;
-    private int restartTickMaxCounter = 5;
+    private int restartTickMaxCounter = 2;
     private long lastOrderTime = 0;
     
     public TradePairQuickWavesProcess(TradingAPIAbstractInterface client, String pair) {
@@ -83,13 +85,14 @@ public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
             int endIndex = series.getEndIndex();
             ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
             EMAIndicator ema = new EMAIndicator(closePrice, emaDistance);
+            EMAIndicator ema2 = new EMAIndicator(closePrice, emaDistanceLong);
             double ema_k = ((ema.getValue(endIndex).doubleValue() / ema.getValue(endIndex-1).doubleValue()) + 
-                    (ema.getValue(endIndex-1).doubleValue() / ema.getValue(endIndex-2).doubleValue()) + 
-                    (ema.getValue(endIndex).doubleValue() / ema.getValue(endIndex-2).doubleValue())) / 3;
+                    (ema.getValue(endIndex).doubleValue() / ema.getValue(endIndex-2).doubleValue()) + 
+                    (ema2.getValue(endIndex).doubleValue() / ema2.getValue(endIndex-1).doubleValue())) / 3;
             
-            System.out.println("EMAK = " + ema_k);
+            System.out.println("EMA_K["+symbol+"] = " + ema_k);
             
-            if (ema_k < 0.975 || ema_k > 1.05) {
+            if (ema_k < 0.97 || ema_k > 1.03) {
                 return;
             }
             
@@ -100,6 +103,17 @@ public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
             BollingerBandsUpperIndicator BBT = new BollingerBandsUpperIndicator(bollingerM, dev, Decimal.valueOf(mult));
         
             currentPrice = depthProcess.getBestAskOrDefault(currentPrice);
+            
+            Double baRatio = depthProcess.getBidAskRatio(BigDecimal.valueOf(baseProfitPercent * 8), currentPrice);
+            if (baRatio != null) {
+                System.out.println("baRatio["+symbol+"] = " + baRatio);
+                if (baRatio < 0.95) {
+                    return;
+                }
+            } else {
+                System.out.println("baRatio["+symbol+"] = NA");
+                return;
+            }
             
             double ema_price = ema.getValue(series.getEndIndex()).doubleValue();
             double cur_price = currentPrice.doubleValue();
@@ -175,7 +189,15 @@ public class TradePairQuickWavesProcess extends TradePairStrategyProcess {
         if (!inAPIOrder && !need_stop) {
             checkStatus();
         }
-        if ((enterPrice != null || exitPrice != null || pyramidSize > 0) && lastOrderTime > 0 && (System.currentTimeMillis() - lastOrderTime) > maxWaitTimeMSeconds) {
+        if (
+                (enterPrice != null || exitPrice != null || pyramidSize > 0) && 
+                lastOrderTime > 0 && 
+                (
+                    (maxWaitTimeBuySeconds > 0 && (exitPrice == null || pyramidSize <= 0) && (System.currentTimeMillis() - lastOrderTime) > maxWaitTimeBuySeconds*1000) ||
+                    (maxWaitTimeSellSeconds > 0 && (exitPrice != null && pyramidSize  > 0) && (System.currentTimeMillis() - lastOrderTime) > maxWaitTimeSellSeconds*1000)
+                ) 
+            )
+        {
             System.out.println("TIMEOUT FOR QUICK WAVE!");
             lastOrderTime = System.currentTimeMillis();
             orderCancel();
